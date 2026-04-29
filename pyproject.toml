@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "spawn-cli"
+version = "0.1.0"
+description = "A minimal installable Python CLI package."
+requires-python = ">=3.11"
+dependencies = []
+
+[project.scripts]
+spawn = "spawn_cli.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

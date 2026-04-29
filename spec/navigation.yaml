@@ -1,0 +1,17 @@
+version: 1
+extend:
+- path: spec/extend/00-general.md
+  description: additional conventions
+design:
+- path: spec/design/hla.md
+  description: Project high-level architecture.
+- path: spec/design/data-structure.md
+  description: Spawn target and extension repository data structures.
+- path: spec/design/utility.md
+  description: Spawn CLI command and repository transformation design.
+- path: spec/design/agentic-flow.md
+  description: Agent-facing Spawn navigation and rendered skill flow.
+- path: spec/design/extensions.md
+  description: Spawn extension authoring and AIDD methodology packaging.
+- path: spec/design/ide-adapters.md
+  description: IDE adapter matrix and Spawn metadata rendering contracts.
