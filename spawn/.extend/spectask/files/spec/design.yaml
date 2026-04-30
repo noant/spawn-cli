@@ -1,0 +1,6 @@
+schema: 1
+# Registry of architecture docs under spec/design/. Keys: path (POSIX, repo-relative), description.
+# Maintained with skill spectask-design (and optionally updated when Step 7 changes HLA).
+documents:
+  - path: spec/design/hla.md
+    description: "Project high-level architecture; primary write target in Step 7 (spec/main.md)."

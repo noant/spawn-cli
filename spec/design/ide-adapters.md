@@ -168,10 +168,9 @@ adapter. It must tell the agent to read `spawn/navigation.yaml`, read all
 Adapters must preserve the same semantic content:
 
 1. Skill name and description.
-2. Instruction to consult `spawn/navigation.yaml`.
-3. Mandatory reads from `required-read`.
+2. Original skill body (extension source markdown after frontmatter).
+3. Mandatory reads: merged `required-read` paths plus `spawn/navigation.yaml` exactly once, always the last mandatory bullet.
 4. Contextual reads from `auto-read`.
-5. Original skill body.
 
 ### Markdown Skill Shape
 
@@ -192,15 +191,14 @@ name: spectask-execute
 description: Execute approved spectasks.
 ---
 
-Read `spawn/navigation.yaml` first.
+{source skill content}
 
 Mandatory reads:
 - `spec/main.md` - Spec task process.
+- `spawn/navigation.yaml` - Merged Spawn navigation (read-required, read-contextual).
 
 Contextual reads:
 - `spec/design/hla.md` - Project high-level architecture.
-
-{source skill content}
 ```
 
 Adapters that do not support frontmatter should remove the frontmatter and keep
@@ -239,7 +237,11 @@ alwaysApply: false
 
 # spectask-execute
 
-Read `spawn/navigation.yaml` first.
+{skill body}
+
+Mandatory reads:
+- ...
+- `spawn/navigation.yaml` - Merged Spawn navigation (read-required, read-contextual).
 
 ...
 ```
@@ -262,7 +264,11 @@ applyTo: "**"
 
 Description: Execute approved spectasks.
 
-Read `spawn/navigation.yaml` first.
+{skill body}
+
+Mandatory reads:
+- ...
+- `spawn/navigation.yaml` - Merged Spawn navigation (read-required, read-contextual).
 
 ...
 ```

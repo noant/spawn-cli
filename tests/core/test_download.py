@@ -10,8 +10,10 @@ from spawn_cli.core import download as dl
 from spawn_cli.core import high_level as hl
 from spawn_cli.core import low_level as ll
 from spawn_cli.core.errors import SpawnError
+from spawn_cli.io.yaml_io import configure_yaml_dump
 
 YAML_S = YAML(typ="safe")
+configure_yaml_dump(YAML_S)
 
 
 def _write_yaml(p: Path, data: dict) -> None:

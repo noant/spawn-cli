@@ -1,0 +1,7 @@
+extension: spectask
+source:
+  type: git
+  path: https://github.com/noant/spawn-ext-spectask.git
+installed:
+  version: 1.0.3
+  installedAt: '2026-04-30T17:01:04+00:00'

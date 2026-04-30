@@ -1,1 +1,6 @@
-Read `spec/navigation.yaml`, then `spec/main.md`. Use **spectask-create** (Steps 1–2), **spectask-spec-review-passed** (Step 3), **spectask-extend** (new `spec/extend/*` + navigation entry), **spectask-execute** (Steps 4–5, then wait for user Step 6), or **spectask-code-review-passed** (Step 6) depending on the task.
+<!-- spawn:start -->
+Before working, read `spawn/navigation.yaml`.
+Read every file listed under `read-required`.
+Inspect `read-contextual` descriptions and read only files relevant to the current task.
+
+<!-- spawn:end -->

@@ -8,8 +8,8 @@ IMPORTANT: always use `spec/main.md` and `spec/navigation.yaml` for rules.
 - [x] Spec review passed
 - [x] Code implemented
 - [x] Self code review passed
-- [ ] Code review passed
-- [ ] HLA updated
+- [x] Code review passed
+- [x] HLA updated
 
 ## Goal
 Create design documents that specify Spawn data layout, utility behavior, agentic flow, and extension authoring for future implementation tasks.
@@ -31,7 +31,7 @@ Create design documents that specify Spawn data layout, utility behavior, agenti
 ## Details
 No blocking clarification is required because the user provided the target structures, config fields, command set, and methodology principles. The implementation should preserve the user's terms `target-repo`, `extend-repo`, `spawn/`, `extsrc/`, `extension config`, `navigation.yaml`, `rendered-skills.yaml`, and `rendered-mcp.yaml`.
 
-Documentation must be written in English per `spec/extend/00-general.md`. Keep the design files concise but complete enough to guide future implementation. Do not implement runtime Python behavior in this task.
+Documentation must be written in English per `spawn/rules/00-general.md`. Keep the design files concise but complete enough to guide future implementation. Do not implement runtime Python behavior in this task.
 
 Key design constraints:
 - The local `spawn-cli` repository must not reproduce the target repository `spawn/` runtime structure as active data; the CLI will create that structure inside a target repository.

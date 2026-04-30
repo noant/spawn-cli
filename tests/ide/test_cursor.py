@@ -47,9 +47,15 @@ def test_add_skills_creates_file(adapter: CursorAdapter, tmp_path: Path) -> None
     assert p.exists()
     text = p.read_text(encoding="utf-8")
     assert "---\n" in text and "name: My Skill" in text
-    assert "Read `spawn/navigation.yaml` first." in text
+    assert "Read `spawn/navigation.yaml` first." not in text
+    assert "Body." in text
+    idx_body = text.index("Body.")
+    assert idx_body < text.index("Mandatory reads:")
     assert "Mandatory reads:" in text
     assert "- `spec/main.md` - Main" in text
+    assert "- `spawn/navigation.yaml`" in text
+    mand = text.split("Contextual reads:")[0] if "Contextual reads:" in text else text
+    assert mand.index("spec/main.md") < mand.index("spawn/navigation.yaml")
 
 
 def test_add_skills_warns_on_overwrite(adapter: CursorAdapter, tmp_path: Path) -> None:

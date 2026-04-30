@@ -92,7 +92,7 @@ def _run_script(
         check=False,
     )
     if proc.returncode != 0:
-        msg = f"script {script_filename!r} failed (exit {proc.returncode})"
+        msg = f"Setup script {script_filename!r} exited with status {proc.returncode}"
         if proc.stderr.strip():
             msg = f"{msg}: {proc.stderr.strip()}"
         if blocking:
@@ -200,7 +200,7 @@ def run_after_uninstall_from_snapshot(
         check=False,
     )
     if proc.returncode != 0:
-        msg = f"after-uninstall script failed (exit {proc.returncode})"
+        msg = f"After-uninstall script exited with status {proc.returncode}"
         if proc.stderr.strip():
             msg = f"{msg}: {proc.stderr.strip()}"
         warnings.warn(msg, SpawnWarning)

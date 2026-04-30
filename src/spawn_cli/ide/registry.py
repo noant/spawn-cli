@@ -79,6 +79,10 @@ class IdeAdapter(ABC):
         """Returns rendered path or warning string."""
         ...
 
+    def finalize_repo_after_ide_removed(self, target_root: Path) -> None:
+        """Vacancy-prune Spawn-owned repo-root directories after MCP/skills/ignore teardown."""
+        del target_root
+
 
 ALIASES: dict[str, str] = {
     "claude": "claude-code",

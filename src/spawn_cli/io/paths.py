@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from spawn_cli.core.errors import SpawnError
+from spawn_cli.errors import SpawnError
 
 
 def ensure_dir(path: Path) -> None:

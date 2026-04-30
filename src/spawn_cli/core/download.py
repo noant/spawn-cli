@@ -342,7 +342,7 @@ def _materialize_files(target_root: Path, extension: str, config: ExtensionConfi
                 continue
             if dest.exists() and dest.is_file():
                 warnings.warn(
-                    f"overwriting existing static file (Spawn-managed install): {rel_path}",
+                    f"Replacing existing file from extension (static): {rel_path}",
                     SpawnWarning,
                 )
             ensure_dir(dest.parent)
@@ -438,6 +438,11 @@ def _stage_extension(
         parent = Path(tempfile.gettempdir()) / "spawn-stage"
     temp_base = parent / op
     ensure_dir(temp_base.parent)
+    ll.prune_metadata_temp(
+        temp_base.parent,
+        max_age_seconds=ll.METADATA_TEMP_MAX_AGE_SECONDS,
+        reserved=op,
+    )
     try:
         anchor = target_root if target_root is not None else Path.cwd()
         extsrc_dir, source_info = _stage_from_path_string(anchor, path, branch, temp_base)

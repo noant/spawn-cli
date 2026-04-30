@@ -3,4 +3,16 @@ name: spectask-code-review-passed
 description: After user confirms code review — Steps 6–7 in one run (spec/main.md).
 ---
 
-Read `spec/navigation.yaml`, `spec/main.md`. On the active `spec/tasks/{X}-{name}/overview.md`, finish **Step 6** (mark **code review passed** and the Step 6 prompt), then complete **Step 7** per `spec/main.md` through **HLA updated** in the same run. Ask which task if unclear.
+
+Operate within the **spectask** process defined in attached **spec/main.md**.
+
+On the active `spec/tasks/{X}-{name}/overview.md`, finish **Step 6** (mark **code review passed** and the Step 6 prompt), then complete **Step 7** through **HLA updated** in the same run. Ask which task if unclear.
+
+
+Mandatory reads:
+- `spec/main.md` - Spec-Tasks methodology — folder structure, seven-step process, overview template.
+- `spec/design.yaml` - Index of architecture documents under spec/design/ — path and description per entry.
+- `spawn/navigation.yaml` - Merged Spawn navigation (read-required, read-contextual).
+
+Contextual reads:
+- `spec/design/hla.md` - Project high-level architecture; updated in Step 7.

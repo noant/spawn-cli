@@ -11,6 +11,7 @@ from spawn_cli.core import low_level as ll
 from spawn_cli.core.errors import SpawnError
 from spawn_cli.ide.registry import DetectResult, detect_supported_ides
 from spawn_cli.io.lock import spawn_lock
+from spawn_cli.warnings_display import install_spawn_warning_format
 
 
 def _require_init(target_root: Path) -> None:
@@ -51,6 +52,8 @@ def build_parser() -> argparse.ArgumentParser:
     _ext_update.add_argument("extension_name")
     _ext_remove = ext_sub.add_parser("remove")
     _ext_remove.add_argument("extension_name")
+    _ext_reinstall = ext_sub.add_parser("reinstall")
+    _ext_reinstall.add_argument("extension_name")
     ext_sub.add_parser("list")
     _ext_init = ext_sub.add_parser("init")
     _ext_init.add_argument("path", nargs="?", default=".")
@@ -79,6 +82,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
+    install_spawn_warning_format()
     parser = build_parser()
     args = parser.parse_args(argv)
     target_root = Path.cwd().resolve()
@@ -171,6 +175,10 @@ def _dispatch_extension(args: argparse.Namespace, target_root: Path) -> int:
         hl.remove_extension(target_root, args.extension_name)
         return 0
 
+    if sub == "reinstall":
+        hl.reinstall_extension(target_root, args.extension_name)
+        return 0
+
     if sub == "init":
         hl.extension_init(Path(args.path).resolve(), args.name)
         return 0
@@ -216,6 +224,8 @@ def _print_yaml(data: object) -> None:
     """Serialize data to YAML. DetectResult dataclass values use utility.md output shape."""
     from ruamel.yaml import YAML
 
+    from spawn_cli.io.yaml_io import configure_yaml_dump
+
     def _to_serializable(obj: object) -> object:
         if isinstance(obj, DetectResult):
             return {
@@ -229,4 +239,5 @@ def _print_yaml(data: object) -> None:
         return obj
 
     yaml = YAML()
+    configure_yaml_dump(yaml)
     yaml.dump(_to_serializable(data), sys.stdout)

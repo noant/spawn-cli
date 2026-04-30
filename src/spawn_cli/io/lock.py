@@ -5,7 +5,7 @@ from pathlib import Path
 
 from filelock import FileLock, Timeout
 
-from spawn_cli.core.errors import SpawnError
+from spawn_cli.errors import SpawnError
 from spawn_cli.io.paths import ensure_dir
 
 

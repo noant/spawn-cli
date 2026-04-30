@@ -5,8 +5,8 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from spawn_cli.core.low_level import normalize_skill_name
-from spawn_cli.models.skill import SkillMetadata
+from spawn_cli.core.low_level import _norm_read_path, normalize_skill_name
+from spawn_cli.models.skill import SkillFileRef, SkillMetadata
 
 SPAWN_BLOCK_START = "<!-- spawn:start -->"
 SPAWN_BLOCK_END = "<!-- spawn:end -->"
@@ -14,30 +14,47 @@ SPAWN_BLOCK_END = "<!-- spawn:end -->"
 IGNORE_BLOCK_START = "# spawn:start"
 IGNORE_BLOCK_END = "# spawn:end"
 
+_NAV_YAML_FILE = "spawn/navigation.yaml"
+_NAV_YAML_DESCRIPTION = "Merged Spawn navigation (read-required, read-contextual)."
+
+
+def _mandatory_reads_for_render(skill: SkillMetadata) -> list[SkillFileRef]:
+    """Build mandatory list with spawn/navigation.yaml deduped and last."""
+    nav_key = _norm_read_path(_NAV_YAML_FILE)
+    nav_ref: SkillFileRef | None = None
+    others: list[SkillFileRef] = []
+    for ref in skill.required_read:
+        if _norm_read_path(ref.file) == nav_key:
+            if nav_ref is None:
+                nav_ref = ref
+        else:
+            others.append(ref)
+    if nav_ref is None:
+        nav_ref = SkillFileRef(file=_NAV_YAML_FILE, description=_NAV_YAML_DESCRIPTION)
+    return others + [nav_ref]
+
 
 def render_skill_md(skill: SkillMetadata) -> str:
-    """Render normalized skill to Markdown with frontmatter, nav instruction,
-    mandatory reads, contextual reads, and skill body."""
+    """Render normalized skill to Markdown with frontmatter, skill body,
+    mandatory reads (navigation path last), and contextual reads."""
     lines = [
         "---",
         f"name: {skill.name}",
         f"description: {skill.description}",
         "---",
         "",
-        "Read `spawn/navigation.yaml` first.",
+        skill.content,
         "",
+        "Mandatory reads:",
     ]
-    if skill.required_read:
-        lines += ["Mandatory reads:"]
-        for ref in skill.required_read:
-            lines += [f"- `{ref.file}` - {ref.description}"]
-        lines += [""]
+    for ref in _mandatory_reads_for_render(skill):
+        lines += [f"- `{ref.file}` - {ref.description}"]
+    lines += [""]
     if skill.auto_read:
         lines += ["Contextual reads:"]
         for ref in skill.auto_read:
             lines += [f"- `{ref.file}` - {ref.description}"]
         lines += [""]
-    lines += [skill.content]
     return "\n".join(lines)
 
 

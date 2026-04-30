@@ -5,6 +5,7 @@ from __future__ import annotations
 import warnings
 from pathlib import Path
 
+from spawn_cli.ide import _vacancy as _vac
 from spawn_cli.ide.registry import (
     DetectResult,
     IdeAdapter,
@@ -80,6 +81,9 @@ class WindsurfAdapter(IdeAdapter):
         ep = target_root / "AGENTS.md"
         rewrite_managed_block(ep, prompt)
         return ep.relative_to(target_root).as_posix()
+
+    def finalize_repo_after_ide_removed(self, target_root: Path) -> None:
+        _vac.finalize_standard_dotdir_skills_and_mcp(target_root, ".windsurf", allow_delete_entire=True)
 
 
 register(WindsurfAdapter())

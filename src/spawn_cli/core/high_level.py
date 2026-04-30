@@ -227,6 +227,17 @@ def update_extension(target_root: Path, extension: str, *, force: bool = False) 
     scripts.run_after_install_scripts(target_root, extension)
 
 
+def reinstall_extension(target_root: Path, extension: str) -> None:
+    _require_init(target_root)
+    if extension not in ll.list_extensions(target_root):
+        raise SpawnError(f"extension {extension!r} is not installed")
+    stored = dl._load_stored_source(target_root, extension)
+    if not stored:
+        raise SpawnError(f"no source.yaml for extension {extension!r}")
+    remove_extension(target_root, extension)
+    install_extension(target_root, stored.source.path, stored.source.branch)
+
+
 def extension_healthcheck(target_root: Path, extension: str) -> bool:
     _require_init(target_root)
     if extension not in ll.list_extensions(target_root):
@@ -243,7 +254,10 @@ def extension_init(path: Path, name: str) -> None:
     extsrc = path / "extsrc"
     cfg_path = extsrc / "config.yaml"
     if cfg_path.is_file():
-        warnings.warn("extsrc/config.yaml already exists; skipping extension_init", SpawnWarning)
+        warnings.warn(
+            "extsrc/config.yaml already exists; left unchanged during extension init",
+            SpawnWarning,
+        )
         return
     ensure_dir(extsrc / "skills")
     ensure_dir(extsrc / "files")
@@ -385,9 +399,15 @@ def add_ide(target_root: Path, ide: str) -> None:
     dr = adapter.detect(target_root)
     caps = dr.capabilities
     if caps.skills == "unsupported":
-        warnings.warn(f"IDE {ide!r} has unsupported skills capability", SpawnWarning)
+        warnings.warn(
+            f"IDE {ide!r} does not support skills; skills were skipped",
+            SpawnWarning,
+        )
     if caps.mcp in ("unsupported", "external"):
-        warnings.warn(f"IDE {ide!r} has limited MCP capability ({caps.mcp})", SpawnWarning)
+        warnings.warn(
+            f"IDE {ide!r} has limited MCP support ({caps.mcp})",
+            SpawnWarning,
+        )
     refresh_entry_point(target_root, ide)
     for ext in ll.list_extensions(target_root):
         refresh_mcp(target_root, ide, ext)
@@ -402,8 +422,9 @@ def remove_ide(target_root: Path, ide: str) -> None:
         remove_skills(target_root, ide, ext)
     old = ll.get_agent_ignore_list(target_root, ide)
     ide_get(ide).remove_agent_ignore(target_root, old)
-    ll.save_agent_ignore_list(target_root, ide, [])
+    ide_get(ide).finalize_repo_after_ide_removed(target_root)
     ll.remove_ide_from_list(target_root, ide)
+    ll.remove_ide_metadata_dir(target_root, ide)
 
 
 def install_extension(target_root: Path, path: str, branch: str | None = None) -> None:
@@ -431,6 +452,7 @@ __all__ = [
     "refresh_navigation",
     "refresh_rules_navigation",
     "refresh_skills",
+    "reinstall_extension",
     "remove_extension",
     "remove_extension_for_ide",
     "remove_ide",

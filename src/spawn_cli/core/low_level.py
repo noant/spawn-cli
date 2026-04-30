@@ -1,8 +1,12 @@
 from __future__ import annotations
 
 import re
+import shutil
+import time
+import uuid
 import warnings
 from collections import defaultdict
+from collections.abc import Iterable
 from importlib import resources
 from pathlib import Path
 from typing import Any
@@ -13,7 +17,7 @@ from spawn_cli.core.errors import SpawnError, SpawnWarning
 from spawn_cli.io.json_io import load_json
 from spawn_cli.io.paths import ensure_dir
 from spawn_cli.io.text_io import read_lines, write_lines
-from spawn_cli.io.yaml_io import load_yaml, save_yaml
+from spawn_cli.io.yaml_io import configure_yaml_dump, load_yaml, save_yaml
 from spawn_cli.models.config import ExtensionConfig, FileMode, IdeList, ReadFlag
 from spawn_cli.models.mcp import McpCapabilities, McpEnvVar, McpServer, McpTransport, NormalizedMcp
 from spawn_cli.models.skill import SkillFileRef, SkillMetadata, SkillRawInfo
@@ -85,6 +89,38 @@ def remove_ide_from_list(target_root: Path, ide: str) -> None:
     model = IdeList.model_validate(data) if data else IdeList()
     model.ides = [x for x in model.ides if x != ide]
     save_yaml(path, model.model_dump(by_alias=True, exclude_none=True))
+
+
+METADATA_TEMP_MAX_AGE_SECONDS = 86400
+
+
+def remove_ide_metadata_dir(target_root: Path, ide: str) -> None:
+    md = _spawn(target_root) / ".metadata" / ide
+    if md.is_dir():
+        shutil.rmtree(md, ignore_errors=True)
+
+
+def prune_metadata_temp(parent: Path, *, max_age_seconds: int, reserved: str | None = None) -> None:
+    if not parent.is_dir():
+        return
+    now = time.time()
+    for child in sorted(parent.iterdir(), key=lambda p: p.name):
+        try:
+            if not child.is_dir():
+                continue
+            uuid.UUID(child.name)
+        except ValueError:
+            continue
+        except OSError:
+            continue
+        if reserved and child.name == reserved:
+            continue
+        try:
+            age = now - child.stat().st_mtime
+            if age > max_age_seconds:
+                shutil.rmtree(child, ignore_errors=True)
+        except OSError:
+            continue
 
 
 def _config_path(target_root: Path, extension: str) -> Path:
@@ -250,11 +286,17 @@ def _flatten_global_refs_ordered(
     seen: set[str] = set()
     for ext_id in list_extensions(target_root):
         for ref in per_ext.get(ext_id, []):
-            if ref.file in seen:
+            nk = _norm_read_path(ref.file)
+            if nk in seen:
                 continue
-            seen.add(ref.file)
+            seen.add(nk)
             out.append(ref)
     return out
+
+
+def _norm_read_path(path_str: str) -> str:
+    """Normalize relative paths when comparing skill required vs contextual lists."""
+    return Path(path_str).as_posix().replace("\\", "/")
 
 
 def _required_read_description_for_path(
@@ -282,16 +324,17 @@ def generate_skills_metadata(target_root: Path, extension: str) -> list[SkillMet
     for skill_path in list_skills(target_root, extension):
         raw = get_skill_raw_info(target_root, extension, skill_path)
         required_paths: list[str] = []
-        seen_paths: set[str] = set()
+        seen_norm: set[str] = set()
         for blob in (
             list(raw.required_read),
             [r.file for r in local_required],
             [r.file for r in merged_global_required],
         ):
             for fp in blob:
-                if fp in seen_paths:
+                nk = _norm_read_path(fp)
+                if nk in seen_norm:
                     continue
-                seen_paths.add(fp)
+                seen_norm.add(nk)
                 required_paths.append(fp)
         required_out = [
             SkillFileRef(
@@ -301,16 +344,22 @@ def generate_skills_metadata(target_root: Path, extension: str) -> list[SkillMet
             for p in required_paths
         ]
 
+        required_key_set = {_norm_read_path(p) for p in required_paths}
+
         auto_out: list[SkillFileRef] = []
         seen_auto: set[str] = set()
         for ar in local_auto:
-            if ar.file not in seen_auto:
-                seen_auto.add(ar.file)
-                auto_out.append(ar)
+            key = _norm_read_path(ar.file)
+            if key in required_key_set or key in seen_auto:
+                continue
+            seen_auto.add(key)
+            auto_out.append(ar)
         for ar in merged_global_auto:
-            if ar.file not in seen_auto:
-                seen_auto.add(ar.file)
-                auto_out.append(ar)
+            key = _norm_read_path(ar.file)
+            if key in required_key_set or key in seen_auto:
+                continue
+            seen_auto.add(key)
+            auto_out.append(ar)
 
         metas.append(
             SkillMetadata(
@@ -633,6 +682,39 @@ def _strip_ext_sections_inplace(groups: list[Any], extension: str) -> None:
             del groups[i]
 
 
+def _desired_navigation_root_key_order(keys: Iterable[str]) -> list[str]:
+    """Canonical top-level navigation keys: read-required, read-contextual, then unknown keys."""
+
+    ks = list(keys)
+    others = [k for k in ks if k not in ("read-required", "read-contextual")]
+    ordered: list[str] = []
+    if "read-required" in ks:
+        ordered.append("read-required")
+    if "read-contextual" in ks:
+        ordered.append("read-contextual")
+    ordered.extend(others)
+    return ordered
+
+
+def _ensure_navigation_root_key_order(nav: Any) -> None:
+    """Reorder root keys (required before contextual). CommentedMap in-place; plain dict rebuilt."""
+
+    if not isinstance(nav, dict):
+        return
+    desired = _desired_navigation_root_key_order(nav.keys())
+    if list(nav.keys()) == desired:
+        return
+    mover = getattr(nav, "move_to_end", None)
+    if mover is not None:
+        for key in reversed(desired):
+            if key in nav:
+                mover(key, last=False)
+        return
+    reordered = {k: nav[k] for k in desired}
+    nav.clear()
+    nav.update(reordered)
+
+
 def save_extension_navigation(
     target_root: Path,
     extension: str,
@@ -641,6 +723,7 @@ def save_extension_navigation(
 ) -> None:
     nav_path = _spawn(target_root) / "navigation.yaml"
     yaml_rt = YAML(typ="rt")
+    configure_yaml_dump(yaml_rt)
     if nav_path.is_file():
         with nav_path.open("r", encoding="utf-8") as fh:
             raw = yaml_rt.load(fh)
@@ -663,7 +746,13 @@ def save_extension_navigation(
     if read_required_files:
         rr.append({"ext": extension, "files": _nav_refs_to_files(read_required_files)})
     if read_contextual_files:
-        rc.append({"ext": extension, "files": _nav_refs_to_files(read_contextual_files)})
+        req_norm = {_norm_read_path(r.file) for r in read_required_files}
+        contextual_only = [
+            r for r in read_contextual_files if _norm_read_path(r.file) not in req_norm
+        ]
+        if contextual_only:
+            rc.append({"ext": extension, "files": _nav_refs_to_files(contextual_only)})
+    _ensure_navigation_root_key_order(raw)
     ensure_dir(nav_path.parent)
     with nav_path.open("w", encoding="utf-8") as fh:
         yaml_rt.dump(raw, fh)
@@ -731,15 +820,19 @@ def save_rules_navigation(target_root: Path) -> None:
             if exists:
                 out.append({'path': rk, 'description': str(entry.get('description') or 'Local rule file.')})
             else:
-                warnings.warn(f'removed missing rule file from navigation: {rk}', SpawnWarning)
+                warnings.warn(
+                    f"Removed missing rule path from navigation: {rk}",
+                    SpawnWarning,
+                )
         lst[:] = out
 
     prune(rq_rules_list)
     if cq_rules_list is not None:
         prune(cq_rules_list)
 
-    raw['read-required'] = rr
-    raw['read-contextual'] = rc
+    raw["read-required"] = rr
+    raw["read-contextual"] = rc
+    _ensure_navigation_root_key_order(raw)
     save_yaml(nav_path, raw)
 
 
@@ -802,9 +895,12 @@ __all__ = [
     "list_ides",
     "list_mcp",
     "list_skills",
+    "METADATA_TEMP_MAX_AGE_SECONDS",
     "normalize_skill_name",
+    "prune_metadata_temp",
     "push_to_global_gitignore",
     "remove_from_global_gitignore",
+    "remove_ide_metadata_dir",
     "remove_ide_from_list",
     "save_agent_ignore_list",
     "save_extension_navigation",

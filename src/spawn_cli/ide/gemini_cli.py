@@ -6,6 +6,7 @@ import json
 import warnings
 from pathlib import Path
 
+from spawn_cli.ide import _vacancy as _vac
 from spawn_cli.ide.registry import (
     DetectResult,
     IdeAdapter,
@@ -114,6 +115,14 @@ class GeminiCliAdapter(IdeAdapter):
         ep = target_root / "GEMINI.md"
         rewrite_managed_block(ep, prompt)
         return ep.relative_to(target_root).as_posix()
+
+    def finalize_repo_after_ide_removed(self, target_root: Path) -> None:
+        _vac.finalize_standard_dotdir_skills_and_mcp(
+            target_root,
+            ".gemini",
+            allow_delete_entire=True,
+            unlink_settings_json_when_mcp_servers_empty=True,
+        )
 
 
 register(GeminiCliAdapter())

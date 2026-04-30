@@ -90,10 +90,13 @@ def test_render_skill_md_minimal() -> None:
         )
     )
     assert "---\nname: spectask-run\ndescription: Run tasks.\n---" in md
-    assert "Read `spawn/navigation.yaml` first." in md
-    assert "Mandatory reads:" not in md
+    assert "Read `spawn/navigation.yaml` first." not in md
+    idx_body = md.index("Skill body line.")
+    idx_mand = md.index("Mandatory reads:")
+    assert idx_body < idx_mand
+    assert "- `spawn/navigation.yaml` - Merged Spawn navigation (read-required, read-contextual)." in md
+    assert md.index("- `spawn/navigation.yaml`") > md.rindex("Mandatory reads:")
     assert "Contextual reads:" not in md
-    assert md.endswith("Skill body line.")
 
 
 def test_render_skill_md_full() -> None:
@@ -112,13 +115,55 @@ def test_render_skill_md_full() -> None:
             ],
         )
     )
-    idx_nav = md.index("Read `spawn/navigation.yaml` first.")
+    idx_body = md.index("body")
     idx_mand = md.index("Mandatory reads:")
     idx_ctx = md.index("Contextual reads:")
-    idx_body = md.index("body")
-    assert idx_nav < idx_mand < idx_ctx < idx_body
+    assert idx_body < idx_mand < idx_ctx
     assert "- `spec/main.md` - Main spec" in md
     assert "- `doc/hla.md` - HLA" in md
+    assert "- `spawn/navigation.yaml` - Merged Spawn navigation (read-required, read-contextual)." in md
+    mand = md.split("Contextual reads:", 1)[0]
+    assert mand.index("spec/main.md") < mand.index("spawn/navigation.yaml")
+
+
+def test_render_skill_md_mandatory_nav_reordered() -> None:
+    from spawn_cli.models.skill import SkillFileRef, SkillMetadata
+
+    md = render_skill_md(
+        SkillMetadata(
+            name="a",
+            description="b",
+            content="c",
+            required_read=[
+                SkillFileRef(file="spawn/navigation.yaml", description="Custom nav"),
+                SkillFileRef(file="spec/main.md", description="Main"),
+            ],
+            auto_read=[],
+        )
+    )
+    mand = md.split("Contextual reads:")[0] if "Contextual reads:" in md else md
+    assert mand.index("spec/main.md") < mand.index("spawn/navigation.yaml")
+    assert "- `spawn/navigation.yaml` - Custom nav" in md
+
+
+def test_render_skill_md_mandatory_nav_deduped() -> None:
+    from spawn_cli.models.skill import SkillFileRef, SkillMetadata
+
+    md = render_skill_md(
+        SkillMetadata(
+            name="a",
+            description="b",
+            content="c",
+            required_read=[
+                SkillFileRef(file="spawn/navigation.yaml", description="First"),
+                SkillFileRef(file=r"spawn\navigation.yaml", description="Second"),
+            ],
+            auto_read=[],
+        )
+    )
+    assert md.count("spawn/navigation.yaml") + md.count(r"spawn\navigation.yaml") == 1
+    assert " - First" in md
+    assert "Second" not in md
 
 
 def test_rewrite_managed_block_creates(tmp_path: Path) -> None:

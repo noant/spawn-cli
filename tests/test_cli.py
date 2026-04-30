@@ -194,6 +194,20 @@ def test_spawn_extension_remove(tmp_path, monkeypatch):
     mock_rm.assert_called_once_with(root, "my-ext")
 
 
+def test_spawn_extension_reinstall(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "spawn").mkdir()
+    root = tmp_path.resolve()
+    mock_re = MagicMock()
+
+    with patch("spawn_cli.cli.spawn_lock", _noop_lock), patch(
+        "spawn_cli.cli.hl.reinstall_extension", mock_re
+    ):
+        assert main(["extension", "reinstall", "my-ext"]) == 0
+
+    mock_re.assert_called_once_with(root, "my-ext")
+
+
 def test_spawn_extension_list(tmp_path, monkeypatch, capsys):
     monkeypatch.chdir(tmp_path)
     (tmp_path / "spawn").mkdir()

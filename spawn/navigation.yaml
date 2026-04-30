@@ -1,0 +1,13 @@
+read-required:
+- rules:
+  - path: spawn/rules/00-general.md
+    description: General language-agnostic conventions (ASCII, documentation, chat language).
+read-contextual:
+- ext: spectask
+  files:
+  - path: spec/main.md
+    description: Spec-Tasks methodology — folder structure, seven-step process, overview template.
+  - path: spec/design/hla.md
+    description: Project high-level architecture; updated in Step 7.
+  - path: spec/design.yaml
+    description: Index of architecture documents under spec/design/ — path and description per entry.

@@ -14,9 +14,10 @@ from spawn_cli.core import low_level as ll
 from spawn_cli.core.errors import SpawnError
 from spawn_cli.ide.registry import DetectResult, IdeCapabilities
 
-from spawn_cli.io.yaml_io import load_yaml
+from spawn_cli.io.yaml_io import configure_yaml_dump, load_yaml
 
 YAML_W = YAML(typ="safe")
+configure_yaml_dump(YAML_W)
 
 
 def _load_cfg_dict(path: Path) -> dict:
@@ -69,6 +70,9 @@ def _stub_ide():
 
         def rewrite_entry_point(self, root: Path, prompt: str):
             return "AGENTS.md"
+
+        def finalize_repo_after_ide_removed(self, root: Path):
+            return None
 
     return A()
 
@@ -242,6 +246,44 @@ def test_remove_ide(target: Path) -> None:
     assert ll.get_rendered_skills(target, "cursor", "e1") == []
 
 
+def test_remove_ide_cursor_deletes_dot_cursor_and_metadata(target: Path) -> None:
+    ll.add_ide_to_list(target, "cursor")
+    _install_ext(
+        target,
+        "e1",
+        skills={"s.md": {"name": "sk", "description": "d"}},
+        mcp_servers=[
+            {"name": "srv-one", "transport": {"type": "stdio", "command": "true"}},
+        ],
+    )
+    hl.refresh_skills(target, "cursor", "e1")
+    hl.refresh_mcp(target, "cursor", "e1")
+    assert (target / ".cursor").is_dir()
+    meta_ide = target / "spawn" / ".metadata" / "cursor"
+    assert meta_ide.is_dir()
+
+    hl.remove_ide(target, "cursor")
+
+    assert "cursor" not in ll.list_ides(target)
+    assert not (target / ".cursor").exists()
+    assert not meta_ide.exists()
+
+
+def test_remove_ide_keeps_cursor_when_user_file_remains(target: Path) -> None:
+    ll.add_ide_to_list(target, "cursor")
+    _install_ext(target, "e1", skills={"s.md": {"name": "sk", "description": "d"}})
+    hl.refresh_skills(target, "cursor", "e1")
+    user_file = target / ".cursor" / "rules" / "keep.md"
+    user_file.parent.mkdir(parents=True)
+    user_file.write_text("x", encoding="utf-8")
+
+    hl.remove_ide(target, "cursor")
+
+    assert "cursor" not in ll.list_ides(target)
+    assert user_file.exists()
+    assert (target / ".cursor").is_dir()
+
+
 @patch("spawn_cli.core.high_level.ide_get", lambda *_a, **_k: _stub_ide())
 def test_refresh_extension(target: Path) -> None:
     ll.add_ide_to_list(target, "cursor")
@@ -280,6 +322,63 @@ def test_remove_extension(target: Path) -> None:
         hl.remove_extension(target, "e1")
         bu.assert_called_once()
     assert "e1" not in ll.list_extensions(target)
+
+
+def _write_ext_source_yaml(target_root: Path, ext: str, *, path: str, branch: str | None) -> None:
+    src: dict = {"type": "git", "path": path}
+    if branch is not None:
+        src["branch"] = branch
+    _write_yaml(
+        target_root / "spawn" / ".extend" / ext / "source.yaml",
+        {
+            "extension": ext,
+            "source": src,
+            "installed": {"version": "1.0.0", "installedAt": "2020-01-01T00:00:00+00:00"},
+        },
+    )
+
+
+@patch("spawn_cli.core.high_level.ide_get", lambda *_a, **_k: _stub_ide())
+def test_reinstall_extension_remove_then_install(target: Path) -> None:
+    _install_ext(target, "e1", skills={"s.md": {"name": "sk", "description": "d"}})
+    _write_ext_source_yaml(target, "e1", path="https://example.com/e.git", branch="main")
+    order: list[str] = []
+
+    with (
+        patch.object(hl, "remove_extension") as mock_rm,
+        patch.object(hl, "install_extension") as mock_inst,
+    ):
+        mock_rm.side_effect = lambda *a, **k: order.append("rm")
+        mock_inst.side_effect = lambda *a, **k: order.append("in")
+        hl.reinstall_extension(target, "e1")
+
+    assert order == ["rm", "in"]
+    mock_rm.assert_called_once_with(target, "e1")
+    mock_inst.assert_called_once_with(target, "https://example.com/e.git", "main")
+
+
+@patch("spawn_cli.core.high_level.ide_get", lambda *_a, **_k: _stub_ide())
+def test_reinstall_extension_install_branch_none(target: Path) -> None:
+    _install_ext(target, "e1", skills={"s.md": {"name": "sk", "description": "d"}})
+    _write_ext_source_yaml(target, "e1", path="/local/ext", branch=None)
+    with (
+        patch.object(hl, "remove_extension", MagicMock()),
+        patch.object(hl, "install_extension") as mock_inst,
+    ):
+        hl.reinstall_extension(target, "e1")
+    mock_inst.assert_called_once_with(target, "/local/ext", None)
+
+
+def test_reinstall_extension_not_installed(target: Path) -> None:
+    with pytest.raises(SpawnError, match="not installed"):
+        hl.reinstall_extension(target, "missing")
+
+
+@patch("spawn_cli.core.high_level.ide_get", lambda *_a, **_k: _stub_ide())
+def test_reinstall_extension_no_source_yaml(target: Path) -> None:
+    _install_ext(target, "e1", skills={"s.md": {"name": "sk", "description": "d"}})
+    with pytest.raises(SpawnError, match="no source.yaml"):
+        hl.reinstall_extension(target, "e1")
 
 
 def test_extension_init_creates_skeleton(tmp_path: Path) -> None:
