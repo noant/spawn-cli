@@ -1,6 +1,8 @@
 pyproject.toml
 src/spawn_cli/__init__.py
 src/spawn_cli/cli.py
+src/spawn_cli/errors.py
+src/spawn_cli/warnings_display.py
 src/spawn_cli.egg-info/PKG-INFO
 src/spawn_cli.egg-info/SOURCES.txt
 src/spawn_cli.egg-info/dependency_links.txt
@@ -16,6 +18,7 @@ src/spawn_cli/core/scripts.py
 src/spawn_cli/ide/__init__.py
 src/spawn_cli/ide/_helpers.py
 src/spawn_cli/ide/_stub.py
+src/spawn_cli/ide/_vacancy.py
 src/spawn_cli/ide/claude_code.py
 src/spawn_cli/ide/codex.py
 src/spawn_cli/ide/cursor.py
@@ -39,3 +42,4 @@ src/spawn_cli/models/skill.py
 src/spawn_cli/resources/__init__.py
 src/spawn_cli/resources/default_core_config.yaml
 tests/test_cli.py
+tests/test_warnings_display.py

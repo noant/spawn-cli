@@ -1,9 +1,11 @@
 schema: 1
 name: spectask
-version: "1.0.3"
+version: "1.1.1"
 
 folders:
   spec/tasks:
+    mode: artifact
+  spec/seeds:
     mode: artifact
 
 files:
@@ -36,9 +38,9 @@ skills:
   spectask-code-review-passed.md:
     name: spectask-code-review-passed
     description: "After user confirms code review — Steps 6–7 in one run (spec/main.md)."
-  spectask-extend.md:
-    name: spectask-extend
-    description: "Use when adding a new rule file under spec/extend/ (per spec/main.md)."
   spectask-design.md:
     name: spectask-design
     description: "Use when registering architecture files in spec/design.yaml or drafting spec/design/*.md."
+  spectask-seed-create.md:
+    name: spectask-seed-create
+    description: "Capture a rough idea as spec/seeds/{X}-{slug}.md (not a full task); then offer to start spectask-create."

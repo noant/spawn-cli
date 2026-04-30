@@ -9,7 +9,7 @@
 - spec/tasks/{X}-{name}/ — task folder (artifact tree in this methodology pack).
 - spec/tasks/{X}-{name}/overview.md — task overview (required).
 - spec/tasks/{X}-{name}/{N}-{description}.md — subtask files (optional).
-- spec/extend/{name}.md — team processes, code style, conventions (optional).
+- spec/seeds/{X}-{slug}.md — seed file (artifact tree in this methodology pack).
 
 **Embedded rules:**
 
@@ -112,6 +112,7 @@ Do not start Step 7 until **Code review passed** is marked (Step 6).
 1. Update spec/design/hla.md — create the file if it does not exist yet (always, regardless of scope).
 2. If the task introduced or renamed architecture docs under spec/design/, update **spec/design.yaml** (path + description for each).
 3. Rename folder to _DONE_{X}-{name}.
+4. If Source seed Path in overview is concrete and the listed spec/seeds file has linked task to this overview, rename it once with _DONE_ added.
 
 → set [V] "HLA updated"
 
@@ -122,7 +123,8 @@ Do not start Step 7 until **Code review passed** is marked (Step 6).
 ```markdown
 # {X}: {Title}
 
-IMPORTANT: always use `spawn/navigation.yaml` and `spec/main.md` for rules.
+## Source seed
+- Path: {seed path or none}
 
 ## Status
 - [ ] Spec created
@@ -159,3 +161,15 @@ IMPORTANT: always use `spawn/navigation.yaml` and `spec/main.md` for rules.
 ```
 
 Omit `## Execution Scheme` if no decomposition (single-file spec).
+
+---
+
+**Seed** — optional: a Markdown file in `spec/seeds/` to capture an idea fast; Steps 1–7 do not require it unless you deliberately start there. Link from `overview.md` when you promote into a spectask; apply Step 7 item 4 when closing the linked seed.
+
+## Seed file template (header)
+
+```markdown
+linked task: {task path or none}
+
+{idea content}
+```

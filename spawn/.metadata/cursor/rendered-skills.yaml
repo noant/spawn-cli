@@ -8,7 +8,7 @@ extensions:
     path: .cursor/skills/spectask-design/SKILL.md
   - skill: spectask-execute
     path: .cursor/skills/spectask-execute/SKILL.md
-  - skill: spectask-extend
-    path: .cursor/skills/spectask-extend/SKILL.md
+  - skill: spectask-seed-create
+    path: .cursor/skills/spectask-seed-create/SKILL.md
   - skill: spectask-spec-review-passed
     path: .cursor/skills/spectask-spec-review-passed/SKILL.md

@@ -22,4 +22,4 @@ If the user only wants a registry row, still ensure the target **`.md` exists** 
 
 ## Spawn / agent reads
 
-New paths are discoverable from **`spec/design.yaml`** once that file is read. For mandatory or default context at session start, paths still need **`globalRead` / `localRead`** (and non-empty **`description`**) in a Spawn extension **`config.yaml`** for the repo — same idea as **`spectask-extend`**. If the user maintains this methodology pack, add a matching `files:` entry under **`extsrc/config.yaml`** and reinstall/update the extension; otherwise note the requirement for a companion extension or local config.
+New paths are discoverable from **`spec/design.yaml`** once that file is read. For mandatory or default context at session start, paths still need **`globalRead` / `localRead`** (and non-empty **`description`**) in a Spawn extension **`config.yaml`** for the repo. If the user maintains this methodology pack, add a matching `files:` entry under **`extsrc/config.yaml`** and reinstall/update the extension; otherwise note the requirement for a companion extension or local config.

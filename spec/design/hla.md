@@ -4,7 +4,7 @@ This document describes how the Spawn CLI package is structured and how major pi
 
 ## Packaging and entry point
 
-The project is an installable Python package with a `src/` layout. Build and dependency metadata live in `pyproject.toml` (`setuptools`, `pytest`). The console script `spawn` maps to `spawn_cli.cli:main`.
+The project is an installable Python package with a `src/` layout. Build and dependency metadata live in `pyproject.toml` (`setuptools`, `pytest`). The console script `spawn` maps to `spawn_cli.cli:main`. Maintainers can publish to PyPI with `scripts/publish.py` (requires `uv` on PATH): it bumps the patch segment of `[project].version`, rebuilds artifacts under `dist/`, and runs `uv publish` using `SPAWN_CLI_PYPI_TOKEN` or `--token` (passed to the child process as `UV_PUBLISH_TOKEN`).
 
 ## Layering
 
