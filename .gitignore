@@ -1,6 +1,7 @@
 /.vs
 __pycache__/
 uv.lock
+*.egg-info/
 # spawn:start
 spawn/.metadata/temp/**
 # spawn:end

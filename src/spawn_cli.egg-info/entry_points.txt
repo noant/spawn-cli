@@ -1,2 +1,0 @@
-[console_scripts]
-spawn = spawn_cli.cli:main
