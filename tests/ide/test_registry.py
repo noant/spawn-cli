@@ -227,10 +227,10 @@ def test_remove_ignore_block(tmp_path: Path) -> None:
 
 def test_stub_add_skills_warns() -> None:
     cap = IdeCapabilities("native", "project", "project", "agents-md")
-    stub = StubAdapter("qoder", cap)
+    stub = StubAdapter("cursor", cap)
     with warnings.catch_warnings(record=True) as w:
         warnings.simplefilter("always")
         stub.add_skills(Path("."), [])
         assert len(w) == 1
-        assert "qoder" in str(w[0].message)
+        assert "cursor" in str(w[0].message)
         assert "skill rendering not yet implemented" in str(w[0].message)

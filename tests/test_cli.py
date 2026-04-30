@@ -23,6 +23,15 @@ def test_spawn_help(capsys):
     assert "spawn" in capsys.readouterr().out
 
 
+def test_spawn_extension_add_help_shows_argument_descriptions(capsys):
+    with pytest.raises(SystemExit) as exc:
+        main(["extension", "add", "--help"])
+    assert exc.value.code == 0
+    out = capsys.readouterr().out
+    assert "--branch" in out
+    assert "Git" in out or "git" in out
+
+
 def test_spawn_init(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     root = tmp_path.resolve()

@@ -22,8 +22,7 @@ exists; otherwise **`SpawnError`** including **`need init before`**.
 | **Reads** | No I/O. **Implementation:** one module-level `CANONICAL_IDE_KEYS`
 tuple/list in source defines **both** order and membership; no env vars, no
 config files. |
-| **How** | Return that constant. Registry code must register adapters for every
-key (stub or full). |
+| **How** | Return that constant. Registry code must register a **concrete** adapter for every key. |
 | **Writes** | None. |
 | **Meaning** | Same ordered list drives `detect_supported_ides` iteration and `spawn ide list-supported-ides` YAML key order. |
 

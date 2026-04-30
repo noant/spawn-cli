@@ -20,7 +20,10 @@ def _require_init(target_root: Path) -> None:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="spawn", description="Spawn CLI")
+    parser = argparse.ArgumentParser(
+        prog="spawn",
+        description="Spawn CLI: manage Spawn extensions and IDE adapters in this repository.",
+    )
     parser.add_argument(
         "--version",
         action="version",
@@ -28,55 +31,263 @@ def build_parser() -> argparse.ArgumentParser:
     )
     sub = parser.add_subparsers(dest="command", required=True)
 
-    sub.add_parser("init", help="Initialize spawn/ in the current repository")
+    sub.add_parser(
+        "init",
+        help="Initialize spawn/ in the current repository",
+        description=(
+            "Create the spawn/ tree in the repository root "
+            "(config, metadata layout, navigation stub)."
+        ),
+    )
 
-    rules_p = sub.add_parser("rules")
+    rules_p = sub.add_parser(
+        "rules",
+        help="Rebuild navigation mandatory reads from spawn/rules/",
+        description="Refresh navigation.yaml from files under spawn/rules/.",
+    )
     rules_sub = rules_p.add_subparsers(dest="rules_command", required=True)
-    rules_sub.add_parser("refresh", help="Sync spawn/rules/ into navigation.yaml")
+    rules_sub.add_parser(
+        "refresh",
+        help="Sync spawn/rules/ into navigation.yaml",
+        description=(
+            "Scan spawn/rules/ and rewrite read-required paths in spawn/navigation.yaml."
+        ),
+    )
 
-    ide_p = sub.add_parser("ide")
+    ide_p = sub.add_parser(
+        "ide",
+        help="Add, remove, or list IDE adapters registered for this repo",
+        description=(
+            "Control which IDE keys Spawn configures (rendered metadata under spawn/.metadata/)."
+        ),
+    )
     ide_sub = ide_p.add_subparsers(dest="ide_command", required=True)
-    _ide_add = ide_sub.add_parser("add")
-    _ide_add.add_argument("ides", nargs="+")
-    _ide_remove = ide_sub.add_parser("remove")
-    _ide_remove.add_argument("ides", nargs="+")
-    ide_sub.add_parser("list")
-    ide_sub.add_parser("list-supported-ides")
 
-    ext_p = sub.add_parser("extension")
+    _ide_add = ide_sub.add_parser(
+        "add",
+        help="Install metadata rendering for IDE key(s)",
+        description="Install metadata rendering for one or more IDE keys (cursor, codex, ...).",
+    )
+    _ide_add.add_argument(
+        "ides",
+        nargs="+",
+        metavar="IDE",
+        help="IDE identifiers to add (canonical keys from Spawn).",
+    )
+
+    _ide_remove = ide_sub.add_parser(
+        "remove",
+        help="Unregister IDE key(s) and clean vacancy where supported",
+        description="Unregister IDE keys and drop rendered outputs when the adapter defines cleanup.",
+    )
+    _ide_remove.add_argument(
+        "ides",
+        nargs="+",
+        metavar="IDE",
+        help="IDE identifiers to remove.",
+    )
+
+    ide_sub.add_parser(
+        "list",
+        help="Print registered IDE identifiers for this repository",
+        description="Print one IDE identifier per line from the Spawn registry.",
+    )
+    ide_sub.add_parser(
+        "list-supported-ides",
+        help="Print YAML map of IDE keys to detected capabilities",
+        description=(
+            "Probe installed IDE adapters on this machine; emit YAML suited for tooling."
+        ),
+    )
+
+    ext_p = sub.add_parser(
+        "extension",
+        help="Install, scaffold, upgrade, validate, or list Spawn extensions",
+        description=(
+            "Manage Spawn extensions under spawn/.extend/ (sources, reinstall, scaffold, checks)."
+        ),
+    )
     ext_sub = ext_p.add_subparsers(dest="ext_command", required=True)
-    _ext_add = ext_sub.add_parser("add")
-    _ext_add.add_argument("path")
-    _ext_add.add_argument("--branch", default=None)
-    _ext_update = ext_sub.add_parser("update")
-    _ext_update.add_argument("extension_name")
-    _ext_remove = ext_sub.add_parser("remove")
-    _ext_remove.add_argument("extension_name")
-    _ext_reinstall = ext_sub.add_parser("reinstall")
-    _ext_reinstall.add_argument("extension_name")
-    ext_sub.add_parser("list")
-    _ext_init = ext_sub.add_parser("init")
-    _ext_init.add_argument("path", nargs="?", default=".")
-    _ext_init.add_argument("--name", required=True)
-    _ext_check = ext_sub.add_parser("check")
-    _ext_check.add_argument("path", nargs="?", default=".")
-    _ext_check.add_argument("--strict", action="store_true")
-    _ext_from_rules = ext_sub.add_parser("from-rules")
-    _ext_from_rules.add_argument("source")
-    _ext_from_rules.add_argument("--name", required=True)
-    _ext_from_rules.add_argument("--branch", default=None)
-    _ext_from_rules.add_argument("--output", default=".")
-    _ext_health = ext_sub.add_parser("healthcheck")
-    _ext_health.add_argument("extension_name")
 
-    build_p = sub.add_parser("build")
+    _ext_add = ext_sub.add_parser(
+        "add",
+        help="Fetch and register an extension (git archive, ZIP, local path)",
+        description="Download or copy an extension into spawn/.extend/ and refresh renders.",
+    )
+    _ext_add.add_argument(
+        "path",
+        metavar="SOURCE",
+        help="Extension source URL, git ref, ZIP path, or local directory/archive.",
+    )
+    _ext_add.add_argument(
+        "--branch",
+        default=None,
+        metavar="REV",
+        help="Git revision to use when the source is a Git URL (ignored for non-git sources).",
+    )
+
+    _ext_update = ext_sub.add_parser(
+        "update",
+        help="Pull or resync extension content from recorded source.yaml",
+        description="Upgrade an installed extension to its configured upstream revision.",
+    )
+    _ext_update.add_argument(
+        "extension_name",
+        metavar="NAME",
+        help="Installed extension name (directory spawn/.extend/<name>/).",
+    )
+
+    _ext_remove = ext_sub.add_parser(
+        "remove",
+        help="Unregister and delete an extension from this repo",
+        description="Remove spawn/.extend/<name>/ entry and unload extension-side scripts.",
+    )
+    _ext_remove.add_argument(
+        "extension_name",
+        metavar="NAME",
+        help="Installed extension name to remove.",
+    )
+
+    _ext_reinstall = ext_sub.add_parser(
+        "reinstall",
+        help="Re-download extension from spawn/.extend/<name>/source.yaml",
+        description="Staging reinstall from cached source.yaml (recovery after corrupted tree).",
+    )
+    _ext_reinstall.add_argument(
+        "extension_name",
+        metavar="NAME",
+        help="Installed extension name to reinstall.",
+    )
+
+    ext_sub.add_parser(
+        "list",
+        help="Print installed extension names",
+        description="Emit one extension name per line.",
+    )
+
+    _ext_init = ext_sub.add_parser(
+        "init",
+        help="Create a Spawn extension scaffold from a filesystem path",
+        description="Lay out skeleton files for a new extension under the chosen directory.",
+    )
+    _ext_init.add_argument(
+        "path",
+        nargs="?",
+        default=".",
+        metavar="PATH",
+        help="Directory receiving the scaffold (defaults to '.').",
+    )
+    _ext_init.add_argument(
+        "--name",
+        required=True,
+        metavar="ID",
+        help="Canonical extension id used in spawn/.extend/<id>/ when installed.",
+    )
+
+    _ext_check = ext_sub.add_parser(
+        "check",
+        help="Lint extension workspace against authoring rules",
+        description="Warn on missing declares, dangling paths, skill layout issues.",
+    )
+    _ext_check.add_argument(
+        "path",
+        nargs="?",
+        default=".",
+        metavar="PATH",
+        help="Extension project root directory to validate.",
+    )
+    _ext_check.add_argument(
+        "--strict",
+        action="store_true",
+        help=(
+            "Fail on issues that default to warnings "
+            "(missing skill files, bad mcp.json, empty file descriptions)."
+        ),
+    )
+
+    _ext_from_rules = ext_sub.add_parser(
+        "from-rules",
+        help="Compose an extension scaffold from YAML rules-derived sources",
+        description="Hydrate packaged rules into a scaffold under --output.",
+    )
+    _ext_from_rules.add_argument(
+        "source",
+        metavar="SOURCE",
+        help=(
+            "Repository root containing spawn/rules (local dir), "
+            "or remote URL/Git ref staged before import."
+        ),
+    )
+    _ext_from_rules.add_argument(
+        "--name",
+        required=True,
+        metavar="ID",
+        help="Canonical extension id for the generated scaffold.",
+    )
+    _ext_from_rules.add_argument(
+        "--branch",
+        default=None,
+        metavar="REV",
+        help="Revision for Git-backed sources referenced by SOURCE.",
+    )
+    _ext_from_rules.add_argument(
+        "--output",
+        default=".",
+        metavar="DIR",
+        help="Existing directory receiving new extension files.",
+    )
+
+    _ext_health = ext_sub.add_parser(
+        "healthcheck",
+        help="Verify installed extension manifests and renders",
+        description="Smoke-test extension installs (non-zero exit on failure).",
+    )
+    _ext_health.add_argument(
+        "extension_name",
+        metavar="NAME",
+        help="Installed extension name to diagnose.",
+    )
+
+    build_p = sub.add_parser(
+        "build",
+        help="Install extensions listed in an aggregate build YAML manifest",
+        description="Batch installs driven by YAML enumerating URLs or paths.",
+    )
     build_sub = build_p.add_subparsers(dest="build_command", required=True)
-    _build_install = build_sub.add_parser("install")
-    _build_install.add_argument("path")
-    _build_install.add_argument("--branch", default=None)
-    _build_list = build_sub.add_parser("list")
-    _build_list.add_argument("path")
-    _build_list.add_argument("--branch", default=None)
+
+    _build_install = build_sub.add_parser(
+        "install",
+        help="Resolve manifest entries and spawn extension add each",
+        description="Iterate manifest entries calling install-extension logic serially.",
+    )
+    _build_install.add_argument(
+        "path",
+        metavar="MANIFEST",
+        help="YAML file listing extensions to install.",
+    )
+    _build_install.add_argument(
+        "--branch",
+        default=None,
+        metavar="REV",
+        help="Fallback Git revision for entries omitting explicit branch.",
+    )
+
+    _build_list = build_sub.add_parser(
+        "list",
+        help="Dry-run: print resolved manifest entries without installing",
+        description="Normalize manifest and emit YAML of resolved extension specs.",
+    )
+    _build_list.add_argument(
+        "path",
+        metavar="MANIFEST",
+        help="YAML aggregate manifest describing extension sources.",
+    )
+    _build_list.add_argument(
+        "--branch",
+        default=None,
+        metavar="REV",
+        help="Fallback Git revision applied when entries lack branch.",
+    )
 
     return parser
 

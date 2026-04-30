@@ -25,15 +25,10 @@ from spawn_cli.models.skill import SkillFileRef, SkillMetadata, SkillRawInfo
 CANONICAL_IDE_KEYS: tuple[str, ...] = (
     "cursor",
     "codex",
-    "qoder",
     "claude-code",
-    "qwen-code",
     "windsurf",
     "github-copilot",
-    "aider",
-    "zed",
     "gemini-cli",
-    "devin",
 )
 
 SPAWN_GITIGNORE_START = "# spawn:start"

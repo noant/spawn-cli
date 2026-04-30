@@ -3,7 +3,7 @@ from __future__ import annotations
 import warnings
 from pathlib import Path
 
-from .registry import DetectResult, IdeAdapter, IdeCapabilities, register
+from .registry import DetectResult, IdeAdapter, IdeCapabilities
 from spawn_cli.models.mcp import NormalizedMcp
 from spawn_cli.models.skill import SkillMetadata
 
@@ -48,16 +48,5 @@ class StubAdapter(IdeAdapter):
         warnings.warn(f"{self.key}: entry point not yet implemented")
         return ""
 
-
-_STUBS: list[tuple[str, IdeCapabilities]] = [
-    ("qoder", IdeCapabilities("native", "project", "project", "agents-md")),
-    ("qwen-code", IdeCapabilities("native", "project", "project", "qwen-md")),
-    ("aider", IdeCapabilities("entry-only", "unsupported", "project", "conventions-md")),
-    ("zed", IdeCapabilities("unsupported", "project", "unsupported", "agents-md")),
-    ("devin", IdeCapabilities("native", "project", "unsupported", "agents-md")),
-]
-
-for _key, _caps in _STUBS:
-    register(StubAdapter(_key, _caps))
 
 __all__ = ["StubAdapter"]

@@ -86,7 +86,6 @@ class IdeAdapter(ABC):
 
 ALIASES: dict[str, str] = {
     "claude": "claude-code",
-    "qwen": "qwen-code",
     "gemini": "gemini-cli",
     "copilot": "github-copilot",
     "github": "github-copilot",

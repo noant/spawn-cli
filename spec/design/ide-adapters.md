@@ -17,29 +17,27 @@ warning list on `detect()` itself.
 The canonical IDE key **order and membership** are defined by **one frozen
 constant in source code** (see `spec/design/utility.md`, Supported IDE keys). There
 are **no** environment variables or config files that alter this list.
-`supported_ide_keys()` returns that constant; the adapter registry must cover
-every key (concrete or stub). User-facing aliases are handled only when parsing
+`supported_ide_keys()` returns that constant; the adapter registry must register
+a **concrete** adapter for every canonical key. User-facing aliases are handled only when parsing
 CLI arguments before `ide.Get(name)`.
 
-Supported names:
+Supported names (canonical):
 
 - `cursor`
 - `codex`
-- `qoder`
 - `claude-code`
-- `qwen-code`
 - `windsurf`
 - `github-copilot`
-- `aider`
-- `zed`
 - `gemini-cli`
-- `devin`
+
+Additional IDE layouts (Qoder, Qwen Code, Aider, Zed, Devin) are described later
+in this document for future adapters; they are **not** CLI-supported until added
+to `CANONICAL_IDE_KEYS` with a full implementation.
 
 Aliases are normalized before lookup:
 
 ```text
 claude -> claude-code
-qwen -> qwen-code
 gemini -> gemini-cli
 copilot -> github-copilot
 github -> github-copilot

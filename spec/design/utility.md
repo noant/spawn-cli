@@ -98,27 +98,21 @@ extensions is **not** supported.
 ## Supported IDE keys
 
 The Spawn CLI keeps **one frozen ordered tuple/list constant in source code**
-(for example in the IDE registry module). That constant is the **only**
+(`spawn_cli.core.low_level.CANONICAL_IDE_KEYS`). That constant is the **only**
 authority for canonical key order and membership: **no** environment variables,
 **no** user config files, and **no** secondary lists elsewhere. `supported_ide_keys()`
-returns that constant verbatim. The registry must register exactly one adapter
-per key in that list (plus stub adapters where the spec calls for warn-only
-implementations). User-facing aliases (`claude` → `claude-code`, etc.) apply only
+returns that constant verbatim. The registry must register exactly one **concrete**
+adapter per key in that list. User-facing aliases (`claude` → `claude-code`, etc.) apply only
 when parsing commands; the constant contains canonical identifiers only.
 
 ```yaml
 # Canonical keys — illustrative order matches Adapter Registry
 - cursor
 - codex
-- qoder
 - claude-code
-- qwen-code
 - windsurf
 - github-copilot
-- aider
-- zed
 - gemini-cli
-- devin
 ```
 
 ## Low-Level Modules
@@ -330,10 +324,9 @@ There is no separate warning list on the result.
 A coordination layer calls `ide.Get(name).add_skills`,
 `ide.Get(name).remove_skills`, and equivalent operations.
 
-Supported IDE adapter targets are Cursor, Codex, Qoder, Claude Code, Qwen Code,
-Windsurf, GitHub Copilot, Aider, Zed, Gemini CLI, and Devin. Their exact skill
-folders, MCP formats, and shared agent files such as `AGENTS.md` should be
-specified in IDE-specific design or implementation tasks.
+Spawn ships **concrete** adapters for Cursor, Codex, Claude Code, Windsurf,
+GitHub Copilot, and Gemini CLI. Additional IDE targets may be documented in
+`spec/design/ide-adapters.md` before an adapter is added to the canonical key list.
 
 The IDE adapter contract should be captured in a table during implementation:
 
