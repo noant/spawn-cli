@@ -15,6 +15,8 @@ design:
   description: Agent-facing Spawn navigation and rendered skill flow.
 - path: spec/design/extensions.md
   description: Spawn extension authoring and AIDD methodology packaging.
+- path: spec/design/extension-author-guide.md
+  description: User-facing guide for extension authors (layout, config, workflows).
 - path: spec/design/ide-adapters.md
   description: IDE adapter matrix and Spawn metadata rendering contracts.
 - path: spec/design/user-guide.md
