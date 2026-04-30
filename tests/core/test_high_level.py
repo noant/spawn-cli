@@ -1,0 +1,333 @@
+from __future__ import annotations
+
+import json
+
+from pathlib import Path
+from unittest.mock import MagicMock, patch
+
+import pytest
+import warnings
+from ruamel.yaml import YAML
+
+from spawn_cli.core import high_level as hl
+from spawn_cli.core import low_level as ll
+from spawn_cli.core.errors import SpawnError
+from spawn_cli.ide.registry import DetectResult, IdeCapabilities
+
+from spawn_cli.io.yaml_io import load_yaml
+
+YAML_W = YAML(typ="safe")
+
+
+def _load_cfg_dict(path: Path) -> dict:
+    return dict(load_yaml(path) or {})
+
+
+def _write_yaml(path: Path, data: dict) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8") as fh:
+        YAML_W.dump(data, fh)
+
+
+@pytest.fixture
+def target(tmp_path: Path) -> Path:
+    ll.init(tmp_path)
+    return tmp_path
+
+
+def _stub_ide():
+    """Minimal IDE adapter matching StubIdeAdapter behavior."""
+    from spawn_cli.models.mcp import NormalizedMcp
+    from spawn_cli.models.skill import SkillMetadata
+
+    class A:
+        key = "cursor"
+
+        def detect(self, root: Path):
+            return DetectResult(
+                False,
+                IdeCapabilities("native", "project", "native", "agents-md"),
+            )
+
+        def add_skills(self, root: Path, metas: list[SkillMetadata]):
+            return [{"skill": m.name, "path": f".t/{m.name}"} for m in metas]
+
+        def remove_skills(self, root: Path, rendered: list[dict]):
+            return None
+
+        def add_mcp(self, root: Path, normalized_mcp: NormalizedMcp):
+            return [s.name for s in normalized_mcp.servers]
+
+        def remove_mcp(self, root: Path, names: list[str]):
+            return None
+
+        def add_agent_ignore(self, root: Path, globs: list[str]):
+            return None
+
+        def remove_agent_ignore(self, root: Path, globs: list[str]):
+            return None
+
+        def rewrite_entry_point(self, root: Path, prompt: str):
+            return "AGENTS.md"
+
+    return A()
+
+
+def _install_ext(
+    target_root: Path,
+    name: str,
+    *,
+    git_ignore: list[str] | None = None,
+    skills: dict | None = None,
+    mcp_servers: list | None = None,
+    setup: dict | None = None,
+) -> None:
+    root = target_root / "spawn" / ".extend" / name
+    root.mkdir(parents=True)
+    cfg = {
+        "name": name,
+        "version": "1.0.0",
+        "schema": 1,
+        "files": {},
+        "folders": {},
+        "agent-ignore": [],
+        "git-ignore": git_ignore or [],
+        "skills": skills or {},
+        "setup": setup or {},
+    }
+    _write_yaml(root / "config.yaml", cfg)
+    sk = root / "skills"
+    sk.mkdir(exist_ok=True)
+    for k in (skills or {}):
+        (sk / k).write_text("---\nname: sn\n---\nbody\n", encoding="utf-8")
+    if mcp_servers:
+        (root / "mcp.json").write_text(
+            json.dumps({"servers": mcp_servers}),
+            encoding="utf-8",
+        )
+    if setup:
+        (root / "setup").mkdir(exist_ok=True)
+
+
+@patch("spawn_cli.core.high_level.ide_get", lambda *_a, **_k: _stub_ide())
+def test_refresh_gitignore(target: Path) -> None:
+    _install_ext(target, "e1", git_ignore=[".cache/**"])
+    hl.refresh_gitignore(target)
+    lines = (target / "spawn" / ".metadata" / "git-ignore.txt").read_text(encoding="utf-8")
+    assert ".cache/**" in lines
+    gi = (target / ".gitignore").read_text(encoding="utf-8")
+    assert ".cache/**" in gi
+
+
+@patch("spawn_cli.core.high_level.ide_get", lambda *_a, **_k: _stub_ide())
+def test_refresh_gitignore_removes_old(target: Path) -> None:
+    _install_ext(target, "e1", git_ignore=["a/"])
+    hl.refresh_gitignore(target)
+    ext = target / "spawn" / ".extend" / "e1"
+    raw = _load_cfg_dict(ext / "config.yaml")
+    raw["git-ignore"] = ["b/"]
+    _write_yaml(ext / "config.yaml", raw)
+    hl.refresh_gitignore(target)
+    meta = ll.get_git_ignore_list(target)
+    assert "b/" in meta
+    assert "a/" not in meta
+
+
+@patch("spawn_cli.core.high_level.ide_get", lambda *_a, **_k: _stub_ide())
+def test_refresh_agent_ignore(target: Path) -> None:
+    ll.add_ide_to_list(target, "cursor")
+    _install_ext(target, "e1", git_ignore=[])
+    ext_dir = target / "spawn" / ".extend" / "e1"
+    cfg = _load_cfg_dict(ext_dir / "config.yaml")
+    cfg["agent-ignore"] = ["logs/**"]
+    _write_yaml(ext_dir / "config.yaml", cfg)
+    hl.refresh_agent_ignore(target, "cursor")
+    got = ll.get_agent_ignore_list(target, "cursor")
+    assert any("logs/**" in g for g in got)
+
+
+@patch("spawn_cli.core.high_level.ide_get", lambda *_a, **_k: _stub_ide())
+def test_refresh_skills(target: Path) -> None:
+    ll.add_ide_to_list(target, "cursor")
+    _install_ext(
+        target,
+        "e1",
+        skills={"s.md": {"name": "uniq-skill", "description": "d"}},
+    )
+    hl.refresh_skills(target, "cursor", "e1")
+    data = ll.get_rendered_skills(target, "cursor", "e1")
+    assert len(data) >= 1
+
+
+@patch("spawn_cli.core.high_level.ide_get", lambda *_a, **_k: _stub_ide())
+def test_refresh_skills_duplicate_name_errors(target: Path) -> None:
+    ll.add_ide_to_list(target, "cursor")
+    _install_ext(target, "a", skills={"x.md": {"name": "dup", "description": "d"}})
+    _install_ext(target, "b", skills={"y.md": {"name": "dup", "description": "d"}})
+    with pytest.raises(SpawnError, match="duplicate"):
+        hl.refresh_skills(target, "cursor", "b")
+
+
+@patch("spawn_cli.core.high_level.ide_get", lambda *_a, **_k: _stub_ide())
+def test_refresh_mcp(target: Path) -> None:
+    ll.add_ide_to_list(target, "cursor")
+    _install_ext(
+        target,
+        "e1",
+        mcp_servers=[
+            {
+                "name": "srv-one",
+                "transport": {"type": "stdio", "command": "true"},
+            }
+        ],
+    )
+    hl.refresh_mcp(target, "cursor", "e1")
+    assert ll.get_rendered_mcp(target, "cursor", "e1") == ["srv-one"]
+
+
+@patch("spawn_cli.core.high_level.ide_get", lambda *_a, **_k: _stub_ide())
+def test_refresh_mcp_duplicate_server_errors(target: Path) -> None:
+    ll.add_ide_to_list(target, "cursor")
+    s = {"name": "same", "transport": {"type": "stdio", "command": "true"}}
+    _install_ext(target, "a", mcp_servers=[s])
+    _install_ext(target, "b", mcp_servers=[s])
+    with pytest.raises(SpawnError, match="duplicate"):
+        hl.refresh_mcp(target, "cursor", "b")
+
+
+@patch("spawn_cli.core.high_level.ide_get", lambda *_a, **_k: _stub_ide())
+def test_remove_skills(target: Path) -> None:
+    ll.add_ide_to_list(target, "cursor")
+    _install_ext(target, "e1", skills={"s.md": {"name": "n", "description": "d"}})
+    hl.refresh_skills(target, "cursor", "e1")
+    hl.remove_skills(target, "cursor", "e1")
+    assert ll.get_rendered_skills(target, "cursor", "e1") == []
+
+
+@patch("spawn_cli.core.high_level.ide_get", lambda *_a, **_k: _stub_ide())
+def test_refresh_entry_point(target: Path) -> None:
+    ll.add_ide_to_list(target, "cursor")
+    mock = MagicMock(wraps=_stub_ide())
+    with patch("spawn_cli.core.high_level.ide_get", return_value=mock):
+        hl.refresh_entry_point(target, "cursor")
+    mock.rewrite_entry_point.assert_called_once()
+    assert hl.SPAWN_ENTRY_POINT_PROMPT in mock.rewrite_entry_point.call_args[0][1]
+
+
+@patch("spawn_cli.core.high_level.ide_get", lambda *_a, **_k: _stub_ide())
+def test_refresh_rules_navigation(target: Path) -> None:
+    with patch("spawn_cli.core.low_level.save_rules_navigation") as srn:
+        hl.refresh_rules_navigation(target)
+        srn.assert_called_once_with(target)
+
+
+@patch("spawn_cli.core.high_level.ide_get", lambda *_a, **_k: _stub_ide())
+def test_add_ide(target: Path) -> None:
+    _install_ext(target, "e1", skills={"s.md": {"name": "sk", "description": "d"}})
+    mock = MagicMock(wraps=_stub_ide())
+    with patch("spawn_cli.core.high_level.ide_get", return_value=mock):
+        hl.add_ide(target, "cursor")
+    assert "cursor" in ll.list_ides(target)
+    assert mock.rewrite_entry_point.called
+    assert mock.add_skills.called
+
+
+@patch("spawn_cli.core.high_level.ide_get", lambda *_a, **_k: _stub_ide())
+def test_remove_ide(target: Path) -> None:
+    ll.add_ide_to_list(target, "cursor")
+    _install_ext(target, "e1", skills={"s.md": {"name": "sk", "description": "d"}})
+    hl.refresh_skills(target, "cursor", "e1")
+    hl.remove_ide(target, "cursor")
+    assert "cursor" not in ll.list_ides(target)
+    assert ll.get_rendered_skills(target, "cursor", "e1") == []
+
+
+@patch("spawn_cli.core.high_level.ide_get", lambda *_a, **_k: _stub_ide())
+def test_refresh_extension(target: Path) -> None:
+    ll.add_ide_to_list(target, "cursor")
+    _install_ext(
+        target,
+        "e1",
+        skills={"s.md": {"name": "sk", "description": "d"}},
+        setup={"before-install": "bi.py", "after-install": "ai.py"},
+    )
+    setup_dir = target / "spawn" / ".extend" / "e1" / "setup"
+    (setup_dir / "bi.py").write_text("print(1)\n", encoding="utf-8")
+    (setup_dir / "ai.py").write_text("print(1)\n", encoding="utf-8")
+    with (
+        patch("spawn_cli.core.high_level.scripts.run_before_install_scripts") as bi,
+        patch("spawn_cli.core.high_level.scripts.run_after_install_scripts") as ai,
+    ):
+        hl.refresh_extension(target, "e1")
+        bi.assert_called_once()
+        ai.assert_called_once()
+
+
+@patch("spawn_cli.core.high_level.ide_get", lambda *_a, **_k: _stub_ide())
+def test_remove_extension(target: Path) -> None:
+    ll.add_ide_to_list(target, "cursor")
+    _install_ext(
+        target,
+        "e1",
+        skills={"s.md": {"name": "sk", "description": "d"}},
+        setup={"before-uninstall": "bu.py", "after-uninstall": "au.py"},
+    )
+    sd = target / "spawn" / ".extend" / "e1" / "setup"
+    (sd / "bu.py").write_text("# noop\n", encoding="utf-8")
+    (sd / "au.py").write_text("# noop\n", encoding="utf-8")
+    hl.refresh_skills(target, "cursor", "e1")
+    with patch("spawn_cli.core.high_level.scripts.run_before_uninstall_scripts") as bu:
+        hl.remove_extension(target, "e1")
+        bu.assert_called_once()
+    assert "e1" not in ll.list_extensions(target)
+
+
+def test_extension_init_creates_skeleton(tmp_path: Path) -> None:
+    hl.extension_init(tmp_path, "my-pack")
+    cfg = tmp_path / "extsrc" / "config.yaml"
+    assert cfg.is_file()
+    raw = _load_cfg_dict(cfg)
+    assert raw.get("name") == "my-pack"
+    assert (tmp_path / "extsrc" / "skills").is_dir()
+
+
+def test_extension_init_idempotent(tmp_path: Path) -> None:
+    hl.extension_init(tmp_path, "my-pack")
+    with warnings.catch_warnings(record=True) as w:
+        warnings.simplefilter("always")
+        hl.extension_init(tmp_path, "other")
+        assert any("already exists" in str(x.message) for x in w)
+    raw = _load_cfg_dict(tmp_path / "extsrc" / "config.yaml")
+    assert raw.get("name") == "my-pack"
+
+
+def test_extension_check_valid(tmp_path: Path) -> None:
+    hl.extension_init(tmp_path, "p")
+    assert hl.extension_check(tmp_path, strict=False) == []
+
+
+def test_extension_check_missing_skill(tmp_path: Path) -> None:
+    hl.extension_init(tmp_path, "p")
+    extsrc = tmp_path / "extsrc"
+    cfg = _load_cfg_dict(extsrc / "config.yaml")
+    cfg["skills"] = {"missing.md": {"name": "m", "description": "d"}}
+    _write_yaml(extsrc / "config.yaml", cfg)
+    with pytest.raises(SpawnError, match="skill file missing"):
+        hl.extension_check(tmp_path, strict=True)
+
+
+def test_extension_check_missing_description(tmp_path: Path) -> None:
+    hl.extension_init(tmp_path, "p")
+    extsrc = tmp_path / "extsrc"
+    cfg = _load_cfg_dict(extsrc / "config.yaml")
+    cfg["files"] = {
+        "doc.md": {
+            "description": "",
+            "mode": "static",
+            "globalRead": "required",
+            "localRead": "no",
+        }
+    }
+    _write_yaml(extsrc / "config.yaml", cfg)
+    with pytest.raises(SpawnError, match="description"):
+        hl.extension_check(tmp_path, strict=True)

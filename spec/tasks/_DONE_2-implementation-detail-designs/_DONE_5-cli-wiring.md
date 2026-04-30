@@ -8,7 +8,15 @@ Before implementing, read:
 Extend `src/spawn_cli/cli.py` with all public subcommands, integrate the Spawn lock, and connect CLI argument parsing to the utility layer (high-level modules).
 
 ## Approach
-Replace the stub `cli.py` with a full `argparse` subcommand tree. Each subcommand handler acquires the lock (when mutating) and calls the appropriate high-level or low-level function. Read-only commands do not acquire the lock.
+Replace the stub `cli.py` with a full `argparse` subcommand tree. **Every**
+command uses **`Path.cwd().resolve()`** as the target repository root — **no**
+`--target` flag. Only **`spawn init`** may run before `spawn/` exists; all other
+subcommands call **`_require_init(target_root)`** first (`SpawnError` including
+**`need init before`**). **Every** subcommand (including `list-supported-ides`,
+`extension list`, `extension check`, `build list`) runs the handler body **inside**
+**`spawn_lock(target_root)`** — **non-blocking**; lock failure surfaces **`Операция в
+процессе (файл lock detected)`** per `spec/design/utility.md`. Console output is
+always **verbose** (no log-level flag).
 
 ## Affected files
 
@@ -22,6 +30,8 @@ tests/test_cli.py  (integration-level CLI smoke tests)
 ```
 spawn
   init
+  rules
+    refresh
   ide
     add    <ide1> [ide2 ...]
     remove <ide1> [ide2 ...]
@@ -29,7 +39,7 @@ spawn
     list-supported-ides
   extension
     add    <path> [--branch <branch>]
-    update <extension-name>
+    update <extension-name>   # re-resolves source from installed source.yaml only
     remove <extension-name>
     list
     init   [path] --name <name>
@@ -54,13 +64,23 @@ from spawn_cli.core import download as dl
 from spawn_cli.ide.registry import detect_supported_ides
 from spawn_cli.core.errors import SpawnError
 
+
+def _require_init(target_root: Path) -> None:
+    if not (target_root / "spawn").is_dir():
+        raise SpawnError("need init before: run spawn init in this repository.")
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="spawn", description="Spawn CLI")
-    parser.add_argument("--target", default=".", help="Target repository root (default: cwd)")
     sub = parser.add_subparsers(dest="command", required=True)
 
     # spawn init
-    sub.add_parser("init", help="Initialize spawn/ in the target repository")
+    sub.add_parser("init", help="Initialize spawn/ in the current repository")
+
+    # spawn rules
+    rules_p = sub.add_parser("rules")
+    rules_sub = rules_p.add_subparsers(dest="rules_command", required=True)
+    rules_sub.add_parser("refresh", help="Sync spawn/rules/ into navigation.yaml")
 
     # spawn ide
     ide_p = sub.add_parser("ide")
@@ -113,7 +133,7 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv=None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
-    target_root = Path(args.target).resolve()
+    target_root = Path.cwd().resolve()
 
     try:
         return _dispatch(args, target_root)
@@ -133,15 +153,26 @@ def _dispatch(args, target_root: Path) -> int:
             ll.init(target_root)
         return 0
 
-    if cmd == "ide":
-        return _dispatch_ide(args, target_root)
+    _require_init(target_root)
 
-    if cmd == "extension":
-        return _dispatch_extension(args, target_root)
+    with spawn_lock(target_root):
+        if cmd == "rules":
+            return _dispatch_rules(args, target_root)
+        if cmd == "ide":
+            return _dispatch_ide(args, target_root)
+        if cmd == "extension":
+            return _dispatch_extension(args, target_root)
+        if cmd == "build":
+            return _dispatch_build(args, target_root)
 
-    if cmd == "build":
-        return _dispatch_build(args, target_root)
+    return 1
 
+
+def _dispatch_rules(args, target_root: Path) -> int:
+    sub = args.rules_command
+    if sub == "refresh":
+        hl.refresh_rules_navigation(target_root)
+        return 0
     return 1
 
 
@@ -149,7 +180,6 @@ def _dispatch_ide(args, target_root: Path) -> int:
     sub = args.ide_command
 
     if sub == "list-supported-ides":
-        # read-only, no lock
         results = detect_supported_ides(target_root)
         _print_yaml(results)
         return 0
@@ -161,15 +191,13 @@ def _dispatch_ide(args, target_root: Path) -> int:
         return 0
 
     if sub == "add":
-        with spawn_lock(target_root):
-            for ide in args.ides:
-                hl.add_ide(target_root, ide)
+        for ide in args.ides:
+            hl.add_ide(target_root, ide)
         return 0
 
     if sub == "remove":
-        with spawn_lock(target_root):
-            for ide in args.ides:
-                hl.remove_ide(target_root, ide)
+        for ide in args.ides:
+            hl.remove_ide(target_root, ide)
         return 0
 
     return 1
@@ -184,33 +212,31 @@ def _dispatch_extension(args, target_root: Path) -> int:
         return 0
 
     if sub == "add":
-        with spawn_lock(target_root):
-            dl.install_extension(target_root, args.path, getattr(args, "branch", None))
+        dl.install_extension(target_root, args.path, getattr(args, "branch", None))
         return 0
 
     if sub == "update":
-        with spawn_lock(target_root):
-            hl.update_extension(target_root, args.extension_name)
+        hl.update_extension(target_root, args.extension_name)
         return 0
 
     if sub == "remove":
-        with spawn_lock(target_root):
-            hl.remove_extension(target_root, args.extension_name)
+        hl.remove_extension(target_root, args.extension_name)
         return 0
 
     if sub == "init":
-        hl.extension_init(Path(args.path), args.name)
+        hl.extension_init(Path(args.path).resolve(), args.name)
         return 0
 
     if sub == "check":
-        warnings = hl.extension_check(Path(args.path), strict=args.strict)
+        warnings = hl.extension_check(Path(args.path).resolve(), strict=args.strict)
         for w in warnings:
             print(f"Warning: {w}")
         return 0
 
     if sub == "from-rules":
-        with spawn_lock(target_root):
-            hl.extension_from_rules(args.source, Path(args.output), args.name, getattr(args, "branch", None))
+        hl.extension_from_rules(
+            args.source, Path(args.output).resolve(), args.name, getattr(args, "branch", None)
+        )
         return 0
 
     if sub == "healthcheck":
@@ -229,8 +255,7 @@ def _dispatch_build(args, target_root: Path) -> int:
         return 0
 
     if sub == "install":
-        with spawn_lock(target_root):
-            dl.install_build(target_root, args.path, getattr(args, "branch", None))
+        dl.install_build(target_root, args.path, getattr(args, "branch", None))
         return 0
 
     return 1
@@ -261,24 +286,27 @@ def _print_yaml(data) -> None:
 
 ## Notes
 
-- `--target` global flag allows pointing at a different directory than `cwd`. Defaults to `.` (resolved to absolute).
-- All mutating commands acquire `spawn_lock(target_root)` before calling utility functions.
-- `list-supported-ides` is read-only; no lock.
+- **Current working directory only** — no `--target`; users `cd` into the repository.
+- **`spawn init`** is the only command that runs without a pre-existing `spawn/` tree.
+- **Lock** wraps **all** other handlers (including read-only / diagnostic commands).
+- `spawn rules refresh` mutates `spawn/navigation.yaml` only (rules section).
 - `SpawnError` → exit code 1, print to stderr.
-- `spawn build list` is read-only; no lock.
-- `spawn extension list`, `spawn ide list`, `spawn extension check`, `spawn extension init` do not require the lock (no target mutations, or self-contained path).
+- Git-only operations must surface **`SpawnError`** with install hints when `git` is missing (`utility.md`, Core Rules).
 
 ## Tests
 
 `tests/test_cli.py`:
 - `test_spawn_help` — `spawn --help` exits 0
-- `test_spawn_init` — calls `ll.init` with correct target_root (mock)
-- `test_spawn_ide_list_supported_ides` — calls `detect_supported_ides`, prints YAML
-- `test_spawn_ide_add` — calls `hl.add_ide` for each ide, lock acquired
+- `test_spawn_init` — `cwd=tmp_path`, calls `ll.init(tmp_path)` with lock (mock)
+- `test_spawn_need_init` — e.g. `rules refresh` without `spawn/` → `SpawnError` / message contains `need init before`
+- `test_spawn_lock_busy` — second concurrent invocation gets `Операция в процессе` (platform-appropriate mock)
+- `test_spawn_rules_refresh` — calls `hl.refresh_rules_navigation` under lock (mock)
+- `test_spawn_ide_list_supported_ides` — calls `detect_supported_ides`, prints YAML; **under lock**
+- `test_spawn_ide_add` — calls `hl.add_ide` for each ide under lock
 - `test_spawn_ide_remove` — calls `hl.remove_ide`
 - `test_spawn_ide_list` — calls `ll.list_ides`, prints each
 - `test_spawn_extension_add` — calls `dl.install_extension`
-- `test_spawn_extension_update` — calls `hl.update_extension`
+- `test_spawn_extension_update` — calls `hl.update_extension` (no path arg)
 - `test_spawn_extension_remove` — calls `hl.remove_extension`
 - `test_spawn_extension_list` — calls `ll.list_extensions`
 - `test_spawn_extension_init` — calls `hl.extension_init`

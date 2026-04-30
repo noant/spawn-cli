@@ -7,8 +7,16 @@ about command semantics and directory mutations, not parser implementation.
 
 All paths handled by modules are relative to the target repository root.
 
+The CLI does **not** accept a `--target` flag or equivalent: every command uses
+the **current working directory** as the target repository root. Users `cd` into
+the repository before running `spawn`.
+
+If `spawn/` is not present (initialization has not been run), every command except
+`spawn init` must fail with **`SpawnError`** whose message includes **`need init
+before`** (see `spawn init`).
+
 If a file or directory under `spawn/.metadata/` is missing, Spawn creates it on
-demand.
+demand **after** initialization has succeeded.
 
 Spawn removes only entries it owns. Ownership is recorded in:
 
@@ -22,24 +30,81 @@ state. Re-running `spawn init`, adding an already listed IDE, refreshing an
 installed extension, or rebuilding skills should converge to the same rendered
 state without duplicating metadata or ignore entries.
 
-Mutating commands should acquire a repository-local Spawn lock before changing
-files. The lock prevents concurrent installs, updates, rebuilds, and IDE
-refreshes from interleaving metadata writes. Read-only commands do not require
-the lock.
+### Refresh ordering and recovery (ordering **D**, repair **A**)
 
-Warnings report recoverable inconsistencies such as an already existing
-rendered skill that Spawn will overwrite, an IDE without MCP support, or a
-missing optional setup script. Errors stop the command before the next mutation
-when continuing could corrupt ownership state, overwrite another extension's
-files, or install an unsupported config schema.
+Skill and MCP rebuilds follow a fixed phase order:
+
+1. Read prior ownership from `rendered-skills.yaml` / `rendered-mcp.yaml`.
+2. Compute the **candidate** rendered state from current extension configs and
+   **validate** it (**cross-extension identity**, schema, etc.). If validation
+   fails, stop with **`SpawnError`** before mutating IDE files.
+3. Call `remove_*` with the recorded prior state (adapter mutates IDE files).
+4. Call `add_*` to apply the candidate state.
+5. Write ownership metadata **only after** step 4 succeeds and the adapter
+   returns the new paths / server names.
+
+If step 4 fails, Spawn **must not** update ownership metadata to describe the
+new state; metadata still reflects the pre-step-3 record while IDE files may
+already be cleared. The supported fix is **A**: rerun the same refresh (or full
+extension / IDE refresh). The next run repeats step 3 (remove is idempotent or
+cleans remnants) and retries step 4 until convergence.
+
+**Repository lock:** **Every** CLI command (including read-only diagnostics such
+as `spawn ide list-supported-ides` and `spawn extension check`) must acquire the
+same repository-local Spawn lock **before** doing any work. Two `spawn`
+invocations must never run concurrently against the same repository: there is
+**no** waiting or queue. If the lock is already held, fail immediately with
+**`SpawnError`** and a user-visible message that includes **`Операция в процессе
+(файл lock detected)`**.
+
+Use a **cross-platform** file lock (`filelock` is the baseline dependency) with
+**non-blocking** acquisition (for example `timeout=0`) so attempts while another
+process holds the lock error out at once on Windows, Linux, and macOS.
+
+**Git** is required **only** for operations that use git remotes (`git clone`,
+etc.). If such an operation runs and `git` is not available, fail with
+**`SpawnError`** that tells the user to install Git and points to one install
+command per OS, for example: **Windows** (`winget install Git.Git`), **macOS**
+(`brew install git` or Xcode CLT), **Linux** (`sudo apt install git`,
+`sudo dnf install git`, or distro-appropriate).
+
+**Console output:** a single **verbose** policy — everything informative goes to
+the console as implemented. There is no log-level flag in the baseline CLI.
+
+Warnings report recoverable inconsistencies such as an IDE without MCP support or a
+missing optional setup script. **Duplicate rendered skill or MCP server names
+across two installed extensions** are **errors**, not warnings (see Cross-extension
+rendered identity).
+
+Errors stop the command before the next mutation when continuing could corrupt
+ownership state, overwrite another extension's files, violate global uniqueness
+of rendered names, or install an unsupported config schema.
+
+## Cross-extension rendered identity
+
+Rendered **skill** names (after `normalize_skill_name`) and **MCP server** names
+(from each extension's `mcp.json`) must be **pairwise distinct across all
+installed extensions** in the same target repository for a given refresh
+operation. Before calling `add_skills` / `add_mcp`, Spawn validates the union of
+names from every extension that contributes to that IDE surface. If two
+extensions would render the same skill name or the same MCP server key into the
+same IDE merge target, Spawn raises **`SpawnError`** and performs **no** further
+mutation in that command (install, update, or refresh).
+
+Authors should prefix generic names with the extension or methodology identifier
+(`extensions.md`, Naming). Automatic namespacing or silent overwrite across
+extensions is **not** supported.
 
 ## Supported IDE keys
 
-The Spawn CLI keeps a **static ordered list** of canonical IDE keys (one frozen
-constant in code). It must stay aligned with the Adapter Registry in
-`spec/design/ide-adapters.md`: each key must have a registered adapter at
-`ide.Get(key)`. User-facing aliases (`claude` → `claude-code`, etc.) apply only
-when parsing commands; this list contains canonical identifiers only.
+The Spawn CLI keeps **one frozen ordered tuple/list constant in source code**
+(for example in the IDE registry module). That constant is the **only**
+authority for canonical key order and membership: **no** environment variables,
+**no** user config files, and **no** secondary lists elsewhere. `supported_ide_keys()`
+returns that constant verbatim. The registry must register exactly one adapter
+per key in that list (plus stub adapters where the spec calls for warn-only
+implementations). User-facing aliases (`claude` → `claude-code`, etc.) apply only
+when parsing commands; the constant contains canonical identifiers only.
 
 ```yaml
 # Canonical keys — illustrative order matches Adapter Registry
@@ -69,7 +134,9 @@ each canonical IDE key maps to one `DetectResult` (`used-in-repo`,
 `init()` creates `spawn/`, `spawn/.core/config.yaml`,
 `spawn/.metadata/ide.yaml`, `spawn/.metadata/git-ignore.txt`,
 `spawn/rules/`, and `spawn/navigation.yaml` when missing. Core config content
-comes from CLI resources.
+comes from CLI resources (default `agent-ignore` hides `spawn/**` except
+navigation and rules; see `data-structure.md`). `init()` also registers
+`spawn/.metadata/temp/` in Spawn-managed root `.gitignore` patterns per Temporary download staging.
 
 `add-ide-to-list(ide)` adds an IDE to `spawn/.metadata/ide.yaml`.
 
@@ -80,23 +147,31 @@ comes from CLI resources.
 `list-ides()` returns IDE names from `spawn/.metadata/ide.yaml`.
 
 `get-required-read-global(extension)` reads
-`spawn/.extend/{extension}/config.yaml` and returns files with
+`spawn/.extend/{extension}/config.yaml` and returns a **flat** list of file
+references (path + description) for **that extension only** — entries with
 `globalRead: required`.
 
-`get-required-read-global()` calls the extension-specific function for every
-installed extension and returns a list grouped by extension.
+`get-required-read-global()` (no extension argument) calls the per-extension
+function for every installed extension and returns a **map** from extension id →
+**flat** list of file references (path + description), not a single flattened
+list across all extensions.
 
 `get-required-read-ext-local(extension)` returns files with
-`localRead: required`.
+`localRead: required` as a **flat** list for that extension.
 
-`get-auto-read-global(extension)` returns files with `globalRead: auto`.
+`get-auto-read-global(extension)` returns a **flat** list — files with
+`globalRead: auto` for that extension.
 
-`get-auto-read-global()` calls the extension-specific function for every
-installed extension and returns a list grouped by extension.
+`get-auto-read-global()` returns the same **map** shape as
+`get-required-read-global()` but for `globalRead: auto`.
 
-`get-auto-read-local(extension)` returns files with `localRead: auto`.
+`get-auto-read-local(extension)` returns files with `localRead: auto` as a
+**flat** list for that extension.
 
-Each read function returns file path and description.
+**Typing rule:** any function whose signature includes `extension` returns only
+that extension’s **flat** `list`. Functions that aggregate over all extensions
+return **`dict[str, list]`** (or equivalent) keyed by extension id. Every
+element includes **both** path and description.
 
 `get-folders(extension)` returns the `folders` section from extension config.
 
@@ -175,7 +250,10 @@ the corresponding extension section.
 are added to `read-required -> rules`; missing files are removed with a
 warning.
 
-## Normalized MCP Shape
+`refresh-rules-navigation()` calls `save-rules-navigation()` only. It supports
+the `spawn rules refresh` command when authors add or remove files under
+`spawn/rules/` and want `spawn/navigation.yaml` updated without running a full
+extension refresh or editing YAML by hand.
 
 `list-mcp(extension)` returns data that can be rendered to any IDE:
 
@@ -221,16 +299,22 @@ Each IDE has files with the same logical signatures:
 - `ide/{ide}/rewrite-entry-point.py`
 - `ide/{ide}/detect.py`
 
-`add-skills` receives `skill-metadata[]` and writes IDE-specific skills. If the
-destination skill already exists, Spawn warns and overwrites it.
+`add-skills` receives `skill-metadata[]` and writes IDE-specific skills. Global
+uniqueness of normalized skill names across installed extensions is validated
+**before** this call (`Cross-extension rendered identity`). Overwriting a
+destination already listed as Spawn-owned for the **same** extension may emit a
+warning; conflicts with non-Spawn files follow `ide-adapters.md` error rules.
 
 `remove-skills` receives rendered skill paths and deletes only those paths.
 
-`add-mcp` and `remove-mcp` add or remove MCP entries. If an IDE does not support
-MCP, the adapter emits a warning.
+`add-mcp` and `remove-mcp` add or remove MCP entries. MCP server names are
+validated for global uniqueness **before** `add-mcp` (`Cross-extension rendered
+identity`). If an IDE does not support MCP, the adapter emits a warning.
 
 `add-agent-ignore` and `remove-agent-ignore` mutate the IDE-specific ignore file
-with the given globs.
+with the given globs. **`add-agent-ignore` returns nothing** (`None`); ownership
+of ignore patterns is tracked via `spawn/.metadata/{ide}/agent-ignore.txt`, not
+via a return value from the adapter.
 
 `rewrite-entry-point(prompt)` writes the IDE-specific entry point file, such as
 `AGENTS.md`, `CLAUDE.md`, or another agent instruction file used by that IDE.
@@ -271,15 +355,20 @@ Extension-specific script runners:
 - `run-after-uninstall-scripts(extension)`
 - `run-healthcheck-scripts(extension)`
 
-If no script is configured, the runner returns. If a script fails, Spawn emits
-a warning unless the command defines that phase as blocking.
+If no script is configured for a phase, the runner does not run anything for
+that phase. If a script **is** configured in `config.yaml` for a phase, that
+script **must** be executed when that phase runs; a failed run uses the blocking
+vs warning rules below.
 
-Install and update treat `before-install` failures as blocking because they run
-before repository mutations and usually validate prerequisites. `after-install`
-failures are warnings after rendered state has been refreshed. Uninstall treats
-`before-uninstall` failures as blocking only when the script explicitly marks
-itself as required; otherwise uninstall continues with a warning. Healthcheck
-failure returns a non-zero health result but does not mutate repository state.
+Install and update treat `before-install` failures as **blocking** (`SpawnError`)
+because they run before repository mutations. `after-install` failures are
+**warnings** after rendered state has been refreshed.
+
+Uninstall: if `before-uninstall` is **omitted** from config, skip that phase. If
+it **is** set, the script **must** run and its failure is **blocking**
+(`SpawnError`) before further uninstall steps. `after-uninstall` failures are
+**warnings**. Healthcheck failure returns a non-zero health result but does not
+mutate repository state.
 
 Setup scripts run with the target repository root as the working directory.
 Spawn passes the installed extension path, extension name, current version, and
@@ -299,8 +388,15 @@ push-to-global-gitignore(new - existing)
 remove-from-global-gitignore(existing - new)
 ```
 
+`refresh-rules-navigation()` calls `save-rules-navigation()` only (see Low-Level
+Modules). Used when only local `spawn/rules/` changed relative to navigation.
+
 `refresh-agent-ignore(ide)` rebuilds IDE agent ignore entries from core ignore
-globs and all extension agent-ignore globs.
+globs and all extension agent-ignore globs. It reads the previous Spawn-owned
+list from `agent-ignore.txt`, computes the new merged list, calls
+`remove_agent_ignore` for globs that dropped out, `add_agent_ignore` for globs
+that were added, then saves the new list to metadata (same diff idea as
+`refresh-gitignore`; see Rebuild Semantics).
 
 `refresh-skills(ide, extension)` removes old rendered skills for the extension,
 generates fresh skill metadata, renders through the IDE adapter, and saves the
@@ -334,12 +430,16 @@ outputs for every initialized IDE, runs after-uninstall scripts, removes the
 installed extension folder, then refreshes ignores and navigation so rebuilt
 global state no longer includes the removed extension.
 
-`update-extension(extension)` reads `spawn/.extend/{extension}/source.yaml`,
-downloads the same source, validates the candidate version, preserves artifact
-paths, replaces static extension source, runs migration-capable setup scripts,
-and refreshes navigation, skills, MCP, ignores, and entry points. Updating to
-the same or an older version is an error unless the command explicitly supports
-force reinstall in a future extension.
+`update-extension(extension)` reads **`spawn/.extend/{extension}/source.yaml` only**:
+the CLI does **not** take a new source path argument. It re-resolves the stored
+source (git / zip / local), validates the candidate **version** string from the
+new source against the version recorded for install (see Download And Install),
+preserves artifact paths, replaces static extension source, runs setup scripts,
+and refreshes navigation, skills, MCP, ignores, and entry points. Downgrades /
+same-version no-ops follow the version rules in Download And Install. Changing to
+a **different** source identity than `source.yaml` is **not** allowed through
+`update-extension`; the user must **`spawn extension remove`** then
+**`spawn extension add`** with the new source.
 
 `extension-healthcheck(extension)` checks required files such as
 `config.yaml`, validates referenced skills, MCP config, setup scripts, and
@@ -363,7 +463,8 @@ and no copied files are left undeclared except as warnings in non-strict mode.
 `extension_from_rules(source, outputPath, name, branch)` creates extension
 source from an existing target repository. `source` may be a local path, git
 URL, or zip URL. Git sources may use `branch`. The command resolves the source
-into a temporary folder when needed, reads `spawn/rules/` and
+into `spawn/.metadata/temp/{operation_id}/` when staging is needed (see Temporary download
+staging), reads `spawn/rules/` and
 `spawn/navigation.yaml` from that target repository, then writes a new
 `{outputPath}/extsrc/` tree for extension authoring.
 
@@ -380,15 +481,52 @@ extension, removes Spawn-managed agent-ignore entries, then removes the IDE from
 
 ## Download And Install
 
-`download-extension(path, branch)` resolves a git or zip source into a temporary
-local folder. It validates `extsrc/config.yaml`, checks for file conflicts with
+### Temporary download staging
+
+Commands that materialize a remote or archive source (git clone, zip extract, or
+similar) **must** stage files under:
+
+```text
+spawn/.metadata/temp/{operation_id}/
+```
+
+relative to the target repository root. `operation_id` is a freshly generated UUID (or equivalent uniqueness) **per
+staging operation** (for example one id per `download-extension` invocation
+that needs a staging directory). Local path sources do not need this directory
+unless an implementation chooses to copy via staging for consistency.
+
+**Zip extraction** must refuse path traversal (reject entries whose resolved path
+escapes the staging directory). Tests must cover a malicious archive.
+
+The CLI **must** remove `spawn/.metadata/temp/{operation_id}/` after the operation
+finishes, whether it succeeds or fails (for example `try` / `finally`), so
+aborted runs do not rely on manual cleanup. Stale directories from crashes may
+remain; they are safe to delete by the user. `spawn init` **must** ensure
+`spawn/.metadata/temp/` is covered by Spawn-managed root `.gitignore` patterns so staged
+content is not committed.
+
+### Install and build
+
+`download-extension(path, branch)` resolves a git or zip source into
+`spawn/.metadata/temp/{operation_id}/` as above. It validates `extsrc/config.yaml`, checks for file conflicts with
 other installed extensions, checks version/source rules, then copies `extsrc/`
 to `spawn/.extend/{extension}`.
 
-If the same version or a newer version already exists, Spawn errors. If an older
-version exists, Spawn replaces the installed extension source after source
-identity checks. If existing `source.yaml` points to a different source, Spawn
-errors before replacing files.
+**Source identity:** when an extension is **already** installed, `source.yaml`
+records the authoritative source. `extension add` with a candidate source that
+**does not match** that record must **`SpawnError` before any mutation** — the
+only way to switch sources is **`spawn extension remove`** followed by
+**`spawn extension add`** with the new source.
+
+**Version strings:** `config.yaml` carries a plain `version` string. Spawn
+compares versions **in-process** without adding a third-party dependency (for
+example split on `.`, compare numeric segments left to right, trailing non-numeric
+suffix compared lexicographically, or another deterministic rule documented next
+to the helper). No external **packaging** / dependency solver is required.
+
+If the candidate version is **not newer** than the installed version per that
+rule, `SpawnError`. If an older installed tree is being replaced by a strictly
+newer candidate and source identity matches, proceed after checks.
 
 After a successful copy, Spawn writes `source.yaml` with the source path,
 branch, and resolved revision or artifact identity.
@@ -405,10 +543,13 @@ manifest and refreshes each installed extension.
 
 Extension install follows this order:
 
-1. Resolve source into a temporary folder.
+1. Resolve source into `spawn/.metadata/temp/{operation_id}/` when staging is required.
 2. Validate `extsrc/config.yaml`, skills, files, folders, setup scripts, and
    MCP definitions.
-3. Check version, source identity, and cross-extension path collisions.
+3. Check version, source identity, cross-extension path collisions, and
+   **cross-extension rendered identity** (normalized skill names and MCP server
+   names from the candidate must not duplicate names from any **other** already
+   installed extension).
 4. Run blocking `before-install` scripts from the candidate source when
    configured.
 5. Copy extension source into `spawn/.extend/{ext}` and write `source.yaml`.
@@ -418,7 +559,9 @@ Extension install follows this order:
 
 Extension uninstall follows this order:
 
-1. Run `before-uninstall` scripts.
+1. Run `before-uninstall` scripts **when configured** — if the key is absent,
+   skip this step; if present, failure **`SpawnError`** **aborts** the command
+   before further steps.
 2. Remove Spawn-rendered MCP and skills for every initialized IDE.
 3. Remove static files and folders returned by `get-removable(extension)`.
 4. Preserve artifact files and folders.
@@ -430,7 +573,8 @@ Commands should avoid partial ownership updates. When a failure happens after a
 mutation, the command reports the completed phase and the next recommended
 repair command, usually `spawn extension update {extension}` or a full refresh command.
 Future implementations may add transactional rollback, but the baseline design
-relies on metadata-driven refresh to converge after recoverable failures.
+relies on **metadata-driven refresh** to converge after recoverable failures
+(Core Rules: **Refresh ordering and recovery**).
 
 ## Public Commands
 
@@ -438,7 +582,8 @@ The CLI uses Python `argparse`-style subcommands. Command names use words and
 nested resources instead of mixing flag-only commands with dash-composed command
 names.
 
-`spawn init` creates the core `spawn/` structure.
+`spawn init` creates the core `spawn/` structure and ensures `spawn/.metadata/temp/` is
+gitignored (see Temporary download staging).
 
 `spawn ide add {ide1} {ide2} ...` adds IDEs to the target repository and
 refreshes rendered state for each one.
@@ -448,10 +593,11 @@ then removes them from `spawn/.metadata/ide.yaml`.
 
 `spawn ide list` lists initialized IDEs.
 
-`spawn ide list-supported-ides` does **not** require `spawn init`. It uses the
-current working directory as `targetRoot`, invokes `detect_supported_ides`,
-and prints YAML to stdout. For each canonical IDE key from `supported_ide_keys`,
-one nested mapping containing `used-in-repo` and `capabilities`. Example shape:
+`spawn ide list-supported-ides` requires **`spawn init`** like every other
+command. It uses the current working directory as `targetRoot`, invokes
+`detect_supported_ides`, and prints YAML to stdout. For each canonical IDE key in
+`supported_ide_keys()` order, one nested mapping containing `used-in-repo` and
+`capabilities`. Example shape:
 
 ```yaml
 cursor:
@@ -470,7 +616,13 @@ codex:
     entryPoint: agents-md
 ```
 
-Read-only; does not acquire the Spawn lock.
+It uses the same **non-blocking Spawn lock** as all other commands (Core Rules).
+
+`spawn rules refresh` rescans `spawn/rules/` and updates rule entries in
+`spawn/navigation.yaml` via `save-rules-navigation()`. Requires an initialized
+target (`spawn init`). Mutating; acquires the Spawn lock. Does not reinstall
+extensions, refresh IDE skills, or rewrite entry points — only the **rules**
+section of navigation.
 
 `spawn extension add "path" [--branch "branch"]` installs an extension from a
 local path, git URL, or zip URL.
@@ -510,6 +662,10 @@ initializing a repository and installing a build is `spawn init` followed by
 followed by `spawn ide add {ide}`.
 
 ## Rebuild Semantics
+
+Rebuilds follow the phase order in **Refresh ordering and recovery** under Core
+Rules: validate the candidate, remove using prior metadata, add, then persist
+metadata after a successful add.
 
 Skill rebuild always removes previous Spawn-rendered skills first, using
 `rendered-skills.yaml`, then renders new skills from current extension config.

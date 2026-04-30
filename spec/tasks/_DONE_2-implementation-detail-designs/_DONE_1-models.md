@@ -218,17 +218,32 @@ class SkillMetadata(BaseModel):
 - `spawn_root(target: Path) -> Path` — returns `target / "spawn"`
 
 ### `io/lock.py`
+Cross-platform **`filelock`** with **non-blocking** acquire (`timeout=0`). If
+acquisition fails, raise **`SpawnError`** including **`Операция в процессе
+(файл lock detected)`**.
+
 ```python
-from filelock import FileLock
+from spawn_cli.core.errors import SpawnError
+from filelock import FileLock, Timeout
 from contextlib import contextmanager
 
 @contextmanager
 def spawn_lock(target_root: Path):
     lock_path = target_root / "spawn" / ".metadata" / ".spawn.lock"
     ensure_dir(lock_path.parent)
-    with FileLock(str(lock_path)):
+    lock = FileLock(str(lock_path))
+    try:
+        lock.acquire(timeout=0)
+    except Timeout:
+        raise SpawnError("Операция в процессе (файл lock detected)") from None
+    try:
         yield
+    finally:
+        lock.release()
 ```
+
+**Do not** add a **`packaging`** dependency for version comparison — use an
+in-tree helper (`utility.md`, Install and build).
 
 ## Code examples
 

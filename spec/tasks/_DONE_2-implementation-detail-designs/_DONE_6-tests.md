@@ -122,6 +122,7 @@ Each model module must test:
 
 ### I/O helpers (tests/io/)
 - `yaml_io`: round-trip save/load preserves data; missing file → `{}`; nested structures preserved
+- **`yaml_io` navigation / hand-edit fidelity** (if not covered by `test_low_level`): optional comment-preservation smoke in addition to `test_navigation_yaml_roundtrip_preserves_comments` above
 - `json_io`: round-trip; missing file → `{}`; indent applied
 - `toml_io`: round-trip; missing file → `{}`
 - `text_io`: write then read; missing file → `[]`; trailing newline handled
@@ -134,6 +135,7 @@ All functions listed in subtask `2-core-low-level.md`:
 - Edge cases: missing files return empty defaults; idempotent operations run twice without error
 - `save_extension_navigation` with empty list removes extension section
 - `save_rules_navigation` with new rule file adds to read-required; missing rule file removes and warns
+- **`test_navigation_yaml_roundtrip_preserves_comments`**: write `spawn/navigation.yaml` with ruamel containing `#` comments and blank lines; call `save_extension_navigation` (or minimal navigation rewrite) for one extension section; reload and assert comments outside touched nodes still exist
 - `push_to_global_gitignore` / `remove_from_global_gitignore`: preserve user content, only affect Spawn-owned lines
 - `get_skill_raw_info`: frontmatter stripped from content; name/description resolved from frontmatter then from config override
 
@@ -161,6 +163,7 @@ def mock_adapter():
 - `test_download_local_path`: copies local `extsrc/` to `.extend/{ext}`, writes `source.yaml`
 - `test_download_git_url`: mocks `subprocess.run`, verifies clone args and temp path handling
 - `test_download_zip_url`: mocks `httpx.get` and `zipfile.ZipFile`
+- **`test_download_zip_path_traversal_rejected`**: archive with `../` or absolute paths must **`SpawnError`** / skip unsafe entries (no writes outside temp dir)
 - `test_download_version_error`: same version installed → `SpawnError`
 - `test_download_conflict_error`: file conflict → `SpawnError`
 - `test_install_build`: multiple extensions installed from mock manifest
@@ -169,7 +172,9 @@ def mock_adapter():
 - `test_run_before_install_success`: subprocess called, no exception
 - `test_run_before_install_failure`: subprocess failure → `SpawnError`
 - `test_run_after_install_failure`: subprocess failure → warning (no error)
-- `test_no_script_configured`: runner returns without calling subprocess
+- **`test_run_before_uninstall_failure_blocks`**: when `before-uninstall` configured, subprocess failure → **`SpawnError`**
+- **`test_run_before_uninstall_skipped_when_absent`**: no key in config → no subprocess
+- `test_no_script_configured`: runner returns without calling subprocess for that phase
 - `test_env_vars_passed`: correct env vars in `Popen`/`run` call
 
 ### IDE adapters (tests/ide/)
@@ -192,15 +197,27 @@ Key cases to cover for each adapter:
 - GitHub Copilot `add_agent_ignore` emits warning (unsupported)
 
 ### CLI (tests/test_cli.py)
-All commands verified by patching the underlying utility functions with `unittest.mock.patch` and asserting they are called with correct arguments. Lock is also mocked.
+All commands verified by patching the underlying utility functions with `unittest.mock.patch` and asserting they are called with correct arguments. Use **`monkeypatch.chdir(tmp_path)`** (or equivalent) so `Path.cwd()` resolves to the temp repo — **no** `--target` flag.
 
 ```python
-def test_spawn_init(tmp_path):
+def test_spawn_init(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
     with patch("spawn_cli.cli.ll.init") as mock_init, \
          patch("spawn_cli.cli.spawn_lock"):
-        result = main(["--target", str(tmp_path), "init"])
+        result = main(["init"])
     assert result == 0
     mock_init.assert_called_once_with(tmp_path)
+
+
+def test_spawn_rules_refresh(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "spawn").mkdir()
+    # ... minimal metadata dirs so lock path works ...
+    with patch("spawn_cli.cli.hl.refresh_rules_navigation") as mock_rrn, \
+         patch("spawn_cli.cli.spawn_lock"):
+        result = main(["rules", "refresh"])
+    assert result == 0
+    mock_rrn.assert_called_once_with(tmp_path)
 ```
 
 ## pytest configuration

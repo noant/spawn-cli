@@ -6,10 +6,10 @@ IMPORTANT: always use `spec/main.md` and `spec/navigation.yaml` for rules.
 - [V] Spec created
 - [V] Self spec review passed
 - [V] Spec review passed
-- [ ] Code implemented
-- [ ] Self code review passed
-- [ ] Code review passed
-- [ ] HLA updated
+- [V] Code implemented
+- [V] Self code review passed
+- [V] Code review passed
+- [V] HLA updated
 
 ## Goal
 Implement the full Spawn CLI in Python — data layer, utility modules, agentic flow helpers, extension lifecycle, and IDE adapters for cursor, codex, claude-code, github-copilot, gemini-cli, and windsurf — including unit tests and CLI wiring.
@@ -21,22 +21,24 @@ Implement the full Spawn CLI in Python — data layer, utility modules, agentic 
   - `src/spawn_cli/cli.py` — extended with all public subcommands
   - `src/spawn_cli/models/` — Pydantic data models (config, metadata, extension, MCP, navigation, skills)
   - `src/spawn_cli/io/` — file I/O helpers: YAML, JSON, TOML, text, path utilities, lock
-  - `src/spawn_cli/core/` — low-level utility modules (list_extensions, list_ides, get_*_read, list_skills, list_mcp, ignore helpers, navigation, rendered-skills/mcp metadata)
-  - `src/spawn_cli/utility/` — high-level orchestration modules (refresh_*, remove_*, add_ide, remove_ide, install_extension, update_extension, etc.)
+  - `src/spawn_cli/core/` — low-level (`low_level.py`) and high-level orchestration (`high_level.py`, `download.py`, `scripts.py`): refresh_*, remove_*, add_ide, install/update/remove extension, etc.
   - `src/spawn_cli/ide/` — IDE adapter registry + 6 adapter implementations
   - `tests/` — pytest unit tests for every module
 
 - **Data flow changes:**
-  - CLI receives subcommand → calls utility layer → uses core modules + IDE adapters → reads/writes target repository files through io layer
-  - All file paths relative to `targetRoot`
-  - Spawn lock acquired before any mutating operation
+  - CLI receives subcommand → (`cwd` = target repo root) → utility/core layers → IDE adapters → `io/`
+  - All file paths relative to repository root (`Path.cwd()` for CLI)
+  - **`spawn init` required** before any other command; message must include **`need init before`**
+  - **Non-blocking `filelock`** on `spawn/.metadata/.spawn.lock` for **every** subcommand after init; busy lock → **`Операция в процессе (файл lock detected)`**
+  - Supported platforms: **Windows, Linux, macOS**; Git required only for git-sourced operations (else `SpawnError` with per-OS install hints)
+  - Console output: single **verbose** policy (no log-level flag)
 
 - **Integration points:**
-  - `argparse` CLI → utility layer public functions
-  - Utility layer → IDE adapter registry (`ide.get(name)`)
+  - `argparse` CLI → core high-level / low-level / download (`spawn_cli.core.*` as in step module map)
+  - IDE adapter registry (`ide.get(name)`)
   - Core modules → `io/` helpers
   - IDE adapters → normalized skill/MCP metadata from core
-  - `filelock` library for repository-level lock
+  - **`filelock`** (timeout 0 acquire) for repository-level serialization
 
 ## Before → After
 
@@ -45,7 +47,7 @@ Implement the full Spawn CLI in Python — data layer, utility modules, agentic 
 - No subpackages, no data models, no utility logic, no IDE adapters
 
 ### After
-- Full package structure with models, io, core, utility, ide subpackages
+- Full package structure with models, io, core, ide subpackages
 - All public commands wired in CLI (`spawn init`, `spawn ide *`, `spawn extension *`, `spawn build *`)
 - 6 IDE adapters implemented (cursor, codex, claude-code, github-copilot, gemini-cli, windsurf) + adapter registry for remaining IDEs (warn-only stubs)
 - Comprehensive pytest unit tests
@@ -65,8 +67,9 @@ Implement the full Spawn CLI in Python — data layer, utility modules, agentic 
 ### Clarifications recorded
 - **IDE adapters:** cursor, codex, claude-code, github-copilot, gemini-cli, windsurf fully implemented; remaining 5 IDEs have registered stubs that warn on all operations except `detect()`
 - **Tests:** full pytest unit test coverage per module
-- **Lock:** `filelock` library; lock file at `spawn/.metadata/.spawn.lock`
-- **Download:** full git (subprocess `git clone --depth 1`), zip (httpx download + zipfile), and local path copy
+- **Lock:** `filelock` with **non-blocking** acquire; **no** waiting queue; messages per `utility.md`
+- **Download:** full git (requires `git` on PATH when used), zip (httpx + **anti path-traversal**), and local path copy
+- **Versioning:** in-tree version string helper only — **no** `packaging` dependency
 
 ### Module → file map (abbreviated)
 
@@ -75,7 +78,7 @@ src/spawn_cli/
   models/
     config.py         # CoreConfig, IdeList, ExtensionConfig, SourceYaml, ExtensionsMeta
     metadata.py       # RenderedSkillsMeta, RenderedMcpMeta
-    navigation.py     # NavigationFile, ReadRequiredGroup, ReadContextualGroup
+    navigation.py     # NavigationFile, NavFile, NavExtGroup, NavRulesGroup
     mcp.py            # NormalizedMcp, McpServer, McpTransport, McpEnvVar
     skill.py          # SkillMetadata, SkillRawInfo
   io/
@@ -83,12 +86,13 @@ src/spawn_cli/
     json_io.py        # load_json, save_json
     toml_io.py        # load_toml, save_toml
     text_io.py        # read_lines, write_lines
-    paths.py          # ensure_dir, rel_path, safe_path (no escape)
-    lock.py           # SpawnLock context manager (filelock)
+    paths.py          # ensure_dir, safe_path, spawn_root (no escape)
+    lock.py           # spawn_lock context manager (filelock, timeout=0)
   core/
     low_level.py      # all low-level module functions
     high_level.py     # all high-level module functions (refresh_*, remove_*)
     download.py       # download_extension, install_extension, list_build_extensions
+    scripts.py        # extension setup script runner
   ide/
     registry.py       # IdeAdapter ABC, get(name), supported_ide_keys(), detect_supported_ides()
     cursor.py

@@ -41,11 +41,13 @@ from spawn_cli.models.navigation import NavigationFile
 from spawn_cli.models.mcp import NormalizedMcp
 from spawn_cli.models.skill import SkillRawInfo, SkillFileRef, SkillMetadata
 
-# ── IDE key registry ─────────────────────────────────────────────────────────
-SUPPORTED_IDE_KEYS: list[str] = [
+# ── IDE key list (single source of truth) ───────────────────────────────────
+# Frozen tuple in THIS module: order + membership. No env vars, no config.
+# Registry must register adapters in LOCKSTEP (see ide/registry.py).
+CANONICAL_IDE_KEYS: tuple[str, ...] = (
     "cursor", "codex", "qoder", "claude-code", "qwen-code",
     "windsurf", "github-copilot", "aider", "zed", "gemini-cli", "devin",
-]
+)
 
 def supported_ide_keys() -> list[str]: ...
 
@@ -66,22 +68,23 @@ def remove_ide_from_list(target_root: Path, ide: str) -> None:
 def _load_ext_config(target_root: Path, extension: str) -> ExtensionConfig: ...
 
 def get_required_read_global(target_root: Path, extension: str) -> list[SkillFileRef]:
-    """Files with globalRead: required."""
+    """Files with globalRead: required for this extension only (**flat** list)."""
 
 def get_required_read_global_all(target_root: Path) -> dict[str, list[SkillFileRef]]:
-    """All extensions: {ext: [SkillFileRef]}."""
+    """Map extension id -> flat list. Used for navigation and for flattening
+    into cross-extension unions inside `generate_skills_metadata`."""
 
 def get_required_read_ext_local(target_root: Path, extension: str) -> list[SkillFileRef]:
-    """Files with localRead: required."""
+    """Files with localRead: required (**flat** list for this extension)."""
 
 def get_auto_read_global(target_root: Path, extension: str) -> list[SkillFileRef]:
-    """Files with globalRead: auto."""
+    """Files with globalRead: auto (**flat** list for this extension)."""
 
 def get_auto_read_global_all(target_root: Path) -> dict[str, list[SkillFileRef]]:
-    """All extensions: {ext: [SkillFileRef]}."""
+    """Map extension id -> flat list (global auto reads)."""
 
 def get_auto_read_local(target_root: Path, extension: str) -> list[SkillFileRef]:
-    """Files with localRead: auto."""
+    """Files with localRead: auto (**flat** list for this extension)."""
 
 def get_folders(target_root: Path, extension: str) -> dict[str, Any]:
     """Return folders section from extension config."""
@@ -189,8 +192,17 @@ def init(target_root: Path) -> None:
 
 ## Implementation notes
 
+- **`CANONICAL_IDE_KEYS`**: single tuple in this module; `spawn_cli.ide.registry`
+  imports it for `supported_ide_keys()` / `detect_supported_ides` **iteration order**.
+  **Do not** import `spawn_cli.ide` from `low_level.py` (import cycle).
+- **Cross-extension rendered identity**: before IDE remove/add in skill or MCP
+  refresh, validate normalized skill names and MCP server names across all
+  installed extensions (`utility.md`). Duplicates → `SpawnError` with no prior
+  `remove_*` call in that operation.
 - **Frontmatter parsing** for skills: detect YAML frontmatter block (`---\n...\n---`) at top of skill `.md`; strip it and use `name`/`description` from there as defaults.
-- **`generate_skills_metadata`**: collect descriptions from `SkillFileRef` objects; de-duplicate file paths preserving first description encountered.
+- **`generate_skills_metadata`**: merge per `utility-method-flows.md`: flatten
+  `get_required_read_global_all` / `get_auto_read_global_all` for cross-extension
+  global unions; per-extension APIs stay **flat** lists.
 - **Navigation read/write**: load current `navigation.yaml`, replace extension sections in place, write back. Navigation entries are identified by `ext` key.
 - **`.gitignore` managed block**: push/remove only Spawn-owned lines. Track them via a comment sentinel:
   ```
@@ -200,7 +212,7 @@ def init(target_root: Path) -> None:
   # spawn:end
   ```
   Or simpler: compare against `git-ignore.txt` ownership list.
-- **`init()`**: core config template must be loaded from CLI package resources (`importlib.resources`). Default core config content:
+- **`init()`**: core config template must be loaded from CLI package resources (`importlib.resources`). Register Spawn-managed `.gitignore` entry `spawn/.metadata/temp/` (for example `spawn/.metadata/temp/**`) per `spec/design/utility.md`. Default core config content:
   ```yaml
   version: "0.1.0"
   agent-ignore:
@@ -225,4 +237,6 @@ def init(target_root: Path) -> None:
 - `test_save_extension_navigation_empty_removes_section` — empty lists remove ext section
 - `test_save_rules_navigation_new_rule` — new rule file added to read-required
 - `test_save_rules_navigation_missing_rule_warns` — missing file removed with warning
+- `test_validate_rendered_identity_duplicate_skill` — two extensions, same normalized skill name → SpawnError before remove
+- `test_validate_rendered_identity_duplicate_mcp` — two extensions, same MCP server name → SpawnError
 - `test_init_idempotent` — run twice, no error

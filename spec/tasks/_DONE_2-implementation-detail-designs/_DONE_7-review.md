@@ -20,7 +20,10 @@ A dedicated subagent reads every implemented file and checks against the spec. I
 - [ ] All `pathlib.Path` usage consistent (no raw string paths)
 - [ ] All type hints present on public functions
 - [ ] `SpawnError` vs `SpawnWarning` used correctly per spec rules
-- [ ] Lock acquired in all mutating CLI commands, not in read-only commands
+- [ ] **Every CLI path** uses `Path.cwd().resolve()` — **no** `--target`
+- [ ] **Non-blocking `spawn_lock`** on all commands (including read-only); correct busy message (`utility.md`)
+- [ ] **Init guard**: all commands except `spawn init` require existing `spawn/` (**`need init before`**)
+- [ ] **Canonical IDE keys**: single `CANONICAL_IDE_KEYS` source; **no** env/config overrides
 - [ ] All enum comparisons use `.value` or `==` with `ReadFlag.required` etc.
 
 ### Models
@@ -31,7 +34,7 @@ A dedicated subagent reads every implemented file and checks against the spec. I
 ### I/O
 - [ ] `ensure_dir` called before every `write_text` / `save_yaml` / `save_json`
 - [ ] `safe_path` used whenever user-provided paths are resolved against `target_root`
-- [ ] YAML round-trip preserves comments (ruamel.yaml CommentedMap)
+- [ ] YAML round-trip preserves comments where required (ruamel.yaml); **regression test** loads hand-edited `spawn/navigation.yaml` with comments → mutate one non-comment field via `save_extension_navigation` / equivalent → comments still present (`tests/core/test_low_level.py` or dedicated I/O test per `6-tests.md`)
 
 ### Low-level core
 - [ ] `generate_skills_metadata` deduplication is stable (first description wins)
@@ -41,19 +44,24 @@ A dedicated subagent reads every implemented file and checks against the spec. I
 
 ### High-level core
 - [ ] Script runner order correct: before-install → copy → refresh → after-install
-- [ ] `remove_extension` runs after-uninstall even if before-uninstall warns (non-blocking)
-- [ ] `update_extension` errors on same/older version before any mutation
+- [ ] `before-uninstall` when **configured** is **blocking** on failure; when **omitted**, phase skipped (`extensions.md`)
+- [ ] `update_extension` uses **`source.yaml` only** (no new CLI path); install rejects mismatched `source.yaml` identity until remove+re-add (`utility.md`)
+- [ ] `update_extension` errors on same/older version before any mutation (in-tree version helper — **no** `packaging`)
 - [ ] `extension_check` in strict mode returns errors (not warnings)
 - [ ] File materialization respects `mode: artifact` (create-only, no overwrite)
+- [ ] Skill/MCP refresh: validate cross-extension name uniqueness **before** remove; write `rendered-*.yaml` only after successful adapter add
+- [ ] Rerun refresh after partial failure converges (idempotent repair)
 
 ### Download
+- [ ] Git/zip staging uses `{target_root}/spawn/.metadata/temp/{operation_id}/`; directory removed in `finally` after each operation
 - [ ] `git clone` uses `--depth 1` and `--branch` flag only when branch provided
 - [ ] Zip extraction validates that extracted files don't escape temp dir
 - [ ] `source.yaml` written after successful copy, not before
 
 ### IDE adapters
 - [ ] All 6 concrete adapters implement all 7 interface methods
-- [ ] All 5 stub adapters implement all 7 methods (warn + no-op)
+- [ ] All warn-only stub adapters implement all 7 methods (warn + no-op)
+- [ ] `add_agent_ignore` returns **`None`** / **`void`** only (`ide-adapters.md`)
 - [ ] Managed block regex is DOTALL (entry points may have multiline blocks)
 - [ ] Codex TOML: hyphenated server names use quoted keys
 - [ ] GitHub Copilot VS Code MCP format uses `servers` (not `mcpServers`)
@@ -61,11 +69,10 @@ A dedicated subagent reads every implemented file and checks against the spec. I
 - [ ] `remove_skills` cleans empty parent dirs
 
 ### CLI
-- [ ] `--target` resolved to absolute path before all operations
+- [ ] `Path.cwd().resolve()` is the only repository root — **no** `--target**
 - [ ] `SpawnError` caught and printed to stderr with exit code 1
-- [ ] `spawn ide list-supported-ides` does not acquire lock
-- [ ] `spawn extension check` and `spawn extension init` do not acquire lock
-- [ ] `spawn build list` does not acquire lock
+- [ ] **Every** subcommand (including `list-supported-ides`, `extension check`, `build list`) runs under **`spawn_lock`**
+- [ ] Git-missing `SpawnError` includes per-OS install hints when a git source operation is requested
 
 ### Tests
 - [ ] No test writes outside `tmp_path`

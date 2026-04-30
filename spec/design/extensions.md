@@ -88,14 +88,21 @@ Extension names should be stable, lowercase identifiers, preferably
 kebab-case. The name in `extsrc/config.yaml` should match the installed folder
 name under `spawn/.extend/{ext}`.
 
-Skill names should also be stable across releases. If a skill name is generic,
-prefix it with the methodology or extension name to avoid collisions in IDEs
-that store skills in one shared folder.
+Skill names (`skills` keys / `name` field) and MCP server names (`mcp.json`)
+must be **unique across all extensions installed in the same target repository**
+after normalization (see `utility.md`, Cross-extension rendered identity). A
+second extension that reuses another extension's skill name or MCP server key
+**cannot** be installed or refreshed until authors rename. Prefer
+`{methodology}-{action}` or another explicit prefix.
 
 Target paths declared in `files` and `folders` should be specific enough to
 avoid collisions with other extensions. Shared target folders are not part of
 the initial contract; prefer extension-specific subfolders unless the
 methodology intentionally owns a well-known repository path.
+
+Skill names should also be stable across releases **within** one extension.
+Generic labels (`lint`, `fix`) should include the methodology or extension slug so
+they stay globally unique when multiple packs are combined.
 
 ## Config Sections
 
@@ -236,7 +243,7 @@ remove only Spawn-managed MCP entries.
 
 ## Setup Scripts
 
-Setup scripts are optional and idempotent:
+Supported phases in `config.yaml` (each key optional):
 
 - `before-install`
 - `after-install`
@@ -244,9 +251,14 @@ Setup scripts are optional and idempotent:
 - `after-uninstall`
 - `healthcheck`
 
-Scripts are used for validation, bootstrap, migration, and cleanup that cannot
-be expressed as declarative file/folder rules. A failed script should produce a
-warning unless the command explicitly treats that phase as blocking.
+Setup scripts are optional **per phase**:
+
+- If a phase **has no** script path set, that phase is **skipped**.
+- If a phase **has** a script path, that script **must** run when the phase runs.
+
+A failed run uses the command’s blocking vs warning rules (`utility.md`, Extension
+Setup Modules). **`before-uninstall`** when configured is **blocking** on failure;
+there is no separate “optional uninstall hook” mode beyond omitting the key.
 
 Scripts execute locally in the target repository and should be considered
 trusted code from the extension source. They must not silently delete or
@@ -316,8 +328,7 @@ tree. Only `extsrc/` is copied into target repositories during install.
 
 Spawn can create Extension source from an existing Target repository. The
 source target repository may be a local path, git URL with optional branch, or
-zip URL. Remote sources are resolved into a temporary local folder before
-inspection.
+zip URL. Remote sources are resolved into `spawn/.metadata/temp/{operation_id}/` in the relevant target when staging is needed (see `spec/design/utility.md`).
 
 1. Resolve the target repository source when it is git or zip.
 2. Read `spawn/rules/` and the current navigation entries from the resolved

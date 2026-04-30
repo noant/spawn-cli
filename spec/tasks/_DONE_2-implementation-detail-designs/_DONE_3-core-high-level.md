@@ -9,7 +9,7 @@ Before implementing, read:
 Implement all high-level module functions from `spec/design/utility.md` — refresh_*, remove_*, add_ide, remove_ide, extension lifecycle (install/update/uninstall), and download helpers.
 
 ## Approach
-All functions live in `src/spawn_cli/core/high_level.py` and `src/spawn_cli/core/download.py`. They call low-level functions and IDE adapter registry. They do NOT call CLI parsing code. The Spawn lock is acquired by the CLI layer before calling these functions.
+All functions live in `src/spawn_cli/core/high_level.py` and `src/spawn_cli/core/download.py`. They call low-level functions and IDE adapter registry. They do NOT call CLI parsing code. The **CLI** acquires **`spawn_lock`** for **all** commands (including read-only) after `spawn init` per `utility.md`.
 
 ## Affected files
 
@@ -38,21 +38,23 @@ def refresh_gitignore(target_root: Path) -> None:
     """
 
 def refresh_agent_ignore(target_root: Path, ide: str) -> None:
-    """Rebuild IDE agent ignore entries from core + all extension agent-ignore globs.
-    Calls ide_get(ide).add_agent_ignore(target_root, new_globs).
-    Saves new list via save_agent_ignore_list.
+    """old = get_agent_ignore_list; new = merged get_all_agent_ignore.
+    remove_agent_ignore(old - new); add_agent_ignore(new - old) (or remove all old then add new).
+    save_agent_ignore_list(ide, new).
     """
 
 # ── Skills refresh ───────────────────────────────────────────────────────────
 def refresh_skills(target_root: Path, ide: str, extension: str) -> None:
-    """Remove old rendered skills → generate fresh metadata → render via adapter → save paths."""
+    """Validate global skill name uniqueness → remove old via metadata → add_skills →
+    save rendered-skills.yaml only after successful add."""
 
 def remove_skills(target_root: Path, ide: str, extension: str) -> None:
     """Remove paths from rendered-skills.yaml via adapter, then clear the section."""
 
 # ── MCP refresh ──────────────────────────────────────────────────────────────
 def refresh_mcp(target_root: Path, ide: str, extension: str) -> None:
-    """Remove old MCP → normalize mcp.json → render via adapter → save names."""
+    """Validate global MCP server name uniqueness → remove old via metadata → add_mcp →
+    save rendered-mcp.yaml only after successful add."""
 
 def remove_mcp(target_root: Path, ide: str, extension: str) -> None:
     """Remove names from rendered-mcp.yaml via adapter, then clear the section."""
@@ -77,6 +79,9 @@ def remove_extension_for_ide(target_root: Path, ide: str, extension: str) -> Non
 # ── Navigation ───────────────────────────────────────────────────────────────
 def refresh_navigation(target_root: Path) -> None:
     """Rebuild navigation.yaml from all installed extensions + save_rules_navigation."""
+
+def refresh_rules_navigation(target_root: Path) -> None:
+    """Call save_rules_navigation only (spawn rules refresh CLI)."""
 
 # ── Full extension lifecycle ─────────────────────────────────────────────────
 def refresh_extension(target_root: Path, extension: str) -> None:
@@ -121,17 +126,17 @@ def remove_ide(target_root: Path, ide: str) -> None:
 
 ```python
 def download_extension(target_root: Path, path: str, branch: Optional[str] = None) -> str:
-    """Resolve git/zip/local source into temp folder.
-    Validate extsrc/config.yaml.
-    Check cross-extension file conflicts.
-    Check version/source rules.
+    """Resolve git/zip/local source into target_root/spawn/.metadata/temp/{operation_id}/ when staging is needed.
+    Reject zip entries that escape the staging directory (path traversal).
+    Remove that directory in a finally block after the operation. Validate extsrc/config.yaml.
+    Check cross-extension file conflicts, version rules, and source.yaml identity (see Key implementation details).
     Copy extsrc/ to spawn/.extend/{extension}.
     Write source.yaml.
     Returns extension name.
     Source types:
-    - local path: shutil.copytree
-    - git URL: subprocess git clone --depth 1 --branch {branch}
-    - zip URL: httpx download to temp, zipfile.extract
+    - local path: shutil.copytree (staging optional)
+    - git URL: subprocess git clone --depth 1 --branch {branch} into staging (requires `git` on PATH — else SpawnError with OS-specific install hints)
+    - zip URL: httpx download into staging, zipfile.extract
     """
 
 def install_extension(target_root: Path, path: str, branch: Optional[str] = None) -> None:
@@ -159,7 +164,8 @@ def run_after_install_scripts(target_root: Path, extension: str) -> None:
     """Run after-install script if configured. Failure is warning."""
 
 def run_before_uninstall_scripts(target_root: Path, extension: str) -> None:
-    """Run before-uninstall script if configured. Failure is blocking only if script marks required."""
+    """If `before-uninstall` is absent in config, return. If present, run it;
+    failure raises SpawnError (blocking)."""
 
 def run_after_uninstall_scripts(target_root: Path, extension: str) -> None:
     """Run after-uninstall script if configured. Failure is warning."""
@@ -192,15 +198,19 @@ def _check_path_conflicts(target_root: Path, candidate_config: ExtensionConfig, 
                 raise SpawnError(f"Folder conflict: {folder} claimed by {installed_ext}")
 ```
 
-### Version check in `download_extension`
-```python
-def _check_version(target_root: Path, ext_name: str, candidate_version: str) -> None:
-    source_yaml_path = target_root / "spawn" / ".extend" / ext_name / "source.yaml"
-    if source_yaml_path.exists():
-        existing = SourceYaml.model_validate(load_yaml(source_yaml_path))
-        if Version(candidate_version) <= Version(existing.installed.version):
-            raise SpawnError(f"Candidate version {candidate_version} is not newer than installed {existing.installed.version}")
-```
+### Version check in `download_extension` / `update_extension`
+Use a **small in-tree version helper** (no third-party `packaging` dependency):
+compare `config.yaml` `version` strings deterministically (for example split on
+`.`, compare numeric segments; document the exact rule beside the helper).  
+`SpawnError` when the candidate is **not strictly newer** than `source.yaml`’s
+installed record where the spec requires an upgrade-only path.
+
+### Source identity for `download_extension` / `install_extension`
+If `spawn/.extend/{ext}/source.yaml` already exists for this extension name and the
+resolved candidate source (type + path + branch identity) **does not match** the
+stored record, **`SpawnError` before mutation**. User must **`remove_extension`**
+then **`install_extension`** with the new source.  
+`update_extension` ignores CLI paths: it re-reads only `source.yaml`.
 
 ### Static file materialization
 ```python
@@ -241,9 +251,13 @@ Creates `extsrc/skills/`, `extsrc/files/`, `extsrc/setup/` dirs.
 - `test_refresh_gitignore` — install mock extension, check .gitignore updated
 - `test_refresh_gitignore_removes_old` — second call removes no-longer-needed globs
 - `test_refresh_agent_ignore` — mock adapter called with merged globs
-- `test_refresh_skills` — remove old + render new, metadata saved
+- `test_refresh_skills` — validate uniqueness → remove old + render new, metadata saved only after add
+- `test_refresh_skills_duplicate_name_errors` — second extension collides → SpawnError, no remove
+- `test_refresh_mcp` — validate uniqueness → remove + add, metadata after add
+- `test_refresh_mcp_duplicate_server_errors` — colliding MCP name → SpawnError before remove
 - `test_remove_skills` — adapter remove_skills called, metadata cleared
 - `test_refresh_entry_point` — adapter rewrite_entry_point called with prompt
+- `test_refresh_rules_navigation` — delegates to `save_rules_navigation` only
 - `test_add_ide` — ide.yaml updated, detect called, refresh called for each extension
 - `test_remove_ide` — MCP/skills removed for all extensions, ide.yaml updated
 - `test_refresh_extension` — before/after scripts called around refresh

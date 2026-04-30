@@ -14,11 +14,12 @@ warning list on `detect()` itself.
 
 ## Adapter Registry
 
-`ide.Get(name)` returns one adapter implementation by normalized IDE name.
-
-The canonical IDE keys exposed by `supported_ide_keys()` and
-`spawn ide list-supported-ides` are listed verbatim in `spec/design/utility.md`
-(Supported IDE keys).
+The canonical IDE key **order and membership** are defined by **one frozen
+constant in source code** (see `spec/design/utility.md`, Supported IDE keys). There
+are **no** environment variables or config files that alter this list.
+`supported_ide_keys()` returns that constant; the adapter registry must cover
+every key (concrete or stub). User-facing aliases are handled only when parsing
+CLI arguments before `ide.Get(name)`.
 
 Supported names:
 
@@ -57,7 +58,7 @@ add_skills(targetRoot, skillMetadata[]) -> RenderedPath[]
 remove_skills(targetRoot, renderedPaths[]) -> void
 add_mcp(targetRoot, normalizedMcp) -> RenderedMcpName[]
 remove_mcp(targetRoot, renderedMcpNames[]) -> void
-add_agent_ignore(targetRoot, globs[]) -> RenderedPath[]
+add_agent_ignore(targetRoot, globs[]) -> void
 remove_agent_ignore(targetRoot, globs[]) -> void
 rewrite_entry_point(targetRoot, prompt) -> RenderedPath | warning
 ```
@@ -574,12 +575,11 @@ Rendered filenames should use normalized skill names:
 lowercase, trim, replace spaces with "-", keep [a-z0-9._-], collapse repeats
 ```
 
-If two extensions render the same skill name into the same IDE target, the
-adapter should namespace with the extension name:
+Render-Time uniqueness is enforced **before** adapters run (`utility.md`,
+Cross-extension rendered identity). If two extensions would use the same
+normalized skill name in the same IDE target, Spawn errors; adapters **must not**
+apply automatic `{extension}-{skill}` namespacing to paper over clashes.
 
-```text
-{extension}-{skill}
-```
-
-The default is to warn and overwrite only when the existing target is recorded
-as Spawn-owned by the same extension.
+Overwriting a destination that is **Spawn-owned by the same extension** in
+metadata may still warn per command policy; collisions with **user-owned** paths
+outside Spawn metadata remain errors per Error And Warning Rules above.

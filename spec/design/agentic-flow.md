@@ -155,8 +155,10 @@ adapters.
 Conceptual pseudocode:
 
 ```text
-global_required = get-required-read-global()
-global_auto = get-auto-read-global()
+global_map = get-required-read-global()   # dict[ext -> flat list]
+global_required = flatten_values(global_map)
+global_auto_map = get-auto-read-global()
+global_auto = flatten_values(global_auto_map)
 local_required = get-required-read-ext-local(extension)
 local_auto = get-auto-read-local(extension)
 
@@ -165,9 +167,9 @@ for skill_path in list-skills(extension):
   required = distinct(
     skill_info.required-read +
     local_required +
-    all files from global_required
+    global_required
   )
-  auto = distinct(local_auto + all files from global_auto)
+  auto = distinct(local_auto + global_auto)
   resolve descriptions for required and auto files from read metadata
   emit skill metadata
 ```
@@ -229,10 +231,10 @@ Use this skill body...
 Rendered skills are the active skill surface. Source skills in
 `spawn/.extend/{ext}/skills/` are not read directly by agents.
 
-Rendered skill filenames should be stable for each IDE adapter. When two
-extensions produce the same rendered skill name, the adapter should either
-namespace the rendered file with the extension name or warn and overwrite only
-when the target path is recorded as Spawn-owned by the same extension.
+Rendered skill filenames should be stable for each IDE adapter. **Across
+installed extensions**, normalized skill names must be unique; duplicates are a
+hard error before render (`utility.md`, Cross-extension rendered identity). The
+adapter does not rename or namespace to hide conflicts.
 
 ## Local Rules
 

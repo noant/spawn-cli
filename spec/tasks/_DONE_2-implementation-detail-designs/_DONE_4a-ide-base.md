@@ -12,10 +12,12 @@ and the `StubAdapter` that backs the 5 warn-only IDEs (qoder, qwen-code, aider, 
 This step produces the foundation that every concrete IDE adapter (steps 4b–4g) depends on.
 
 ## Approach
-Create `src/spawn_cli/ide/` as a package. `registry.py` defines the ABC, capability
-dataclasses, registry dict, and public lookup functions. `_helpers.py` (or inline in
-`registry.py`) holds the shared rendering helpers. `_stub.py` holds `StubAdapter` and
-registers the 5 warn-only IDEs. No concrete adapters in this step.
+Create `src/spawn_cli/ide/` as a package. **Canonical IDE key order** is defined
+once in `spawn_cli.core.low_level` as `CANONICAL_IDE_KEYS` (no env, no config).
+`registry.py` imports that tuple, implements `supported_ide_keys()` as `list(CANONICAL_IDE_KEYS)`,
+and iterates **that same order** in `detect_supported_ides`. `register()` must reject
+unknown keys. `ide/__init__.py` imports concrete + stub adapters so `_registry`
+is populated before first use.
 
 ## Affected files
 
@@ -36,6 +38,7 @@ from pathlib import Path
 from spawn_cli.models.skill import SkillMetadata
 from spawn_cli.models.mcp import NormalizedMcp
 from spawn_cli.core.errors import SpawnError
+from spawn_cli.core.low_level import CANONICAL_IDE_KEYS
 
 @dataclass
 class IdeCapabilities:
@@ -103,7 +106,9 @@ ALIASES: dict[str, str] = {
 _registry: dict[str, IdeAdapter] = {}  # populated at module load by each adapter file
 
 def register(adapter: IdeAdapter) -> None:
-    """Register an adapter instance under its canonical key."""
+    """Register an adapter instance under its canonical key (must appear in CANONICAL_IDE_KEYS)."""
+    if adapter.key not in CANONICAL_IDE_KEYS:
+        raise SpawnError(f"Cannot register unknown IDE key: {adapter.key!r}")
     _registry[adapter.key] = adapter
 
 def get(name: str) -> IdeAdapter:
@@ -114,12 +119,12 @@ def get(name: str) -> IdeAdapter:
     return _registry[canonical]
 
 def supported_ide_keys() -> list[str]:
-    """Return canonical ordered key list."""
-    return list(_registry.keys())
+    """Return the frozen ordered list from low_level (not dict iteration order)."""
+    return list(CANONICAL_IDE_KEYS)
 
 def detect_supported_ides(target_root: Path) -> dict[str, DetectResult]:
-    """Run detect() for every canonical IDE key. Returns {key: DetectResult}."""
-    return {key: adapter.detect(target_root) for key, adapter in _registry.items()}
+    """Run detect() for every canonical IDE key in CANONICAL_IDE_KEYS order."""
+    return {key: get(key).detect(target_root) for key in CANONICAL_IDE_KEYS}
 ```
 
 ## Shared rendering helpers

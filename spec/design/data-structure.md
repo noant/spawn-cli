@@ -19,6 +19,9 @@ target-repo/
     .metadata/
       ide.yaml
       git-ignore.txt
+      temp/
+        {operation_id}/
+          …
       {ide}/
         rendered-mcp.yaml
         rendered-skills.yaml
@@ -38,6 +41,19 @@ target-repo/
 
 The local `spawn-cli` repository does not reproduce this runtime tree as active
 state. The CLI creates it inside a target repository.
+
+**Operational alignment:** the CLI uses the **current working directory** as the
+target repository root (no `--target`). File `spawn/.metadata/.spawn.lock`
+serializes **all** commands with **non-blocking** acquisition; missing `spawn/`
+before any command except `spawn init` is an error (**`need init before`**). See
+`spec/design/utility.md` (Core Rules).
+
+`spawn/.metadata/temp/{operation_id}/` is ephemeral staging for git clones, zip
+extracts, and similar download steps inside an initialized target repository.
+Each `operation_id` is unique per staging operation; the CLI removes that
+directory when the operation ends. See `spec/design/utility.md` (Temporary
+download staging). `spawn/.metadata/temp/` **must** be gitignored; it is not
+agent-facing context (and stays under `spawn/**` for core `agent-ignore`).
 
 `spawn/navigation.yaml` is the main agent-facing navigation file. It is rebuilt
 from installed extension configs and local `spawn/rules/` entries.
