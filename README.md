@@ -138,12 +138,12 @@ The **`--branch`** flag applies when the **build source** is Git (clone revision
 
 ### Example extension
 
-`[spawn-ext-spectask](https://github.com/noant/spawn-ext-spectask)` is a concrete extension you can install with `spawn extension add` as shown above.
+[spawn-ext-spectask](https://github.com/noant/spawn-ext-spectask) is a concrete extension you can install with `spawn extension add` as shown above.
 
 ---
 
 - **Python:** 3.10+ (see `pyproject.toml`).
-- **Deep dives:** `[spec/design/user-guide.md](spec/design/user-guide.md)` and `[spec/design/utility.md](spec/design/utility.md)`.
+- **Deep dives:** [spec/design/user-guide.md](spec/design/user-guide.md) and [spec/design/utility.md](spec/design/utility.md).
 
 ## How to create an extension
 
