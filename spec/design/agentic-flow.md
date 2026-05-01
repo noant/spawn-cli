@@ -114,8 +114,15 @@ When a skill is used:
 4. Follow the skill body.
 5. Continue to respect global navigation and local rules.
 
-This keeps each skill small. The skill does not need to embed every repository
-rule because navigation remains the shared context index.
+Spawn rendering also duplicates paths from `spawn/navigation.yaml` **rules**
+groups into each skill's mandatory reads (`read-required` → `rules`) and
+contextual reads (`read-contextual` → `rules`), with the same path-normalization
+and dedup rules as navigation (mandatory tier wins when a path appears in
+both). That way agents opening a skill in the IDE still see repo rule files listed
+explicitly without maintaining a parallel list in extension config.
+
+`spawn/navigation.yaml` remains the canonical index of which repository rules exist
+and whether each is mandatory or contextual for the merged navigation surface.
 
 ## Entrypoint Contract
 

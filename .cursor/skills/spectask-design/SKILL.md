@@ -29,6 +29,7 @@ New paths are discoverable from **`spec/design.yaml`** once that file is read. F
 Mandatory reads:
 - `spec/main.md` - Spec-Tasks methodology — folder structure, seven-step process, overview template.
 - `spec/design.yaml` - Index of architecture documents under spec/design/ — path and description per entry.
+- `spawn/rules/00-general.md` - General language-agnostic conventions (ASCII, documentation, chat language).
 - `spawn/navigation.yaml` - Merged Spawn navigation (read-required, read-contextual).
 
 Contextual reads:

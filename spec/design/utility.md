@@ -569,7 +569,7 @@ Extension uninstall follows this order:
 
 Commands should avoid partial ownership updates. When a failure happens after a
 mutation, the command reports the completed phase and the next recommended
-repair command, usually `spawn extension update {extension}` or a full refresh command.
+repair command, usually `spawn extension update {extension}` or **`spawn refresh`**.
 Future implementations may add transactional rollback, but the baseline design
 relies on **metadata-driven refresh** to converge after recoverable failures
 (Core Rules: **Refresh ordering and recovery**).
@@ -615,6 +615,17 @@ codex:
 ```
 
 It uses the same **non-blocking Spawn lock** as all other commands (Core Rules).
+
+`spawn refresh` replaces `spawn/.core/config.yaml` with the bundled default core
+config (`version` and `agent-ignore` exactly match the packaged resource;
+repository-local edits to core config are not preserved), after validating that
+the existing file parses as `CoreConfig`, then rebuilds MCP,
+skills, agent-ignore, extension navigation and rules navigation, gitignore
+metadata, and IDE entry points for every IDE registered in `spawn/.metadata/ide.yaml`.
+It does **not** run extension install/uninstall setup scripts. Requires
+**`spawn init`**. Mutating; acquires the Spawn lock. If any MCP merge produces
+rendered servers, **stdout** may print **`MCP_MERGED_NOTICE`** at most once for
+the command.
 
 `spawn rules refresh` rescans `spawn/rules/` and updates rule entries in
 `spawn/navigation.yaml` via `save-rules-navigation()`. Requires an initialized

@@ -40,6 +40,15 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
 
+    sub.add_parser(
+        "refresh",
+        help="Sync core config from defaults and rebuild IDE renders",
+        description=(
+            "Replace spawn/.core/config.yaml with bundled default core config, then refresh "
+            "skills, MCP, agent ignore, navigation, gitignore metadata, and IDE entry points."
+        ),
+    )
+
     rules_p = sub.add_parser(
         "rules",
         help="Rebuild navigation mandatory reads from spawn/rules/",
@@ -321,6 +330,9 @@ def _dispatch(args: argparse.Namespace, target_root: Path) -> int:
     with spawn_lock(target_root):
         if cmd == "rules":
             return _dispatch_rules(args, target_root)
+        if cmd == "refresh":
+            hl.refresh_repository(target_root)
+            return 0
         if cmd == "ide":
             return _dispatch_ide(args, target_root)
         if cmd == "extension":

@@ -88,6 +88,28 @@ def test_spawn_rules_refresh(tmp_path, monkeypatch):
     mock_refresh.assert_called_once_with(root)
 
 
+def test_spawn_refresh(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    from spawn_cli.core import low_level as ll
+
+    ll.init(tmp_path)
+    root = tmp_path.resolve()
+    mock_repo = MagicMock()
+
+    with patch("spawn_cli.cli.spawn_lock", _noop_lock), patch(
+        "spawn_cli.cli.hl.refresh_repository", mock_repo
+    ):
+        assert main(["refresh"]) == 0
+
+    mock_repo.assert_called_once_with(root)
+
+
+def test_spawn_refresh_need_init(tmp_path, monkeypatch, capsys):
+    monkeypatch.chdir(tmp_path)
+    assert main(["refresh"]) == 1
+    assert "need init before" in capsys.readouterr().err
+
+
 def test_spawn_ide_list_supported_ides(tmp_path, monkeypatch, capsys):
     monkeypatch.chdir(tmp_path)
     (tmp_path / "spawn").mkdir()

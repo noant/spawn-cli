@@ -18,7 +18,7 @@ from spawn_cli.io.json_io import load_json
 from spawn_cli.io.paths import ensure_dir
 from spawn_cli.io.text_io import read_lines, write_lines
 from spawn_cli.io.yaml_io import configure_yaml_dump, load_yaml, save_yaml
-from spawn_cli.models.config import ExtensionConfig, FileMode, IdeList, ReadFlag
+from spawn_cli.models.config import CoreConfig, ExtensionConfig, FileMode, IdeList, ReadFlag
 from spawn_cli.models.mcp import McpCapabilities, McpEnvVar, McpServer, McpTransport, NormalizedMcp
 from spawn_cli.models.skill import SkillFileRef, SkillMetadata, SkillRawInfo
 
@@ -294,14 +294,59 @@ def _norm_read_path(path_str: str) -> str:
     return Path(path_str).as_posix().replace("\\", "/")
 
 
+def _navigation_rules_refs_from_section(section: Any) -> list[SkillFileRef]:
+    out: list[SkillFileRef] = []
+    if not isinstance(section, list):
+        return out
+    for grp in section:
+        if not isinstance(grp, dict):
+            continue
+        rules_raw = grp.get("rules")
+        if not isinstance(rules_raw, list):
+            continue
+        for entry in rules_raw:
+            if not isinstance(entry, dict):
+                continue
+            path_raw = entry.get("path")
+            if not isinstance(path_raw, str) or not path_raw.strip():
+                continue
+            desc_raw = entry.get("description")
+            desc = "" if desc_raw is None else str(desc_raw)
+            out.append(SkillFileRef(file=path_raw.strip(), description=desc))
+    return out
+
+
+def _navigation_yaml_rules_refs(target_root: Path) -> tuple[list[SkillFileRef], list[SkillFileRef]]:
+    """Return (read-required rules, read-contextual rules) from merged navigation.yaml."""
+    path = _spawn(target_root) / "navigation.yaml"
+    raw = load_yaml(path)
+    if not isinstance(raw, dict):
+        return [], []
+    rr = raw.get("read-required")
+    cq = raw.get("read-contextual")
+    return (
+        _navigation_rules_refs_from_section(rr if isinstance(rr, list) else []),
+        _navigation_rules_refs_from_section(cq if isinstance(cq, list) else []),
+    )
+
+
 def _required_read_description_for_path(
-    p: str, merged_global: list[SkillFileRef], local_req: list[SkillFileRef], cfg_ext: ExtensionConfig
+    p: str,
+    merged_global: list[SkillFileRef],
+    local_req: list[SkillFileRef],
+    cfg_ext: ExtensionConfig,
+    nav_rules_required: list[SkillFileRef] | None = None,
 ) -> str:
+    nk = _norm_read_path(p)
+    if nav_rules_required:
+        for r in nav_rules_required:
+            if _norm_read_path(r.file) == nk and r.description:
+                return r.description
     for r in merged_global:
-        if r.file == p and r.description:
+        if _norm_read_path(r.file) == nk and r.description:
             return r.description
     for r in local_req:
-        if r.file == p and r.description:
+        if _norm_read_path(r.file) == nk and r.description:
             return r.description
     return _describe_path(cfg_ext, p)
 
@@ -314,6 +359,7 @@ def generate_skills_metadata(target_root: Path, extension: str) -> list[SkillMet
     merged_global_auto = _flatten_global_refs_ordered(target_root, get_auto_read_global_all(target_root))
     local_required = get_required_read_ext_local(target_root, extension)
     local_auto = get_auto_read_local(target_root, extension)
+    nav_rules_required, nav_rules_contextual = _navigation_yaml_rules_refs(target_root)
 
     metas: list[SkillMetadata] = []
     for skill_path in list_skills(target_root, extension):
@@ -331,10 +377,19 @@ def generate_skills_metadata(target_root: Path, extension: str) -> list[SkillMet
                     continue
                 seen_norm.add(nk)
                 required_paths.append(fp)
+        for ref in nav_rules_required:
+            nk = _norm_read_path(ref.file)
+            if nk in seen_norm:
+                continue
+            seen_norm.add(nk)
+            required_paths.append(ref.file)
+
         required_out = [
             SkillFileRef(
                 file=p,
-                description=_required_read_description_for_path(p, merged_global_required, local_required, cfg_ext),
+                description=_required_read_description_for_path(
+                    p, merged_global_required, local_required, cfg_ext, nav_rules_required
+                ),
             )
             for p in required_paths
         ]
@@ -350,6 +405,12 @@ def generate_skills_metadata(target_root: Path, extension: str) -> list[SkillMet
             seen_auto.add(key)
             auto_out.append(ar)
         for ar in merged_global_auto:
+            key = _norm_read_path(ar.file)
+            if key in required_key_set or key in seen_auto:
+                continue
+            seen_auto.add(key)
+            auto_out.append(ar)
+        for ar in nav_rules_contextual:
             key = _norm_read_path(ar.file)
             if key in required_key_set or key in seen_auto:
                 continue
@@ -451,13 +512,45 @@ def get_navigation_metadata(target_root: Path, extension: str) -> dict:
 
 def get_core_agent_ignore(target_root: Path) -> list[str]:
     path = _spawn(target_root) / ".core" / "config.yaml"
-    from spawn_cli.models.config import CoreConfig
-
     data = load_yaml(path)
     if not data:
         return []
     core = CoreConfig.model_validate(data)
     return list(core.agent_ignore)
+
+
+def sync_core_config_from_defaults(target_root: Path) -> None:
+    """Overwrite ``spawn/.core/config.yaml`` with bundled default ``CoreConfig``.
+
+    Validates that an existing repo file parses as ``CoreConfig`` before
+    replacing it so corrupted files are not silently clobbered.
+    """
+    path = _spawn(target_root) / ".core" / "config.yaml"
+    if not path.is_file():
+        raise SpawnError("spawn/.core/config.yaml is missing; run spawn init.")
+    bundled_txt = (
+        resources.files("spawn_cli.resources")
+        .joinpath("default_core_config.yaml")
+        .read_text(encoding="utf-8")
+    )
+    yparse = YAML(typ="safe")
+    raw_default = yparse.load(bundled_txt)
+    if not isinstance(raw_default, dict):
+        raise SpawnError("internal error: bundled default core config is not a mapping")
+    try:
+        default_core = CoreConfig.model_validate(raw_default)
+    except Exception as e:
+        raise SpawnError(f"internal error: bundled default core config invalid: {e}") from e
+    raw_existing = load_yaml(path)
+    if not raw_existing:
+        raise SpawnError(
+            "spawn/.core/config.yaml is empty or invalid; restore it or run spawn init again."
+        )
+    try:
+        CoreConfig.model_validate(raw_existing)
+    except Exception as e:
+        raise SpawnError(f"invalid spawn/.core/config.yaml: {e}") from e
+    save_yaml(path, default_core.model_dump(by_alias=True))
 
 
 def get_ext_agent_ignore(target_root: Path, extension: str) -> list[str]:
@@ -890,6 +983,7 @@ __all__ = [
     "list_ides",
     "list_mcp",
     "list_skills",
+    "sync_core_config_from_defaults",
     "METADATA_TEMP_MAX_AGE_SECONDS",
     "normalize_skill_name",
     "prune_metadata_temp",

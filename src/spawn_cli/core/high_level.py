@@ -222,6 +222,36 @@ def refresh_rules_navigation(target_root: Path) -> None:
     ll.save_rules_navigation(target_root)
 
 
+def refresh_repository(target_root: Path) -> None:
+    """Overwrite core config from bundled defaults, then rebuild all IDE-facing metadata."""
+    _require_init(target_root)
+    ll.sync_core_config_from_defaults(target_root)
+    needs_skill = _any_extension_has_skill_files(target_root)
+    needs_mcp = _any_extension_has_mcp_servers(target_root)
+    for ide in ll.list_ides(target_root):
+        _warn_capability_gaps(
+            ide,
+            ide_get(ide).detect(target_root).capabilities,
+            needs_skill_render=needs_skill,
+            needs_mcp_merge=needs_mcp,
+        )
+    merged_any = False
+    for ide in ll.list_ides(target_root):
+        for ext in ll.list_extensions(target_root):
+            names = refresh_mcp(target_root, ide, ext, emit_mcp_merged_notice=False)
+            if names:
+                merged_any = True
+        _refresh_skills_all_extensions_for_ide(target_root, ide)
+    for ide in ll.list_ides(target_root):
+        refresh_agent_ignore(target_root, ide)
+    if merged_any:
+        print(MCP_MERGED_NOTICE)
+    refresh_gitignore(target_root)
+    refresh_navigation(target_root)
+    for ide in ll.list_ides(target_root):
+        refresh_entry_point(target_root, ide)
+
+
 def _refresh_extension_core(target_root: Path, extension: str) -> None:
     needs_skill = _any_extension_has_skill_files(target_root)
     needs_mcp = bool(ll.list_mcp(target_root, extension).servers)
@@ -536,6 +566,7 @@ __all__ = [
     "refresh_gitignore",
     "refresh_mcp",
     "refresh_navigation",
+    "refresh_repository",
     "refresh_rules_navigation",
     "refresh_skills",
     "reinstall_extension",

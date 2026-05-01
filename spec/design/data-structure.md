@@ -309,7 +309,9 @@ extensions:
 ```
 
 These files record Spawn ownership only. They are not the source of extension
-truth.
+truth. Rendered skill bodies list mandatory and contextual paths from extension
+`localRead` / `globalRead` and from **rules** entries in `spawn/navigation.yaml`
+(see `spec/design/agentic-flow.md`).
 
 ## Target Files And Extension Files
 

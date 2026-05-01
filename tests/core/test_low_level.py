@@ -3,6 +3,7 @@ from __future__ import annotations
 import time
 import uuid
 import warnings
+from importlib import resources
 from pathlib import Path
 
 import pytest
@@ -10,7 +11,7 @@ from ruamel.yaml import YAML
 
 from spawn_cli.core import low_level as ll
 from spawn_cli.core.errors import SpawnError, SpawnWarning
-from spawn_cli.io.yaml_io import configure_yaml_dump
+from spawn_cli.io.yaml_io import configure_yaml_dump, load_yaml
 
 YAML_W = YAML(typ="safe")
 configure_yaml_dump(YAML_W)
@@ -230,6 +231,60 @@ def test_generate_skills_metadata_required_paths_normalized_dedup(tmp_path: Path
     auto_norm = {ll._norm_read_path(r.file) for r in m.auto_read}
     assert auto_norm == {ll._norm_read_path("ctx.md")}
     assert not (req_norm & auto_norm)
+
+
+def test_generate_skills_metadata_includes_navigation_rules_refs(tmp_path: Path) -> None:
+    ll.init(tmp_path)
+    cfg = {
+        "name": "spectask",
+        "version": "1.0.0",
+        "schema": 1,
+        "files": {},
+        "skills": {"one.md": {}},
+    }
+    root = tmp_path / "spawn" / ".extend" / "spectask"
+    skill_dir = root / "skills"
+    skill_dir.mkdir(parents=True)
+    (skill_dir / "one.md").write_text("---\nname: one\n---\n\nbody\n", encoding="utf-8")
+    _write_yaml(root / "config.yaml", cfg)
+    same_path = "spawn/rules/both.md"
+    _write_yaml(
+        tmp_path / "spawn" / "navigation.yaml",
+        {
+            "read-required": [
+                {
+                    "rules": [
+                        {
+                            "path": "spawn/rules/required.md",
+                            "description": "Req rule.",
+                        },
+                        {"path": same_path, "description": "In required tier."},
+                    ],
+                },
+            ],
+            "read-contextual": [
+                {
+                    "rules": [
+                        {
+                            "path": "spawn/rules/context.md",
+                            "description": "Ctx rule.",
+                        },
+                        {"path": same_path, "description": "Also in contextual (ignored)."},
+                    ],
+                },
+            ],
+        },
+    )
+
+    m = next(x for x in ll.generate_skills_metadata(tmp_path, "spectask") if x.name == "one")
+    req_by = {ll._norm_read_path(r.file): r.description for r in m.required_read}
+    assert ll._norm_read_path("spawn/rules/required.md") in req_by
+    assert req_by[ll._norm_read_path("spawn/rules/required.md")] == "Req rule."
+    assert ll._norm_read_path(same_path) in req_by
+    auto_by = {ll._norm_read_path(r.file): r.description for r in m.auto_read}
+    assert ll._norm_read_path("spawn/rules/context.md") in auto_by
+    assert auto_by[ll._norm_read_path("spawn/rules/context.md")] == "Ctx rule."
+    assert ll._norm_read_path(same_path) not in auto_by
 
 
 def test_save_extension_navigation_contextual_omits_paths_in_required(tmp_path: Path) -> None:
@@ -456,3 +511,42 @@ def test_navigation_yaml_roundtrip_preserves_comments(tmp_path: Path) -> None:
     assert "# Footer" in text
     assert "spectask" in text
     assert "spec/main.md" in text
+
+
+def test_sync_core_config_from_defaults_overwrites_with_bundled_defaults(tmp_path: Path) -> None:
+    ll.init(tmp_path)
+    cfg = tmp_path / "spawn" / ".core" / "config.yaml"
+    _write_yaml(
+        cfg,
+        {
+            "version": "0.0.1",
+            "agent-ignore": [
+                "spawn/.extend/**",
+                "custom/glob/**",
+            ],
+        },
+    )
+    ll.sync_core_config_from_defaults(tmp_path)
+    out = load_yaml(cfg)
+    bundled_txt = resources.files("spawn_cli.resources").joinpath("default_core_config.yaml").read_text(
+        encoding="utf-8"
+    )
+    expected = YAML_W.load(bundled_txt)
+    assert isinstance(expected, dict)
+    assert out == expected
+
+
+def test_sync_core_config_from_defaults_rejects_invalid_core(tmp_path: Path) -> None:
+    ll.init(tmp_path)
+    cfg = tmp_path / "spawn" / ".core" / "config.yaml"
+    _write_yaml(cfg, {"agent-ignore": []})
+    with pytest.raises(SpawnError, match="invalid spawn"):
+        ll.sync_core_config_from_defaults(tmp_path)
+
+
+def test_sync_core_config_from_defaults_rejects_empty_file(tmp_path: Path) -> None:
+    ll.init(tmp_path)
+    cfg = tmp_path / "spawn" / ".core" / "config.yaml"
+    cfg.write_text("", encoding="utf-8")
+    with pytest.raises(SpawnError, match="empty or invalid"):
+        ll.sync_core_config_from_defaults(tmp_path)
