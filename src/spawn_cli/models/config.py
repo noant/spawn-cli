@@ -40,6 +40,15 @@ class SkillEntry(BaseModel):
     required_read: list[str] = Field(default_factory=list, alias="required-read")
 
 
+class ExtensionHints(BaseModel):
+    """Optional extension-authored hints (plain strings only)."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    global_: list[str] = Field(default_factory=list, alias="global")
+    local: list[str] = Field(default_factory=list)
+
+
 class SetupConfig(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
@@ -62,6 +71,7 @@ class ExtensionConfig(BaseModel):
     git_ignore: list[str] = Field(default_factory=list, alias="git-ignore")
     skills: dict[str, SkillEntry] = Field(default_factory=dict)
     setup: Optional[SetupConfig] = None
+    hints: Optional[ExtensionHints] = None
 
 
 class CoreConfig(BaseModel):

@@ -113,6 +113,10 @@ uv sync
 
 Chain commands in order (e.g. `spawn init`, then `spawn build install "<path>"`).
 
+## Editing `spawn/navigation.yaml`
+
+Maintainers may **hand-edit** **`rules`** groups: paths, **`description`**, and an optional **`hint`** on rows under **`read-required`** only (hints on **`read-contextual` → `rules`** are not consumed into skills or the AGENTS hint rollup). Do **not** manually maintain **`ext`** stanzas (YAML list entries with **`ext:`** and **`files`**, and mirrored **`hints`**): Spawn **overwrites** those blocks when navigation is refreshed. Prefer changing extension-owned text in **`extsrc/config.yaml`** (`hints.global` / `hints.local`) and re-running refresh.
+
 ## Commands and options
 
 The CLI is built with nested `argparse` subcommands. Unless noted, every command after **`spawn init`** requires an initialized repo, runs under the **Spawn lock**, and uses **`Path.cwd()`** as the target root (see **Requirements**). Deeper semantics (validation order, recovery): [`utility.md`](utility.md).

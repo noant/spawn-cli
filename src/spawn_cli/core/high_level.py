@@ -169,7 +169,17 @@ def remove_mcp(target_root: Path, ide: str, extension: str) -> None:
 
 def refresh_entry_point(target_root: Path, ide: str) -> None:
     _require_init(target_root)
-    ide_get(ide).rewrite_entry_point(target_root, SPAWN_ENTRY_POINT_PROMPT)
+    rollup = ll.rollup_hints_for_agents(target_root)
+    ll.warn_if_agents_hints_exceed_measurement(rollup)
+    if rollup:
+        prompt = (
+            f"{SPAWN_ENTRY_POINT_PROMPT}\nHints:\n"
+            + "\n".join(f"- {h}" for h in rollup)
+            + "\n"
+        )
+    else:
+        prompt = SPAWN_ENTRY_POINT_PROMPT
+    ide_get(ide).rewrite_entry_point(target_root, prompt)
 
 
 def refresh_extension_for_ide(target_root: Path, ide: str, extension: str) -> None:
@@ -192,6 +202,7 @@ def refresh_extension_for_ide(target_root: Path, ide: str, extension: str) -> No
     refresh_mcp(target_root, ide, extension)
     _refresh_skills_all_extensions_for_ide(target_root, ide)
     refresh_agent_ignore(target_root, ide)
+    refresh_navigation(target_root)
 
 
 def remove_extension_for_ide(target_root: Path, ide: str, extension: str) -> None:

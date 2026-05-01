@@ -8,6 +8,7 @@ from spawn_cli.models.config import (
     ExtensionConfig,
     ExtensionFileEntry,
     ExtensionFolderEntry,
+    ExtensionHints,
     FileMode,
     IdeList,
     ReadFlag,
@@ -109,3 +110,14 @@ def test_source_yaml_optional_branch() -> None:
     }
     sy = SourceYaml.model_validate(raw)
     assert sy.source.branch == "main"
+
+
+def test_extension_hints_global_local_aliases() -> None:
+    h = ExtensionHints.model_validate({"global": [" one ", "two"], "local": ["skill-only"]})
+    assert h.global_ == [" one ", "two"]
+    assert h.local == ["skill-only"]
+
+
+def test_extension_hints_rejects_non_string_entries() -> None:
+    with pytest.raises(ValidationError):
+        ExtensionHints.model_validate({"global": [1, "ok"], "local": []})

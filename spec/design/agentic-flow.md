@@ -77,17 +77,22 @@ Navigation is generated from two sources:
 - extension files with `globalRead: required` or `globalRead: auto`;
 - user-maintained local rules under `spawn/rules/`.
 
+Merged **`spawn/navigation.yaml`** may also carry **hints**: each extension’s **`- ext:`** entry can include a **`hints`** list (mirrored from that pack’s **`hints.global`** in **`config.yaml`**). Optional **`hint`** on **`rules`** rows applies to **maintainer edits**; only hints on **`read-required` → `rules`** are merged into **skills** and the IDE **Hints:** rollup for **`AGENTS.md`** (**`hint`** on **`read-contextual` → `rules`** is ignored for those pipelines). Deduping is by exact stripped string (first occurrence wins ordering across streams).
+
 Example:
 
 ```yaml
 read-required:
   - ext: spectask
+    hints:
+      - Prefer spectask steps in order.
     files:
       - path: spec/main.md
         description: Spec task process.
   - rules:
       - path: spawn/rules/team.yaml
         description: Team rules.
+        hint: Keep replies concise for this repo.
 read-contextual:
   - ext: spectask
     files:
@@ -111,7 +116,7 @@ When a skill is used:
 1. Read `spawn/navigation.yaml` if it has not already been read.
 2. Read the skill's mandatory files.
 3. Consider the skill's contextual files.
-4. Follow the skill body.
+4. Follow the skill body and any **Hints** list rendered in the skill file.
 5. Continue to respect global navigation and local rules.
 
 Spawn rendering also duplicates paths from `spawn/navigation.yaml` **rules**
@@ -120,6 +125,8 @@ contextual reads (`read-contextual` → `rules`), with the same path-normalizati
 and dedup rules as navigation (mandatory tier wins when a path appears in
 both). That way agents opening a skill in the IDE still see repo rule files listed
 explicitly without maintaining a parallel list in extension config.
+
+**Hints in rendered skills:** normalized metadata adds a **Hints:** section **after** the skill **body** and **before** **Mandatory reads**. Hint strings are plain text, merged from **each** installed extension’s **`hints.global`** (installed-extension order), then **`hints.local`** only for the extension that owns the skill, then **`read-required` `rules`** row **`hint`** values (deduped; first occurrence wins across streams). **Rendered skills** apply a per-hint and combined-size budget: **`SpawnWarning`** when limits are exceeded, and the block may be **truncated** (including a terminal bullet with `...`). **AGENTS.md** (managed block) lists the same rollup class of hints **without truncation**; oversize content still emits **`SpawnWarning`** with guidance to shorten hints or reduce installed extensions. **`hints.local`** is **not** included in the AGENTS rollup (skills only).
 
 `spawn/navigation.yaml` remains the canonical index of which repository rules exist
 and whether each is mandatory or contextual for the merged navigation surface.
@@ -135,6 +142,8 @@ Read every file listed under `read-required`.
 Inspect `read-contextual` descriptions and read only files relevant to the
 current task.
 ```
+
+When hints are present, Spawn appends a **`Hints:`** bullet list (full text, no truncation) built from **`rollup_hints_for_agents`** — extension **`hints.global`** in installed-extension order, then maintainer **`read-required` → `rules`** hints — and may emit warnings if size thresholds are exceeded.
 
 Adapters may format the block differently, but the semantic contract is the
 same across IDEs.
@@ -185,12 +194,18 @@ for skill_path in list-skills(extension):
 not need to repeat files from `local_required` or `global_required`, because the
 generation step always merges those categories and removes duplicates.
 
+**Hints** use the **same breadth for `hints.global`** as flattened global mandatory
+reads: every installed extension’s **`hints.global`** list contributes in
+extension-order before **`hints.local`** for the **`extension`** argument, then maintainer **`read-required` → `rules` → `hint`** strings (exact merge and dedupe in `low_level.generate_skills_metadata`).
+
 Illustrative output pseudostructure:
 
 ```yaml
 name: spectask-execute
 description: Execute approved spectasks.
 content: "Skill body without optional name/description notation."
+hints:
+  - Prefer spectask steps in order.
 required-read:
   - file: spec/main.md
     description: Spec task process.
@@ -211,10 +226,10 @@ A rendered skill must include:
 - name;
 - description;
 - original skill content;
-- mandatory read files;
+- optional **Hints** bullets (from metadata), placed after the body;
+- mandatory read files (`spawn/navigation.yaml` listed once, last among mandatory bullets);
 - contextual read files;
-- instruction to consult `spawn/navigation.yaml` for additional repository
-  context.
+- repository context via those reads (including the navigation path).
 
 Example rendered Markdown:
 
@@ -224,15 +239,19 @@ name: spectask-execute
 description: Execute approved spectasks.
 ---
 
-Read `spawn/navigation.yaml` first.
+Use this skill body...
+
+Optional when hints exist:
+
+Hints:
+- Prefer spectask steps in order.
 
 Mandatory reads:
 - `spec/main.md` - Spec task process.
+- `spawn/navigation.yaml` - Merged Spawn navigation (read-required, read-contextual).
 
 Contextual reads:
 - `spec/design/hla.md` - Read when architecture context is needed.
-
-Use this skill body...
 ```
 
 Rendered skills are the active skill surface. Source skills in

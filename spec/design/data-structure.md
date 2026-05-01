@@ -199,6 +199,11 @@ setup:
   before-uninstall: before_uninstall.py
   after-uninstall: after_uninstall.py
   healthcheck: healthcheck.py
+hints:
+  global:
+    - Short reminder surfaced in navigation, every rendered skill, and AGENTS rollup.
+  local:
+    - Reminder appended only to this pack's rendered skills (not AGENTS).
 ```
 
 `name` is the stable extension identifier. It should match the installed folder
@@ -223,6 +228,7 @@ skill-specific mandatory reads.
 
 `setup` references Python scripts under `setup/`. Every script is optional and
 must be idempotent.
+`hints` optional: `global` and `local` plain-string lists; behavior and aggregation rules are in section 4.9 of `extension-author-guide.md`. `global` mirrors into `spawn/navigation.yaml` under this extension, merges across all packs into every rendered skill hints and into the AGENTS hint rollup; `local` merges only into this pack's rendered skills.
 
 Allowed enum values:
 

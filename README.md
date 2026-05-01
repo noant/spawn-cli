@@ -10,7 +10,7 @@ Spawn is a framework for building **AIDD** (AI-driven development) methodologies
 
 Several methodologies in one repo stay aligned because Spawn maintains **one shared navigation index**: [`spawn/navigation.yaml`](spec/design/data-structure.md) aggregates mandatory and contextual reads from **every installed extension** plus local [`spawn/rules/`](spec/design/user-guide.md) (refreshed with `spawn rules refresh`). Agents are steered through that file instead of chasing disconnected README fragments.
 
-On each install or refresh, the CLI **regenerates IDE-facing artifacts** so skills and entry points stay consistent across extensions: rendered skill bodies include **paths and descriptions** wired from navigation (required reads, contextual hints, rule files), MCP snippets normalize server definitions per IDE adapter, and ignore lists merge without manual copy-paste. The net effect is that methodology files, generated skill links, and repo rules **compose** rather than contradict each other.
+On each install or refresh, the CLI **regenerates IDE-facing artifacts** so skills and entry points stay consistent across extensions: rendered skill bodies include **paths and descriptions** wired from navigation (required reads, contextual hints, rule files), MCP snippets normalize server definitions per IDE adapter, and ignore lists merge without manual copy-paste. The net effect is that methodology files, generated skill links, and repo rules **compose** rather than contradict each other. Optional `hints` add short reminders to rendered skills and the Spawn-managed entry block.
 
 **Example:** [**spawn-ext-spectask**](https://github.com/noant/spawn-ext-spectask) (Spec-Tasks methodology: spec layout, skills, design index) and [**spawn-ext-creator**](https://github.com/noant/spawn-ext-creator) (authoring flows, including agent-guided extension bootstrap) can be installed in the **same** repository and still share that single index and merged IDE outputs.
 
@@ -172,7 +172,7 @@ Read **[spec/design/extension-author-guide.md](spec/design/extension-author-guid
 
 **Minimal mental model:**
 
-- `**extsrc/config.yaml`** — `schema`, `version`, stable `**name`** (install path `spawn/.extend/<name>/`), plus `files`, `skills`, ignores, etc.
+- `**extsrc/config.yaml`** — `schema`, `version`, stable `**name`** (install path `spawn/.extend/<name>/`), plus `files`, `skills`, ignores, optional `hints`, etc.
 - `**extsrc/files/**` — template tree mirrored into the target repo according to `files:` entries.
 - `**spawn extension check . --strict**` — validate before publishing or tagging a release.
 

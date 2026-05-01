@@ -36,7 +36,8 @@ def _mandatory_reads_for_render(skill: SkillMetadata) -> list[SkillFileRef]:
 
 def render_skill_md(skill: SkillMetadata) -> str:
     """Render normalized skill to Markdown with frontmatter, skill body,
-    mandatory reads (navigation path last), and contextual reads."""
+    hints (stable order from metadata), mandatory reads (navigation path last),
+    and contextual reads."""
     lines = [
         "---",
         f"name: {skill.name}",
@@ -45,8 +46,13 @@ def render_skill_md(skill: SkillMetadata) -> str:
         "",
         skill.content,
         "",
-        "Mandatory reads:",
     ]
+    if skill.hints:
+        lines += ["Hints:"]
+        for h in skill.hints:
+            lines += [f"- {h}"]
+        lines += [""]
+    lines += ["Mandatory reads:"]
     for ref in _mandatory_reads_for_render(skill):
         lines += [f"- `{ref.file}` - {ref.description}"]
     lines += [""]

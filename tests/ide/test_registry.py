@@ -166,6 +166,30 @@ def test_render_skill_md_mandatory_nav_deduped() -> None:
     assert "Second" not in md
 
 
+def test_render_skill_md_hints_before_mandatory_reads() -> None:
+    from spawn_cli.models.skill import SkillFileRef, SkillMetadata
+
+    md = render_skill_md(
+        SkillMetadata(
+            name="n",
+            description="d",
+            content="body",
+            hints=["alpha", "beta"],
+            required_read=[
+                SkillFileRef(file="spec/main.md", description="Main spec"),
+            ],
+            auto_read=[],
+        )
+    )
+    idx_body = md.index("body")
+    idx_hints = md.index("Hints:")
+    idx_mand = md.index("Mandatory reads:")
+    assert idx_body < idx_hints < idx_mand
+    assert "- alpha" in md and "- beta" in md
+    sect = md.split("Mandatory reads:", 1)[0]
+    assert sect.rstrip().endswith("beta")
+
+
 def test_rewrite_managed_block_creates(tmp_path: Path) -> None:
     f = tmp_path / "AGENTS.md"
     rewrite_managed_block(f, "hello")

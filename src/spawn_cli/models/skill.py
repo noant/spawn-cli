@@ -25,5 +25,6 @@ class SkillMetadata(BaseModel):
     name: str
     description: str
     content: str
+    hints: list[str] = Field(default_factory=list)
     required_read: list[SkillFileRef] = Field(default_factory=list)
     auto_read: list[SkillFileRef] = Field(default_factory=list)

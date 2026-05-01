@@ -5,6 +5,7 @@ import uuid
 import warnings
 from importlib import resources
 from pathlib import Path
+from typing import Any
 
 import pytest
 from ruamel.yaml import YAML
@@ -287,6 +288,171 @@ def test_generate_skills_metadata_includes_navigation_rules_refs(tmp_path: Path)
     assert ll._norm_read_path(same_path) not in auto_by
 
 
+def test_generate_skills_metadata_hints_merge_and_contextual_ignored(tmp_path: Path) -> None:
+    ll.init(tmp_path)
+    cfg = {
+        "name": "spectask",
+        "version": "1.0.0",
+        "schema": 1,
+        "files": {},
+        "skills": {"one.md": {}},
+        "hints": {"global": ["  global dup ", "global dup"], "local": ["local hint"]},
+    }
+    root = tmp_path / "spawn" / ".extend" / "spectask"
+    skill_dir = root / "skills"
+    skill_dir.mkdir(parents=True)
+    (skill_dir / "one.md").write_text("---\nname: one\n---\nbody\n", encoding="utf-8")
+    _write_yaml(root / "config.yaml", cfg)
+
+    _write_yaml(
+        tmp_path / "spawn" / "navigation.yaml",
+        {
+            "read-required": [
+                {
+                    "rules": [
+                        {"path": "spawn/rules/r1.md", "description": "", "hint": "from required"},
+                        {"path": "spawn/rules/r2.md", "description": "", "hint": "global dup"},
+                    ],
+                },
+            ],
+            "read-contextual": [
+                {
+                    "rules": [{"path": "spawn/rules/c1.md", "description": "", "hint": "contextual skipped"}],
+                },
+            ],
+        },
+    )
+
+    m = next(x for x in ll.generate_skills_metadata(tmp_path, "spectask") if x.name == "one")
+    assert m.hints
+    joined = "\n".join(m.hints)
+    assert joined.index("global dup") < joined.index("local hint")
+    assert joined.index("local hint") < joined.index("from required")
+    assert "contextual skipped" not in joined
+
+
+def test_generate_skills_metadata_global_hints_from_all_extensions(tmp_path: Path) -> None:
+    """hints.global behaves like cross-extension mandatory reads: every skill sees every pack's globals."""
+    ll.init(tmp_path)
+    extend = tmp_path / "spawn" / ".extend"
+
+    def _minimal_cfg(name: str, **extra: Any) -> dict[str, Any]:
+        return {
+            "name": name,
+            "version": "1.0.0",
+            "schema": 1,
+            "files": {},
+            "skills": {"one.md": {}},
+            **extra,
+        }
+
+    alfa_root = extend / "alfa"
+    alfa_skill = alfa_root / "skills"
+    alfa_skill.mkdir(parents=True)
+    (alfa_skill / "one.md").write_text("---\nname: one\n---\na\n", encoding="utf-8")
+    _write_yaml(
+        alfa_root / "config.yaml",
+        _minimal_cfg("alfa", hints={"global": ["from alfa"]}),
+    )
+
+    beta_root = extend / "betaext"
+    beta_skill = beta_root / "skills"
+    beta_skill.mkdir(parents=True)
+    (beta_skill / "one.md").write_text("---\nname: one\n---\nb\n", encoding="utf-8")
+    _write_yaml(
+        beta_root / "config.yaml",
+        _minimal_cfg(
+            "betaext",
+            hints={"global": ["from beta"], "local": ["only on beta skill"]},
+        ),
+    )
+
+    _write_yaml(tmp_path / "spawn" / "navigation.yaml", {"read-required": [], "read-contextual": []})
+
+    m_beta = next(x for x in ll.generate_skills_metadata(tmp_path, "betaext") if x.name == "one")
+    m_alfa = next(x for x in ll.generate_skills_metadata(tmp_path, "alfa") if x.name == "one")
+
+    beta_joined = "\n".join(m_beta.hints)
+    assert beta_joined.index("from alfa") < beta_joined.index("from beta")
+    assert beta_joined.index("from beta") < beta_joined.index("only on beta skill")
+
+    alfa_joined = "\n".join(m_alfa.hints)
+    assert "from alfa" in alfa_joined and "from beta" in alfa_joined
+    assert "only on beta skill" not in alfa_joined
+
+
+def test_generate_skills_metadata_skill_hint_per_hint_truncate_warns(tmp_path: Path) -> None:
+    ll.init(tmp_path)
+    long = "a" * 520
+    cfg = {
+        "name": "spectask",
+        "version": "1.0.0",
+        "schema": 1,
+        "files": {},
+        "skills": {"one.md": {}},
+        "hints": {"global": [long]},
+    }
+    root = tmp_path / "spawn" / ".extend" / "spectask"
+    skill_dir = root / "skills"
+    skill_dir.mkdir(parents=True)
+    (skill_dir / "one.md").write_text("---\nname: one\n---\nbody\n", encoding="utf-8")
+    _write_yaml(root / "config.yaml", cfg)
+    _write_yaml(tmp_path / "spawn" / "navigation.yaml", {"read-required": [], "read-contextual": []})
+
+    with warnings.catch_warnings(record=True) as wrec:
+        warnings.simplefilter("always")
+        m = next(x for x in ll.generate_skills_metadata(tmp_path, "spectask") if x.name == "one")
+    assert len(m.hints) == 1
+    assert m.hints[0] == "a" * 512
+    assert any(issubclass(w.category, SpawnWarning) and "512" in str(w.message) for w in wrec)
+
+
+def test_generate_skills_metadata_combined_budget_adds_ellipsis_hint(tmp_path: Path) -> None:
+    ll.init(tmp_path)
+    pieces = []
+    for i in range(20):
+        pieces.append("-".join(["hint", str(i), "x" * 200]))
+    cfg = {
+        "name": "spectask",
+        "version": "1.0.0",
+        "schema": 1,
+        "files": {},
+        "skills": {"one.md": {}},
+        "hints": {"global": pieces},
+    }
+    root = tmp_path / "spawn" / ".extend" / "spectask"
+    skill_dir = root / "skills"
+    skill_dir.mkdir(parents=True)
+    (skill_dir / "one.md").write_text("---\nname: one\n---\nbody\n", encoding="utf-8")
+    _write_yaml(root / "config.yaml", cfg)
+    _write_yaml(tmp_path / "spawn" / "navigation.yaml", {"read-required": [], "read-contextual": []})
+
+    with warnings.catch_warnings(record=True) as wrec:
+        warnings.simplefilter("always")
+        m = next(x for x in ll.generate_skills_metadata(tmp_path, "spectask") if x.name == "one")
+    assert "..." in m.hints
+    block = "Hints:\n" + "\n".join(f"- {h}" for h in m.hints)
+    assert len(block) <= ll._SKILL_HINT_SECTION_COMBINED_MAX_CHARS
+    assert any(issubclass(w.category, SpawnWarning) and "4096" in str(w.message) for w in wrec)
+
+
+def test_rollup_hints_for_agents_excludes_local(tmp_path: Path) -> None:
+    ll.init(tmp_path)
+    ext = tmp_path / "spawn" / ".extend" / "spectask"
+    ext.mkdir(parents=True)
+    cfg = {
+        "name": "spectask",
+        "version": "1.0.0",
+        "schema": 1,
+        "files": {},
+        "skills": {},
+        "hints": {"global": ["g"], "local": ["loc"]},
+    }
+    _write_yaml(ext / "config.yaml", cfg)
+    nav = ll.rollup_hints_for_agents(tmp_path)
+    assert nav == ["g"]
+
+
 def test_save_extension_navigation_contextual_omits_paths_in_required(tmp_path: Path) -> None:
     ll.init(tmp_path)
     from spawn_cli.models.skill import SkillFileRef
@@ -410,6 +576,114 @@ def test_save_rules_navigation_missing_rule_warns(tmp_path: Path) -> None:
     nav_after = YAML_W.load((tmp_path / "spawn" / "navigation.yaml").read_text(encoding="utf-8"))
     rules_grp = next(g for g in nav_after["read-required"] if isinstance(g, dict) and "rules" in g)
     assert rules_grp["rules"] == []
+
+
+def test_save_extension_navigation_hints_roundtrip_and_contextual_omits_hints(tmp_path: Path) -> None:
+    ll.init(tmp_path)
+    from spawn_cli.models.skill import SkillFileRef
+
+    ext = tmp_path / "spawn" / ".extend" / "spectask"
+    ext.mkdir(parents=True)
+    _write_yaml(
+        ext / "config.yaml",
+        {
+            "name": "spectask",
+            "version": "1.0.0",
+            "schema": 1,
+            "hints": {"global": ["  Alpha ", "Beta", "Beta"], "local": ["only skills"]},
+            "files": {},
+            "skills": {},
+            "folders": {},
+        },
+    )
+    ll.save_extension_navigation(
+        tmp_path,
+        "spectask",
+        [SkillFileRef(file="spec/main.md", description="req")],
+        [SkillFileRef(file="spec/other.md", description="ctx")],
+    )
+    nav = YAML_W.load((tmp_path / "spawn" / "navigation.yaml").read_text(encoding="utf-8"))
+    rq = next(g for g in nav["read-required"] if isinstance(g, dict) and g.get("ext") == "spectask")
+    cq = next(g for g in nav["read-contextual"] if isinstance(g, dict) and g.get("ext") == "spectask")
+    assert rq["hints"] == ["Alpha", "Beta"]
+    assert "hints" not in cq
+
+
+def test_save_extension_navigation_oversized_global_hint_warns_and_truncates(tmp_path: Path) -> None:
+    ll.init(tmp_path)
+    from spawn_cli.models.skill import SkillFileRef
+
+    long_hint = "x" * 513
+    ext = tmp_path / "spawn" / ".extend" / "spectask"
+    ext.mkdir(parents=True)
+    _write_yaml(
+        ext / "config.yaml",
+        {
+            "name": "spectask",
+            "version": "1.0.0",
+            "schema": 1,
+            "hints": {"global": [long_hint]},
+            "files": {},
+            "skills": {},
+            "folders": {},
+        },
+    )
+    with warnings.catch_warnings(record=True) as wrec:
+        warnings.simplefilter("always")
+        ll.save_extension_navigation(
+            tmp_path,
+            "spectask",
+            [SkillFileRef(file="spec/main.md", description="req")],
+            [],
+        )
+    assert any(isinstance(w.message, SpawnWarning) for w in wrec)
+    nav = YAML_W.load((tmp_path / "spawn" / "navigation.yaml").read_text(encoding="utf-8"))
+    rq = next(g for g in nav["read-required"] if isinstance(g, dict) and g.get("ext") == "spectask")
+    assert rq["hints"] == ["x" * 512]
+
+
+def test_save_rules_navigation_preserves_hint_on_rules_rows(tmp_path: Path) -> None:
+    ll.init(tmp_path)
+    req_rule = tmp_path / "spawn" / "rules" / "req.md"
+    req_rule.parent.mkdir(parents=True, exist_ok=True)
+    req_rule.write_text("x\n", encoding="utf-8")
+    ctx_rule = tmp_path / "spawn" / "rules" / "ctx.md"
+    ctx_rule.write_text("y\n", encoding="utf-8")
+    _write_yaml(
+        tmp_path / "spawn" / "navigation.yaml",
+        {
+            "read-required": [
+                {
+                    "rules": [
+                        {
+                            "path": "spawn/rules/req.md",
+                            "description": "Required.",
+                            "hint": "Keep required concise.",
+                        },
+                    ],
+                },
+            ],
+            "read-contextual": [
+                {
+                    "rules": [
+                        {
+                            "path": "spawn/rules/ctx.md",
+                            "description": "Contextual.",
+                            "hint": "Context hint preserved.",
+                        },
+                    ],
+                },
+            ],
+        },
+    )
+    ll.save_rules_navigation(tmp_path)
+    nav = YAML_W.load((tmp_path / "spawn" / "navigation.yaml").read_text(encoding="utf-8"))
+    rq_rules = next(g for g in nav["read-required"] if isinstance(g, dict) and "rules" in g)["rules"]
+    cq_rules = next(g for g in nav["read-contextual"] if isinstance(g, dict) and "rules" in g)["rules"]
+    req_row = next(r for r in rq_rules if ll._norm_read_path(str(r["path"])) == ll._norm_read_path("spawn/rules/req.md"))
+    ctx_row = next(r for r in cq_rules if ll._norm_read_path(str(r["path"])) == ll._norm_read_path("spawn/rules/ctx.md"))
+    assert req_row["hint"] == "Keep required concise."
+    assert ctx_row["hint"] == "Context hint preserved."
 
 
 def test_validate_rendered_identity_duplicate_skill(tmp_path: Path) -> None:

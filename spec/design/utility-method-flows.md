@@ -148,7 +148,7 @@ config files. |
 | **Reads** | `list-skills` + per-skill `get-skill-raw-info`; **`get-required-read-global()`** (no extension arg — **dict** keyed by extension; **flatten** all values to build the “all global required” file set across the repo); **`get-auto-read-global()`** same for auto; **`get-required-read-ext-local(extension)`** and **`get-auto-read-local(extension)`** (**flat** lists for the current extension only). |
 | **How** | `required-read = distinct(skill.required-read ∪ local_required ∪ flattened_global_required)`; `auto-read = distinct(local_auto ∪ flattened_global_auto)`; first-seen description wins on duplicates (`2-core-low-level.md` notes). |
 | **Writes** | None (pure transform). |
-| **Meaning** | Produce **normalized `SkillMetadata[]`** for all IDE `add_skills` adapters — single contract across Cursor, Codex, etc. |
+| **Meaning** | Produce **normalized `SkillMetadata[]`** for all IDE `add_skills` adapters — single contract across Cursor, Codex, etc. Populates **`hints`** from **every** extension's **`hints.global`** (flatten order), then **`hints.local`** only for **this** extension, then maintainer **`read-required` → `rules`** `hint` strings (same ordering idea as flattened global mandatory reads); skill-only size limits apply after merge. |
 
 ---
 
@@ -179,7 +179,7 @@ config files. |
 | Aspect | Detail |
 | --- | --- |
 | **Reads** | Current `spawn/navigation.yaml` (round-trip YAML). |
-| **How** | Replace or remove the **extension-keyed** section; empty lists remove the section. |
+| **How** | Replace or remove the **extension-keyed** section; empty lists remove the section. When **`hints.global`** is configured, persist a **`hints`** list on the **`ext`** block (normalized). |
 | **Writes** | `spawn/navigation.yaml`. |
 | **Meaning** | Publish **read-required** / **read-contextual** index for agents; see `agentic-flow.md`. |
 
@@ -406,7 +406,7 @@ Equivalent **full-replace** strategy is acceptable if the adapter applies a sing
 
 | Step | Calls / data | Persistence |
 | --- | --- | --- |
-| 1 | Build constant prompt: read `spawn/navigation.yaml`, consume all `read-required`, choose `read-contextual` by task | — |
+| 1 | Build prompt: static **`SPAWN_ENTRY_POINT_PROMPT`** spine plus optional **`Hints:`** bullets from **`rollup_hints_for_agents`** (see `low_level.rollup_hints_for_agents`, **`warn_if_agents_hints_exceed_measurement`**) | — |
 | 2 | `ide.Get(ide).rewrite_entry_point(targetRoot, prompt)` | Entry file with managed `<!-- spawn:start -->` block |
 
 **Semantics:** Ensure every initialized IDE has the same **navigation contract**
@@ -582,6 +582,19 @@ failures before copy phase.
 | 2 | `remove-ide-from-list(ide)` |
 
 **Semantics:** Leave extensions installed but remove IDE-specific rendered **artifacts**.
+
+---
+
+## 32. High-level: `refresh-extension-for-ide(ide, extension)`
+
+| Order | Action |
+| --- | --- |
+| 1 | `refresh-mcp(ide, extension)` |
+| 2 | Re-render skills for **every** installed extension on `ide` (`_refresh_skills_all_extensions_for_ide`) |
+| 3 | `refresh-agent-ignore(ide)` |
+| 4 | **`refresh-navigation`** |
+
+**Semantics:** IDE-scoped refresh after MCP or skill-driving changes. **Navigation runs after the cross-extension skill pass** (same relative ordering as **`_refresh_extension_core`**, where per-IDE skills complete before **`refresh_navigation`**). Does **not** update the Spawn-managed entry-point file; run **`refresh-entry-point`** or a full extension / repository refresh to rewrite **`AGENTS.md`** (and equivalents) with an updated hint rollup. Implementation: `spawn_cli.core.high_level.refresh_extension_for_ide`.
 
 ---
 

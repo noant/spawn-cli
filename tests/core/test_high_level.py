@@ -324,6 +324,15 @@ def test_refresh_extension_for_ide_mcp_warn_only_when_named_ext_has_servers(
 
 
 @patch("spawn_cli.core.high_level.ide_get", lambda *_a, **_k: _stub_ide())
+def test_refresh_extension_for_ide_calls_refresh_navigation(target: Path) -> None:
+    ll.add_ide_to_list(target, "cursor")
+    _install_ext(target, "e1", skills={"s.md": {"name": "sk", "description": "d"}})
+    with patch.object(hl, "refresh_navigation") as rn:
+        hl.refresh_extension_for_ide(target, "cursor", "e1")
+        rn.assert_called_once_with(target)
+
+
+@patch("spawn_cli.core.high_level.ide_get", lambda *_a, **_k: _stub_ide())
 def test_refresh_mcp(target: Path) -> None:
     ll.add_ide_to_list(target, "cursor")
     _install_ext(
@@ -459,6 +468,63 @@ def test_refresh_entry_point(target: Path) -> None:
         hl.refresh_entry_point(target, "cursor")
     mock.rewrite_entry_point.assert_called_once()
     assert hl.SPAWN_ENTRY_POINT_PROMPT in mock.rewrite_entry_point.call_args[0][1]
+
+
+@patch("spawn_cli.core.high_level.ide_get", lambda *_a, **_k: _stub_ide())
+def test_refresh_entry_point_hints_rollup_skips_local(tmp_path: Path) -> None:
+    target = tmp_path
+    ll.init(target)
+    ll.add_ide_to_list(target, "cursor")
+    _install_ext(target, "e1", skills={"s.md": {"name": "sk", "description": "d"}})
+    cfg = _load_cfg_dict(target / "spawn" / ".extend" / "e1" / "config.yaml")
+    cfg["hints"] = {"global": ["global-for-agents"], "local": ["locals-only"]}
+    _write_yaml(target / "spawn" / ".extend" / "e1" / "config.yaml", cfg)
+    _write_yaml(
+        target / "spawn" / "navigation.yaml",
+        {
+            "read-required": [
+                {
+                    "rules": [
+                        {
+                            "path": "spawn/rules/r.md",
+                            "description": "r",
+                            "hint": " maintainer-required ",
+                        }
+                    ]
+                },
+            ],
+            "read-contextual": [],
+        },
+    )
+    mock = MagicMock(wraps=_stub_ide())
+    with patch("spawn_cli.core.high_level.ide_get", return_value=mock):
+        hl.refresh_entry_point(target, "cursor")
+    prompt = mock.rewrite_entry_point.call_args[0][1]
+    assert hl.SPAWN_ENTRY_POINT_PROMPT in prompt
+    assert "Hints:" in prompt
+    assert "- global-for-agents" in prompt
+    assert "- maintainer-required" in prompt
+    assert "locals-only" not in prompt
+
+
+@patch("spawn_cli.core.high_level.ide_get", lambda *_a, **_k: _stub_ide())
+def test_refresh_entry_point_agents_warnings_for_oversize_hint(tmp_path: Path) -> None:
+    target = tmp_path
+    ll.init(target)
+    ll.add_ide_to_list(target, "cursor")
+    _install_ext(target, "e1", skills={})
+    cfg = _load_cfg_dict(target / "spawn" / ".extend" / "e1" / "config.yaml")
+    cfg["hints"] = {"global": ["x" * 600]}
+    _write_yaml(target / "spawn" / ".extend" / "e1" / "config.yaml", cfg)
+    mock = MagicMock(wraps=_stub_ide())
+    with patch("spawn_cli.core.high_level.ide_get", return_value=mock):
+        with warnings.catch_warnings(record=True) as wrec:
+            warnings.simplefilter("always")
+            hl.refresh_entry_point(target, "cursor")
+        assert mock.rewrite_entry_point.called
+        prompt = mock.rewrite_entry_point.call_args[0][1]
+        assert "x" * 600 in prompt
+        assert any(issubclass(w.category, SpawnWarning) for w in wrec)
 
 
 @patch("spawn_cli.core.high_level.ide_get", lambda *_a, **_k: _stub_ide())

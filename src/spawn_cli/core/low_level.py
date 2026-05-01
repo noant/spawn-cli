@@ -130,6 +130,182 @@ def _load_ext_config(target_root: Path, extension: str) -> ExtensionConfig:
     return ExtensionConfig.model_validate(raw)
 
 
+_EXTENSION_NAV_HINT_MAX_CODEPOINTS = 512
+_SKILL_HINT_SECTION_COMBINED_MAX_CHARS = 4096
+
+
+def _optional_ext_config(target_root: Path, extension: str) -> ExtensionConfig | None:
+    path = _config_path(target_root, extension)
+    if not path.is_file():
+        return None
+    raw = load_yaml(path)
+    if not raw:
+        return None
+    return ExtensionConfig.model_validate(raw)
+
+
+def _normalized_extension_global_hints_for_navigation(cfg: ExtensionConfig) -> list[str]:
+    """Strip, drop empties, dedupe (first wins), warn + truncate to codepoint limit for persisted navigation."""
+
+    raw_list: list[str] = []
+    if cfg.hints is not None:
+        raw_list.extend(cfg.hints.global_)
+    seen: set[str] = set()
+    out: list[str] = []
+    for h in raw_list:
+        s = h.strip()
+        if not s:
+            continue
+        if s in seen:
+            continue
+        seen.add(s)
+        if len(s) > _EXTENSION_NAV_HINT_MAX_CODEPOINTS:
+            warnings.warn(
+                "Extension navigation hint exceeds 512 Unicode code points and was truncated.",
+                SpawnWarning,
+            )
+            s = s[:_EXTENSION_NAV_HINT_MAX_CODEPOINTS]
+        out.append(s)
+    return out
+
+
+def _truncate_hint_codepoints(text: str, max_codepoints: int) -> tuple[str, bool]:
+    if len(text) <= max_codepoints:
+        return text, False
+    return text[:max_codepoints], True
+
+
+def _merge_hint_streams_ordered(streams: list[list[str]]) -> list[str]:
+    """Dedupe stripped strings with first occurrence winning; earlier streams dominate later ones."""
+
+    seen: set[str] = set()
+    out: list[str] = []
+    for stream in streams:
+        for h in stream:
+            s = h.strip()
+            if not s or s in seen:
+                continue
+            seen.add(s)
+            out.append(s)
+    return out
+
+
+def _navigation_read_required_rule_hints_ordered(target_root: Path) -> list[str]:
+    """Plain-text hints from maintainer-authored read-required ``rules`` rows only (YAML order).
+
+    Hint fields on ``read-contextual`` rules are ignored here.
+    """
+    path = _spawn(target_root) / "navigation.yaml"
+    raw = load_yaml(path)
+    if not isinstance(raw, dict):
+        return []
+    rr = raw.get("read-required")
+    if not isinstance(rr, list):
+        return []
+    out: list[str] = []
+    for grp in rr:
+        if not isinstance(grp, dict):
+            continue
+        rules_raw = grp.get("rules")
+        if not isinstance(rules_raw, list):
+            continue
+        for entry in rules_raw:
+            if not isinstance(entry, dict):
+                continue
+            hint_val = entry.get("hint")
+            if isinstance(hint_val, str):
+                out.append(hint_val)
+    return out
+
+
+def _finalize_hints_for_skill_metadata(merged_hints: list[str]) -> list[str]:
+    """512 codepoints per hint + 4096 char ``Hints:`` section (terminal ``- ...`` when clipped)."""
+
+    trimmed: list[str] = []
+    for h in merged_hints:
+        t, clipped = _truncate_hint_codepoints(h, _EXTENSION_NAV_HINT_MAX_CODEPOINTS)
+        if clipped:
+            warnings.warn(
+                "Skill hint exceeds 512 Unicode code points and was truncated for skill metadata.",
+                SpawnWarning,
+            )
+        trimmed.append(t)
+
+    header = "Hints:\n"
+    warn_combined = (
+        "Skill hints truncated to fit combined 4096 character budget for the Hints section; "
+        "shorten hints and/or split skills."
+    )
+
+    def build_block(strings: list[str], with_ellipsis: bool) -> str:
+        lines = [f"- {s}" for s in strings]
+        if with_ellipsis:
+            lines.append("- ...")
+        if not lines:
+            return ""
+        return header + "\n".join(lines)
+
+    fitted: list[str] = []
+    need_ellipsis = False
+
+    for s in trimmed:
+        plain = build_block(fitted + [s], False)
+        if len(plain) <= _SKILL_HINT_SECTION_COMBINED_MAX_CHARS:
+            fitted.append(s)
+            continue
+        with_el = build_block(fitted + [s], True)
+        if len(with_el) <= _SKILL_HINT_SECTION_COMBINED_MAX_CHARS:
+            fitted.append(s)
+            need_ellipsis = True
+            warnings.warn(warn_combined, SpawnWarning)
+            break
+        need_ellipsis = True
+        warnings.warn(warn_combined, SpawnWarning)
+        break
+
+    if need_ellipsis:
+        fitted.append("...")
+    return fitted
+
+
+def _extension_global_hint_streams_ordered(target_root: Path) -> list[list[str]]:
+    """One hint list per extension, in ``list_extensions`` order (sorted ext ids)."""
+
+    streams: list[list[str]] = []
+    for ext in list_extensions(target_root):
+        cfg = _load_ext_config(target_root, ext)
+        streams.append(list(cfg.hints.global_) if cfg.hints else [])
+    return streams
+
+
+def rollup_hints_for_agents(target_root: Path) -> list[str]:
+    """Deduped ordered hints for ``AGENTS.md``: every extension ``hints.global``, then maintainer."""
+
+    streams = _extension_global_hint_streams_ordered(target_root)
+    streams.append(_navigation_read_required_rule_hints_ordered(target_root))
+    return _merge_hint_streams_ordered(streams)
+
+
+def warn_if_agents_hints_exceed_measurement(hints: list[str]) -> None:
+    """Warn when thresholds are exceeded without mutating hints (full text still written)."""
+
+    if any(len(h) > _EXTENSION_NAV_HINT_MAX_CODEPOINTS for h in hints):
+        warnings.warn(
+            "AGENTS.md hints contain at least one hint over 512 Unicode code points "
+            "(full text retained); shorten hints and/or reduce installed extensions.",
+            SpawnWarning,
+        )
+    block = ""
+    if hints:
+        block = "Hints:\n" + "\n".join(f"- {h}" for h in hints)
+    if hints and len(block) > _SKILL_HINT_SECTION_COMBINED_MAX_CHARS:
+        warnings.warn(
+            "AGENTS.md hints exceed combined 4096 character measurement "
+            "(full text retained); shorten hints and/or reduce installed extensions.",
+            SpawnWarning,
+        )
+
+
 def _file_refs_for_global(extension: ExtensionConfig, flag_required: bool) -> list[SkillFileRef]:
     out: list[SkillFileRef] = []
     for path_str, ent in extension.files.items():
@@ -353,6 +529,16 @@ def _required_read_description_for_path(
 
 def generate_skills_metadata(target_root: Path, extension: str) -> list[SkillMetadata]:
     cfg_ext = _load_ext_config(target_root, extension)
+    maintainer_hints = _navigation_read_required_rule_hints_ordered(target_root)
+    global_streams = _extension_global_hint_streams_ordered(target_root)
+    local_raw = list(cfg_ext.hints.local) if cfg_ext.hints else []
+    merged_for_skill = _merge_hint_streams_ordered(
+        [*global_streams, local_raw, maintainer_hints]
+    )
+    skill_hints = (
+        _finalize_hints_for_skill_metadata(merged_for_skill) if merged_for_skill else []
+    )
+
     merged_global_required = _flatten_global_refs_ordered(
         target_root, get_required_read_global_all(target_root)
     )
@@ -422,6 +608,7 @@ def generate_skills_metadata(target_root: Path, extension: str) -> list[SkillMet
                 name=raw.name,
                 description=raw.description,
                 content=raw.content,
+                hints=list(skill_hints),
                 required_read=required_out,
                 auto_read=auto_out,
             )
@@ -832,7 +1019,13 @@ def save_extension_navigation(
     _strip_ext_sections_inplace(rr, extension)
     _strip_ext_sections_inplace(rc, extension)
     if read_required_files:
-        rr.append({"ext": extension, "files": _nav_refs_to_files(read_required_files)})
+        block: dict[str, Any] = {"ext": extension, "files": _nav_refs_to_files(read_required_files)}
+        cfg_opt = _optional_ext_config(target_root, extension)
+        if cfg_opt is not None:
+            hints_nav = _normalized_extension_global_hints_for_navigation(cfg_opt)
+            if hints_nav:
+                block["hints"] = hints_nav
+        rr.append(block)
     if read_contextual_files:
         req_norm = {_norm_read_path(r.file) for r in read_required_files}
         contextual_only = [
@@ -906,7 +1099,14 @@ def save_rules_navigation(target_root: Path) -> None:
             rk = posix_norm(str(entry['path']))
             exists = rk in paths_on_disk and (Path(target_root) / Path(rk)).is_file()
             if exists:
-                out.append({'path': rk, 'description': str(entry.get('description') or 'Local rule file.')})
+                row: dict[str, Any] = {
+                    'path': rk,
+                    'description': str(entry.get('description') or 'Local rule file.'),
+                }
+                hint_val = entry.get('hint')
+                if isinstance(hint_val, str):
+                    row['hint'] = hint_val
+                out.append(row)
             else:
                 warnings.warn(
                     f"Removed missing rule path from navigation: {rk}",
@@ -991,6 +1191,7 @@ __all__ = [
     "remove_from_global_gitignore",
     "remove_ide_metadata_dir",
     "remove_ide_from_list",
+    "rollup_hints_for_agents",
     "save_agent_ignore_list",
     "save_extension_navigation",
     "save_git_ignore_list",
@@ -999,5 +1200,6 @@ __all__ = [
     "save_skills_rendered",
     "supported_ide_keys",
     "validate_rendered_identity",
+    "warn_if_agents_hints_exceed_measurement",
 ]
 

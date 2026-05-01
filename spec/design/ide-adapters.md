@@ -116,6 +116,8 @@ Skill metadata:
 name: spectask-execute
 description: Execute approved spectasks.
 content: "Skill body without optional notation."
+hints:
+  - Prefer spectask steps in order.
 required-read:
   - file: spec/main.md
     description: Spec task process.
@@ -123,6 +125,8 @@ auto-read:
   - file: spec/design/hla.md
     description: Project high-level architecture.
 ```
+
+`SkillMetadata.hints` carries plain-text hint strings (possibly empty): **`hints.global` from every installed extension** plus **`hints.local` for the owning pack** plus maintainer **`read-required` rule** hints (`generate_skills_metadata`). IDE Markdown rendering lists them in a **Hints:** section **after** the skill body and **before** **Mandatory reads** (`spawn_cli.ide._helpers.render_skill_md`).
 
 MCP metadata:
 
@@ -150,6 +154,8 @@ servers:
 The entry point prompt is generated once by Spawn core and passed to every
 adapter. It must tell the agent to read `spawn/navigation.yaml`, read all
 `read-required` entries, and choose `read-contextual` entries by task relevance.
+When **`rollup_hints_for_agents`** returns non-empty hints, the prompt also
+includes a **Hints:** bullet list (full text; warnings only, no truncation).
 
 ## IDE Matrix
 
@@ -173,8 +179,9 @@ Adapters must preserve the same semantic content:
 
 1. Skill name and description.
 2. Original skill body (extension source markdown after frontmatter).
-3. Mandatory reads: merged `required-read` paths plus `spawn/navigation.yaml` exactly once, always the last mandatory bullet.
-4. Contextual reads from `auto-read`.
+3. **Hints** bullets from `SkillMetadata.hints`, when non-empty, **after** the body and **before** mandatory reads.
+4. Mandatory reads: merged `required-read` paths plus `spawn/navigation.yaml` exactly once, always the last mandatory bullet.
+5. Contextual reads from `auto-read`.
 
 ### Markdown Skill Shape
 
@@ -196,6 +203,9 @@ description: Execute approved spectasks.
 ---
 
 {source skill content}
+
+Hints:
+- Short plain-text reminder when `hints` metadata is non-empty.
 
 Mandatory reads:
 - `spec/main.md` - Spec task process.
@@ -243,6 +253,9 @@ alwaysApply: false
 
 {skill body}
 
+Hints:
+- Short reminder when hints exist.
+
 Mandatory reads:
 - ...
 - `spawn/navigation.yaml` - Merged Spawn navigation (read-required, read-contextual).
@@ -269,6 +282,9 @@ applyTo: "**"
 Description: Execute approved spectasks.
 
 {skill body}
+
+Hints:
+- Short reminder when hints exist.
 
 Mandatory reads:
 - ...
@@ -480,6 +496,9 @@ Before working, read `spawn/navigation.yaml`.
 Read every file listed under `read-required`.
 Inspect `read-contextual` descriptions and read only files relevant to the
 current task.
+
+Hints:
+- Example maintainer or extension-global reminder.
 <!-- spawn:end -->
 ```
 

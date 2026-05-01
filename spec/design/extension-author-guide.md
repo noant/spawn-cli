@@ -75,6 +75,7 @@ Use **`schema: 1`** for the current format.
 | `agent-ignore` | no | list of strings | Glob patterns merged into IDE agent-ignore. |
 | `git-ignore` | no | list of strings | Lines merged into target `.gitignore`. |
 | `setup` | no | object | Optional script filenames per lifecycle phase. |
+| `hints` | no | object | Optional **`global`** / **`local`** lists of plain-text agent hints (see §4.9). |
 
 Unknown top-level keys may be rejected or warned in strict validation in future; stick to the keys above.
 
@@ -152,6 +153,18 @@ Optional object. Each value is a **filename** under **`extsrc/setup/`**. If the 
 
 Scripts are **trusted code**. They should be **idempotent**, avoid silently deleting user **artifact** data, and fail loudly when migration is unsafe.
 
+### 4.9 `hints` — optional agent reminders
+
+Optional top-level map. Values are **lists of plain strings** (YAML keys **`global`** / **`local`** → `hints.global` / `hints.local`). Content is **plain text** only (no indirection into other files).
+
+| | **`global`** | **`local`** |
+|---|--------------|-------------|
+| **`spawn/navigation.yaml`** | Mirrored on this pack’s **`read-required`** **`- ext:`** block as **`hints`** | Not written |
+| **Rendered skills** | Every skill includes **all** packs’ **`hints.global`**, in installed-extension order (same breadth idea as flattened global mandatory reads), then this pack’s **`local`**, then maintainer **`read-required` → `rules` → `hint`** | Only skills **owned by this pack** |
+| **AGENTS / entry rollup** | Included (all packs + maintainer hints) | Omitted |
+
+Strip and dedupe by exact string (first occurrence wins). Oversize strings may emit **`SpawnWarning`**; persisted navigation may truncate past **512** Unicode codepoints. Rendered skill **Hints** blocks may truncate overall size; **`AGENTS.md`** keeps full hint text but can still warn on the same measurement thresholds.
+
 ---
 
 ## 5. Skill sources (`extsrc/skills/*.md`)
@@ -195,13 +208,7 @@ The **body** is everything after the closing frontmatter `---`, or the whole fil
 
 Spawn does **not** copy this file as-is into the IDE. It builds **normalized metadata** (name, description, body text, merged required reads, contextual reads) and each **IDE adapter** writes its own format (e.g. per-IDE skill files).
 
-The **logical** rendered Markdown shape (conceptually) is:
-
-1. YAML frontmatter with `name` and `description`.
-2. A line telling the agent to read **`spawn/navigation.yaml`** first.
-3. A **Mandatory reads** list (paths + descriptions).
-4. A **Contextual reads** list (paths + descriptions), if any.
-5. The **skill body** from the source file.
+Spawn’s shared **`render_skill_md`** output order is: YAML frontmatter (`name`, `description`), the **skill body**, an optional **Hints** bullet list (cross-extension **`hints.global`**, this pack’s **`hints.local`**, then maintainer **`read-required` rule** hints), **Mandatory reads** (paths + descriptions, with **`spawn/navigation.yaml` last among mandatory bullets), then **Contextual reads** when present. Agents should treat mandatory reads (including the navigation file) as the index for repo-wide context.
 
 Keep the source body **short and procedural**; long reference material should live under `extsrc/files/` and be exposed via `globalRead` / `localRead` or skill `required-read`.
 
@@ -465,6 +472,12 @@ name: acme-methodology
 
 # Compared as a string on extension update.
 version: "1.0.0"
+
+hints:
+  global:
+    - Prefer spectask steps in order.
+  local:
+    - This skill expects prior spec approval.
 
 # Paths are relative to TARGET repo root.
 files:
