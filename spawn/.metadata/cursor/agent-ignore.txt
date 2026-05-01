@@ -1,3 +1,4 @@
-spawn/.core/**
-spawn/.metadata/**
-spawn/.extend/**
+spec/seeds/**/_DONE_*/
+spec/seeds/**/_DONE_*/**
+spec/tasks/**/_DONE_*/
+spec/tasks/**/_DONE_*/**

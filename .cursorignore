@@ -1,2 +1,11 @@
-# spawn:start
-# spawn:end
+# spawn:core:start
+spawn/.core/**
+spawn/.metadata/**
+spawn/.extend/**
+# spawn:core:end
+# spawn:ext:start
+spec/seeds/**/_DONE_*/
+spec/seeds/**/_DONE_*/**
+spec/tasks/**/_DONE_*/
+spec/tasks/**/_DONE_*/**
+# spawn:ext:end

@@ -25,7 +25,7 @@
 ## Process Overview
 
 ```
-[1] spec created → [2] self spec review → [3] spec review (user) → [4] code implemented → [5] self code review → [6] code review (user) → [7] hla updated
+[1] spec created → [2] self spec review → [3] spec review (user) → [4] code implemented → [5] self code review → [6] code review (user) → [7] design documents updated
 ```
 
 Mark each status [V] on completion. Prompt the user after steps 2, 5, and 6.
@@ -99,22 +99,24 @@ Review all changes: inconsistencies, naming, missing imports, broken contracts. 
 
 On confirmation ("code review passed", "lgtm", "ok"):
 → set [V] "Code review passed"
-→ prompt: "Will now update spec/design/hla.md."
+→ prompt: "Will now update design documents (Step 7)."
 
 ---
 
-## Step 7: HLA Updated
+## Step 7: Design documents updated
 
 **Executor:** AI Agent (current context)
 
 Do not start Step 7 until **Code review passed** is marked (Step 6).
 
-1. Update spec/design/hla.md — create the file if it does not exist yet (always, regardless of scope).
-2. If the task introduced or renamed architecture docs under spec/design/, update **spec/design.yaml** (path + description for each).
-3. Rename folder to _DONE_{X}-{name}.
-4. If Source seed Path in overview is concrete and the listed spec/seeds file has linked task to this overview, rename it once with _DONE_ added.
+1. **Index** — Read **spec/design.yaml**. If missing, only **spec/design/hla.md** applies (Folder Structure); add **spec/design.yaml** when you register more than one path under **spec/design/**.
+2. **Scope** — From subtasks, Execution Scheme, and files changed or added in this task, choose which `path` rows need updates; update all that matter, skip the rest.
+3. **Write** — For each chosen path, align the markdown with the repo after this task; create the file if it is listed but missing.
+4. If the task introduced or renamed architecture docs under **spec/design/**, update **spec/design.yaml** (`path` + `description` for each).
+5. Rename folder to _DONE_{X}-{name}.
+6. If Source seed Path in overview is concrete and the listed spec/seeds file has linked task to this overview, rename it once with _DONE_ added.
 
-→ set [V] "HLA updated"
+→ set [V] "Design documents updated"
 
 ---
 
@@ -133,7 +135,7 @@ Do not start Step 7 until **Code review passed** is marked (Step 6).
 - [ ] Code implemented
 - [ ] Self code review passed
 - [ ] Code review passed
-- [ ] HLA updated
+- [ ] Design documents updated
 
 ## Goal
 {One concise sentence.}
@@ -164,7 +166,7 @@ Omit `## Execution Scheme` if no decomposition (single-file spec).
 
 ---
 
-**Seed** — optional: a Markdown file in `spec/seeds/` to capture an idea fast; Steps 1–7 do not require it unless you deliberately start there. Link from `overview.md` when you promote into a spectask; apply Step 7 item 4 when closing the linked seed.
+**Seed** — optional: a Markdown file in `spec/seeds/` to capture an idea fast; Steps 1–7 do not require it unless you deliberately start there. Link from `overview.md` when you promote into a spectask; apply Step 7 item 6 when closing the linked seed.
 
 ## Seed file template (header)
 
