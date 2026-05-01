@@ -17,6 +17,10 @@ from .github_copilot import GitHubCopilotAdapter
 from .windsurf import WindsurfAdapter
 from .registry import (
     ALIASES,
+    CORE_IGNORE_BLOCK_END,
+    CORE_IGNORE_BLOCK_START,
+    EXT_IGNORE_BLOCK_END,
+    EXT_IGNORE_BLOCK_START,
     IGNORE_BLOCK_END,
     IGNORE_BLOCK_START,
     SPAWN_BLOCK_END,
@@ -43,6 +47,10 @@ __all__ = [
     "GeminiCliAdapter",
     "GitHubCopilotAdapter",
     "DetectResult",
+    "CORE_IGNORE_BLOCK_END",
+    "CORE_IGNORE_BLOCK_START",
+    "EXT_IGNORE_BLOCK_END",
+    "EXT_IGNORE_BLOCK_START",
     "IGNORE_BLOCK_END",
     "IGNORE_BLOCK_START",
     "IdeAdapter",

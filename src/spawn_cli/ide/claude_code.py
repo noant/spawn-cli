@@ -6,6 +6,7 @@ import json
 import warnings
 from pathlib import Path
 
+from spawn_cli.core import low_level as ll
 from spawn_cli.ide import _vacancy as _vac
 from spawn_cli.ide.registry import (
     DetectResult,
@@ -125,6 +126,11 @@ class ClaudeCodeAdapter(IdeAdapter):
         drop = set(globs)
         perms["deny"] = [g for g in deny if g not in drop]
         settings_path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+
+    def clear_spawn_agent_ignore(self, target_root: Path) -> None:
+        recorded = ll.get_agent_ignore_list(target_root, self.key)
+        if recorded:
+            self.remove_agent_ignore(target_root, recorded)
 
     def rewrite_entry_point(self, target_root: Path, prompt: str) -> str:
         ep = target_root / "CLAUDE.md"

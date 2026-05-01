@@ -206,6 +206,15 @@ those categories automatically and de-duplicates the final list.
 
 `get-all-agent-ignore()` returns core and extension agent-ignore globs.
 
+`get-merged-extension-agent-ignore()` returns extension `agent-ignore` globs only,
+stable deduped across installed extensions.
+
+`merge-core-and-extension-agent-ignore(core, ext)` returns the usual combined list.
+
+`get-agent-ignore-list(ide)` and `save-agent-ignore-list(ide, items)` read and
+replace `spawn/.metadata/{ide}/agent-ignore.txt` (see `data-structure.md` for
+native vs project semantics).
+
 `save-skills-rendered(ide, extension, skillPaths)` rewrites the extension
 section in `spawn/.metadata/{ide}/rendered-skills.yaml`. If `skillPaths` is
 empty, it removes the section.
@@ -222,9 +231,6 @@ from the IDE metadata file.
 
 `get-git-ignore-list()` and `save-git-ignore-list(items)` read and replace
 `spawn/.metadata/git-ignore.txt`.
-
-`get-agent-ignore-list(ide)` and `save-agent-ignore-list(ide, items)` read and
-replace `spawn/.metadata/{ide}/agent-ignore.txt`.
 
 `get-global-gitignore()`, `push-to-global-gitignore(items)`, and
 `remove-from-global-gitignore(items)` read and mutate the target repository
@@ -306,9 +312,13 @@ validated for global uniqueness **before** `add-mcp` (`Cross-extension rendered
 identity`). If an IDE does not support MCP, the adapter emits a warning.
 
 `add-agent-ignore` and `remove-agent-ignore` mutate the IDE-specific ignore file
-with the given globs. **`add-agent-ignore` returns nothing** (`None`); ownership
-of ignore patterns is tracked via `spawn/.metadata/{ide}/agent-ignore.txt`, not
-via a return value from the adapter.
+with the given globs (legacy whole-block helpers for single `# spawn:start`
+regions; orchestration prefers **`rewrite-core-agent-ignore`** and
+**`rewrite-extension-agent-ignore`** on native adapters). **`add-agent-ignore`
+returns nothing** (`None`); ownership for native IDEs is tracked via
+**`agent-ignore.txt`** for the extension slice and core always follows
+`spawn/.core/config.yaml`; project IDEs keep a full-list snapshot in the same
+file for JSON diffing.
 
 `rewrite-entry-point(prompt)` writes the IDE-specific entry point file, such as
 `AGENTS.md`, `CLAUDE.md`, or another agent instruction file used by that IDE.
@@ -384,12 +394,12 @@ remove-from-global-gitignore(existing - new)
 `refresh-rules-navigation()` calls `save-rules-navigation()` only (see Low-Level
 Modules). Used when only local `spawn/rules/` changed relative to navigation.
 
-`refresh-agent-ignore(ide)` rebuilds IDE agent ignore entries from core ignore
-globs and all extension agent-ignore globs. It reads the previous Spawn-owned
-list from `agent-ignore.txt`, computes the new merged list, calls
-`remove_agent_ignore` for globs that dropped out, `add_agent_ignore` for globs
-that were added, then saves the new list to metadata (same diff idea as
-`refresh-gitignore`; see Rebuild Semantics).
+`refresh-agent-ignore(ide)` calls **`refresh-core-agent-ignore(ide)`** then
+**`refresh-extension-agent-ignore(ide)`**. Native ignore adapters rewrite the
+core and extension regions independently (full replace per region); extension
+metadata stores the extension merge only. Project-style adapters re-diff the
+full merged list into IDE config. Legacy `# spawn:start` … `# spawn:end` blocks
+in ignore files are dropped when refreshing.
 
 `refresh-skills(ide, extension)` removes old rendered skills for the extension,
 generates fresh skill metadata, renders through the IDE adapter, and saves the

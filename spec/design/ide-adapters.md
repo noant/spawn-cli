@@ -59,6 +59,9 @@ add_mcp(targetRoot, normalizedMcp) -> RenderedMcpName[]
 remove_mcp(targetRoot, renderedMcpNames[]) -> void
 add_agent_ignore(targetRoot, globs[]) -> void
 remove_agent_ignore(targetRoot, globs[]) -> void
+rewrite_core_agent_ignore(targetRoot, globs[]) -> void   # optional; native IDEs
+rewrite_extension_agent_ignore(targetRoot, globs[]) -> void
+clear_spawn_agent_ignore(targetRoot) -> void
 rewrite_entry_point(targetRoot, prompt) -> RenderedPath | warning
 ```
 

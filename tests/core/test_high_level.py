@@ -69,6 +69,15 @@ def _stub_ide():
         def remove_agent_ignore(self, root: Path, globs: list[str]):
             return None
 
+        def rewrite_core_agent_ignore(self, root: Path, globs: list[str]):
+            return None
+
+        def rewrite_extension_agent_ignore(self, root: Path, globs: list[str]):
+            return None
+
+        def clear_spawn_agent_ignore(self, root: Path) -> None:
+            return None
+
         def rewrite_entry_point(self, root: Path, prompt: str):
             return "AGENTS.md"
 
@@ -109,6 +118,15 @@ def _stub_with_caps(skills_cap: str = "native", mcp_cap: str = "project"):
             return None
 
         def remove_agent_ignore(self, root: Path, globs: list[str]):
+            return None
+
+        def rewrite_core_agent_ignore(self, root: Path, globs: list[str]):
+            return None
+
+        def rewrite_extension_agent_ignore(self, root: Path, globs: list[str]):
+            return None
+
+        def clear_spawn_agent_ignore(self, root: Path) -> None:
             return None
 
         def rewrite_entry_point(self, root: Path, prompt: str):

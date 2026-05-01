@@ -1,7 +1,7 @@
 # 18: Short hints in navigation, skills, and AGENTS.md
 
 ## Source seed
-- Path: spec/seeds/3-short-hints-navigation-skills.md
+- Path: spec/seeds/_DONE_3-short-hints-navigation-skills.md
 
 ## Status
 - [x] Spec created
@@ -9,8 +9,8 @@
 - [x] Spec review passed
 - [x] Code implemented
 - [x] Self code review passed
-- [ ] Code review passed
-- [ ] HLA updated
+- [x] Code review passed
+- [x] HLA updated
 
 ## Goal
 Carry short plain-text agent hints from extension config and from maintainer-authored navigation `rules` into merged `spawn/navigation.yaml`, rendered IDE skills (after skill body, before mandatory file lists), and the Spawn-managed block of `AGENTS.md` where applicable.

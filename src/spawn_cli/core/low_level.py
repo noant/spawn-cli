@@ -746,17 +746,35 @@ def get_ext_agent_ignore(target_root: Path, extension: str) -> list[str]:
 
 
 def get_all_agent_ignore(target_root: Path) -> list[str]:
+    return merge_core_and_extension_agent_ignore(
+        get_core_agent_ignore(target_root),
+        get_merged_extension_agent_ignore(target_root),
+    )
+
+
+def get_merged_extension_agent_ignore(target_root: Path) -> list[str]:
+    """Stable deduped merge of ``agent-ignore`` from all installed extensions."""
     merged: list[str] = []
     seen: set[str] = set()
-    for g in get_core_agent_ignore(target_root):
-        if g not in seen:
-            seen.add(g)
-            merged.append(g)
     for ext in list_extensions(target_root):
         for g in get_ext_agent_ignore(target_root, ext):
             if g not in seen:
                 seen.add(g)
                 merged.append(g)
+    return merged
+
+
+def merge_core_and_extension_agent_ignore(core: list[str], ext: list[str]) -> list[str]:
+    merged: list[str] = []
+    seen: set[str] = set()
+    for g in core:
+        if g not in seen:
+            seen.add(g)
+            merged.append(g)
+    for g in ext:
+        if g not in seen:
+            seen.add(g)
+            merged.append(g)
     return merged
 
 
@@ -851,6 +869,13 @@ def _agent_ignore_list_path(target_root: Path, ide: str) -> Path:
 
 
 def get_agent_ignore_list(target_root: Path, ide: str) -> list[str]:
+    """Last persisted ignore snapshot for *ide*.
+
+    Native file-based ignores: extension ``agent-ignore`` merge only.
+
+    Project-style ignores (e.g. Claude Code): full core+extension merge used for
+    JSON permissions diffing.
+    """
     lines = read_lines(_agent_ignore_list_path(target_root, ide))
     return [ln for ln in lines if ln.strip() and not ln.lstrip().startswith("#")]
 
@@ -1170,6 +1195,7 @@ __all__ = [
     "get_folders",
     "get_git_ignore_list",
     "get_global_gitignore",
+    "get_merged_extension_agent_ignore",
     "get_navigation_metadata",
     "get_rendered_mcp",
     "get_rendered_skills",
@@ -1184,6 +1210,7 @@ __all__ = [
     "list_mcp",
     "list_skills",
     "sync_core_config_from_defaults",
+    "merge_core_and_extension_agent_ignore",
     "METADATA_TEMP_MAX_AGE_SECONDS",
     "normalize_skill_name",
     "prune_metadata_temp",

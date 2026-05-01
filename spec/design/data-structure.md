@@ -74,8 +74,14 @@ MCP entries and leave user-managed MCP configuration untouched.
 Spawn for one IDE. It exists so refresh and uninstall can remove stale
 Spawn-managed skill files without deleting user skills.
 
-`spawn/.metadata/{ide}/agent-ignore.txt` stores the merged Spawn-managed ignore
-patterns rendered into the IDE-specific agent ignore file.
+`spawn/.metadata/{ide}/agent-ignore.txt` records the last Spawn-managed
+**extension** `agent-ignore` merge for native file-based IDEs (e.g. Cursor,
+Windsurf, Gemini CLI). For project-style agent ignore (e.g. Claude Code), it
+stores the last **full** core+extension merge used to diff JSON permissions.
+Native ignore files under the repo root use two Spawn blocks,
+`# spawn:core:start` … `# spawn:core:end` and `# spawn:ext:start` …
+`# spawn:ext:end`, plus optional legacy `# spawn:start` … `# spawn:end` migrated
+on refresh.
 
 `spawn/.metadata/git-ignore.txt` stores the merged Spawn-managed `.gitignore`
 patterns. It is the ownership record for gitignore refresh and uninstall.
@@ -228,7 +234,8 @@ skill-specific mandatory reads.
 
 `setup` references Python scripts under `setup/`. Every script is optional and
 must be idempotent.
-`hints` optional: `global` and `local` plain-string lists; behavior and aggregation rules are in section 4.9 of `extension-author-guide.md`. `global` mirrors into `spawn/navigation.yaml` under this extension, merges across all packs into every rendered skill hints and into the AGENTS hint rollup; `local` merges only into this pack's rendered skills.
+
+`hints` optional: `global` and `local` plain-string lists; `global` mirrors into `spawn/navigation.yaml` under this extension, merges across all packs into every rendered skill hints and into the AGENTS hint rollup; `local` merges only into this pack's rendered skills.
 
 Allowed enum values:
 

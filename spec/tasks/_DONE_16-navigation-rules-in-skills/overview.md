@@ -36,7 +36,7 @@ When Spawn renders IDE skills, include repository rule paths from `spawn/navigat
 - **Non-goals (this task):** new hint/snippet file formats, AGENTS.md body generation beyond existing entrypoint, CI duplication checks, or changing spectask extension `config.yaml` defaults — those stay follow-ups unless the user expands scope at review.
 - **Empty / missing navigation:** no rule injection; behavior matches today for the extension-only merge.
 - **Malformed navigation:** follow existing project pattern for navigation loads in low_level (no crash; treat missing `read-required` / `read-contextual` as empty lists).
-- **Related brainstorm (no seed linkage):** `spec/seeds/3-short-hints-navigation-skills.md` is a broader idea (compact hints without opening whole files, single snippet source-of-truth, AGENTS ergonomics); this task deliberately does **not** close or claim that seed — it only fixes **navigation `rules` → rendered skill read lists**.
+- **Related brainstorm (no seed linkage):** `spec/seeds/_DONE_3-short-hints-navigation-skills.md` is a broader idea (compact hints without opening whole files, single snippet source-of-truth, AGENTS ergonomics); this task deliberately does **not** close or claim that seed — it only fixes **navigation `rules` → rendered skill read lists**.
 
 ## Execution Scheme
 > Each step id is the subtask filename (e.g. `1-abstractions`).

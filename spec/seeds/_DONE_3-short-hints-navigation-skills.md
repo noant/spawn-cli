@@ -1,4 +1,4 @@
-linked task: spec/tasks/18-hints-navigation-skills-agents/overview.md
+linked task: spec/tasks/_DONE_18-hints-navigation-skills-agents/overview.md
 
 ## Idea (informal)
 

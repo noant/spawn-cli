@@ -8,6 +8,10 @@ import pytest
 from spawn_cli.core.errors import SpawnError
 from spawn_cli.core.low_level import CANONICAL_IDE_KEYS
 from spawn_cli.ide import (
+    CORE_IGNORE_BLOCK_END,
+    CORE_IGNORE_BLOCK_START,
+    EXT_IGNORE_BLOCK_END,
+    EXT_IGNORE_BLOCK_START,
     IGNORE_BLOCK_END,
     IGNORE_BLOCK_START,
     SPAWN_BLOCK_END,
@@ -247,6 +251,47 @@ def test_remove_ignore_block(tmp_path: Path) -> None:
     assert "keep-top" in text
     assert "keep-bottom" in text
     assert IGNORE_BLOCK_START not in text
+
+
+def test_cursor_dual_ignore_idempotent(tmp_path: Path) -> None:
+    adapter = CursorAdapter()
+    adapter.rewrite_core_agent_ignore(tmp_path, ["spawn/.core/**"])
+    adapter.rewrite_extension_agent_ignore(tmp_path, ["logs/**"])
+    adapter.rewrite_core_agent_ignore(tmp_path, ["spawn/.core/**"])
+    adapter.rewrite_extension_agent_ignore(tmp_path, ["logs/**"])
+    text = (tmp_path / ".cursorignore").read_text(encoding="utf-8")
+    assert text.count("spawn/.core/**") == 1
+    assert text.count("logs/**") == 1
+    assert CORE_IGNORE_BLOCK_START in text
+    assert EXT_IGNORE_BLOCK_START in text
+
+
+def test_legacy_single_block_migrates_on_rewrite(tmp_path: Path) -> None:
+    f = tmp_path / ".cursorignore"
+    f.write_text(
+        f"top\n{IGNORE_BLOCK_START}\nlegacy-line\n{IGNORE_BLOCK_END}\nbottom\n",
+        encoding="utf-8",
+    )
+    CursorAdapter().rewrite_core_agent_ignore(tmp_path, ["c/core/**"])
+    CursorAdapter().rewrite_extension_agent_ignore(tmp_path, ["e/ext/**"])
+    text = f.read_text(encoding="utf-8")
+    assert "legacy-line" not in text
+    assert "c/core/**" in text
+    assert "e/ext/**" in text
+    assert IGNORE_BLOCK_START not in text
+
+
+def test_clear_spawn_agent_ignore_keeps_user_lines(tmp_path: Path) -> None:
+    adapter = CursorAdapter()
+    adapter.rewrite_core_agent_ignore(tmp_path, ["a/**"])
+    adapter.rewrite_extension_agent_ignore(tmp_path, ["b/**"])
+    p = tmp_path / ".cursorignore"
+    prev = p.read_text(encoding="utf-8")
+    p.write_text("user\n" + prev, encoding="utf-8")
+    adapter.clear_spawn_agent_ignore(tmp_path)
+    text = p.read_text(encoding="utf-8")
+    assert "user\n" in text
+    assert CORE_IGNORE_BLOCK_START not in text
 
 
 def test_stub_add_skills_warns() -> None:

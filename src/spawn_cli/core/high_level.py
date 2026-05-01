@@ -63,12 +63,9 @@ def _extend_dir(target_root: Path, extension: str) -> Path:
 
 
 def _agent_ignore_merge_excluding(target_root: Path, skip_ext: str) -> list[str]:
+    """Merged extension ``agent-ignore`` only, omitting *skip_ext*."""
     merged: list[str] = []
     seen: set[str] = set()
-    for g in ll.get_core_agent_ignore(target_root):
-        if g not in seen:
-            seen.add(g)
-            merged.append(g)
     for ext in ll.list_extensions(target_root):
         if ext == skip_ext:
             continue
@@ -77,6 +74,48 @@ def _agent_ignore_merge_excluding(target_root: Path, skip_ext: str) -> list[str]
                 seen.add(g)
                 merged.append(g)
     return merged
+
+
+def _sync_project_agent_ignore_permissions(target_root: Path, ide: str) -> None:
+    old = ll.get_agent_ignore_list(target_root, ide)
+    new = ll.get_all_agent_ignore(target_root)
+    adapter = ide_get(ide)
+    to_remove = sorted(set(old) - set(new))
+    to_add = sorted(set(new) - set(old))
+    if to_remove:
+        adapter.remove_agent_ignore(target_root, to_remove)
+    if to_add:
+        adapter.add_agent_ignore(target_root, to_add)
+    ll.save_agent_ignore_list(target_root, ide, new)
+
+
+def refresh_core_agent_ignore(target_root: Path, ide: str) -> None:
+    _require_init(target_root)
+    adapter = ide_get(ide)
+    cap = adapter.detect(target_root).capabilities.agent_ignore
+    core = ll.get_core_agent_ignore(target_root)
+    if cap == "native":
+        adapter.rewrite_core_agent_ignore(target_root, core)
+    elif cap == "project":
+        _sync_project_agent_ignore_permissions(target_root, ide)
+
+
+def refresh_extension_agent_ignore(target_root: Path, ide: str) -> None:
+    _require_init(target_root)
+    adapter = ide_get(ide)
+    cap = adapter.detect(target_root).capabilities.agent_ignore
+    ext = ll.get_merged_extension_agent_ignore(target_root)
+    if cap == "native":
+        adapter.rewrite_extension_agent_ignore(target_root, ext)
+        ll.save_agent_ignore_list(target_root, ide, ext)
+    elif cap == "project":
+        _sync_project_agent_ignore_permissions(target_root, ide)
+
+
+def refresh_agent_ignore(target_root: Path, ide: str) -> None:
+    _require_init(target_root)
+    refresh_core_agent_ignore(target_root, ide)
+    refresh_extension_agent_ignore(target_root, ide)
 
 
 def refresh_gitignore(target_root: Path) -> None:
@@ -93,16 +132,6 @@ def refresh_gitignore(target_root: Path) -> None:
     new_set, ex_set = set(new_items), set(existing)
     ll.push_to_global_gitignore(target_root, sorted(new_set - ex_set))
     ll.remove_from_global_gitignore(target_root, sorted(ex_set - new_set))
-
-
-def refresh_agent_ignore(target_root: Path, ide: str) -> None:
-    _require_init(target_root)
-    old = ll.get_agent_ignore_list(target_root, ide)
-    new = ll.get_all_agent_ignore(target_root)
-    adapter = ide_get(ide)
-    adapter.remove_agent_ignore(target_root, sorted(set(old) - set(new)))
-    adapter.add_agent_ignore(target_root, sorted(set(new) - set(old)))
-    ll.save_agent_ignore_list(target_root, ide, new)
 
 
 def refresh_skills(target_root: Path, ide: str, extension: str) -> None:
@@ -208,12 +237,24 @@ def refresh_extension_for_ide(target_root: Path, ide: str, extension: str) -> No
 def remove_extension_for_ide(target_root: Path, ide: str, extension: str) -> None:
     remove_mcp(target_root, ide, extension)
     remove_skills(target_root, ide, extension)
-    old = ll.get_agent_ignore_list(target_root, ide)
-    new = _agent_ignore_merge_excluding(target_root, extension)
+    new_ext = _agent_ignore_merge_excluding(target_root, extension)
     adapter = ide_get(ide)
-    adapter.remove_agent_ignore(target_root, sorted(set(old) - set(new)))
-    adapter.add_agent_ignore(target_root, sorted(set(new) - set(old)))
-    ll.save_agent_ignore_list(target_root, ide, new)
+    cap = adapter.detect(target_root).capabilities.agent_ignore
+    if cap == "native":
+        adapter.rewrite_extension_agent_ignore(target_root, new_ext)
+        ll.save_agent_ignore_list(target_root, ide, new_ext)
+    elif cap == "project":
+        desired = ll.merge_core_and_extension_agent_ignore(
+            ll.get_core_agent_ignore(target_root), new_ext
+        )
+        old = ll.get_agent_ignore_list(target_root, ide)
+        to_remove = sorted(set(old) - set(desired))
+        to_add = sorted(set(desired) - set(old))
+        if to_remove:
+            adapter.remove_agent_ignore(target_root, to_remove)
+        if to_add:
+            adapter.add_agent_ignore(target_root, to_add)
+        ll.save_agent_ignore_list(target_root, ide, desired)
 
 
 def refresh_navigation(target_root: Path) -> None:
@@ -546,8 +587,7 @@ def remove_ide(target_root: Path, ide: str) -> None:
     for ext in ll.list_extensions(target_root):
         remove_mcp(target_root, ide, ext)
         remove_skills(target_root, ide, ext)
-    old = ll.get_agent_ignore_list(target_root, ide)
-    ide_get(ide).remove_agent_ignore(target_root, old)
+    ide_get(ide).clear_spawn_agent_ignore(target_root)
     ide_get(ide).finalize_repo_after_ide_removed(target_root)
     ll.remove_ide_from_list(target_root, ide)
     ll.remove_ide_metadata_dir(target_root, ide)
@@ -571,6 +611,8 @@ __all__ = [
     "extension_init",
     "install_extension",
     "refresh_agent_ignore",
+    "refresh_core_agent_ignore",
+    "refresh_extension_agent_ignore",
     "refresh_entry_point",
     "refresh_extension",
     "refresh_extension_for_ide",

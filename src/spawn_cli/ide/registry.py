@@ -9,6 +9,10 @@ from pathlib import Path
 from spawn_cli.core.errors import SpawnError
 from spawn_cli.core.low_level import CANONICAL_IDE_KEYS
 from spawn_cli.ide._helpers import (
+    CORE_IGNORE_BLOCK_END,
+    CORE_IGNORE_BLOCK_START,
+    EXT_IGNORE_BLOCK_END,
+    EXT_IGNORE_BLOCK_START,
     IGNORE_BLOCK_END,
     IGNORE_BLOCK_START,
     SPAWN_BLOCK_END,
@@ -74,6 +78,15 @@ class IdeAdapter(ABC):
     @abstractmethod
     def remove_agent_ignore(self, target_root: Path, globs: list[str]) -> None: ...
 
+    def rewrite_core_agent_ignore(self, target_root: Path, globs: list[str]) -> None:
+        del target_root, globs
+
+    def rewrite_extension_agent_ignore(self, target_root: Path, globs: list[str]) -> None:
+        del target_root, globs
+
+    def clear_spawn_agent_ignore(self, target_root: Path) -> None:
+        del target_root
+
     @abstractmethod
     def rewrite_entry_point(self, target_root: Path, prompt: str) -> str:
         """Returns rendered path or warning string."""
@@ -122,7 +135,11 @@ def detect_supported_ides(target_root: Path) -> dict[str, DetectResult]:
 
 __all__ = [
     "ALIASES",
+    "CORE_IGNORE_BLOCK_END",
+    "CORE_IGNORE_BLOCK_START",
     "DetectResult",
+    "EXT_IGNORE_BLOCK_END",
+    "EXT_IGNORE_BLOCK_START",
     "IdeAdapter",
     "IdeCapabilities",
     "IGNORE_BLOCK_END",

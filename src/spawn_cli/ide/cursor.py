@@ -7,6 +7,13 @@ import warnings
 from pathlib import Path
 
 from spawn_cli.ide import _vacancy as _vac
+from spawn_cli.ide._helpers import (
+    clear_split_agent_ignore_file,
+    remove_ignore_block,
+    rewrite_core_agent_ignore_region,
+    rewrite_extension_agent_ignore_region,
+    rewrite_ignore_block,
+)
 from spawn_cli.ide.registry import (
     DetectResult,
     IdeAdapter,
@@ -15,8 +22,6 @@ from spawn_cli.ide.registry import (
     normalize_skill_name,
     render_skill_md,
     rewrite_managed_block,
-    rewrite_ignore_block,
-    remove_ignore_block,
 )
 from spawn_cli.models.mcp import McpServer, NormalizedMcp
 from spawn_cli.models.skill import SkillMetadata
@@ -107,6 +112,15 @@ class CursorAdapter(IdeAdapter):
 
     def remove_agent_ignore(self, target_root: Path, globs: list[str]) -> None:
         remove_ignore_block(target_root / ".cursorignore", globs)
+
+    def rewrite_core_agent_ignore(self, target_root: Path, globs: list[str]) -> None:
+        rewrite_core_agent_ignore_region(target_root / ".cursorignore", globs)
+
+    def rewrite_extension_agent_ignore(self, target_root: Path, globs: list[str]) -> None:
+        rewrite_extension_agent_ignore_region(target_root / ".cursorignore", globs)
+
+    def clear_spawn_agent_ignore(self, target_root: Path) -> None:
+        clear_split_agent_ignore_file(target_root / ".cursorignore")
 
     def rewrite_entry_point(self, target_root: Path, prompt: str) -> str:
         ep = target_root / "AGENTS.md"
