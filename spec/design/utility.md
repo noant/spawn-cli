@@ -408,20 +408,25 @@ agent at `spawn/navigation.yaml` and explains required and contextual reads.
 
 `remove-mcp(ide, extension)` removes names recorded in `rendered-mcp.yaml`.
 
-`refresh-extension(ide, extension)` refreshes MCP, skills, and agent ignore for
-one IDE.
+`refresh-extension(ide, extension)` merges MCP for the named extension on that
+IDE, re-renders **skills for every installed extension** on that IDE (skill
+metadata merges global reads across all extensions), then refreshes agent
+ignore for that IDE.
 
 `remove-extension(ide, extension)` removes MCP, skills, agent-ignore entries,
 and rendered metadata for one IDE.
 
-`refresh-extension(extension)` runs before-install scripts, refreshes the
-extension for every initialized IDE, refreshes global agent/git ignore and
-navigation, then runs after-install scripts.
+`refresh-extension(extension)` runs before-install scripts, refreshes MCP for
+the named extension on each initialized IDE, re-renders **all extensions'
+skills** on each IDE, refreshes global agent/git ignore and navigation, updates
+entry points, then runs after-install scripts.
 
 `remove-extension(extension)` runs before-uninstall scripts, removes rendered
 outputs for every initialized IDE, runs after-uninstall scripts, removes the
 installed extension folder, then refreshes ignores and navigation so rebuilt
-global state no longer includes the removed extension.
+global state no longer includes the removed extension, updates agent ignore and
+entry points, and **re-renders skills for each remaining extension** on every
+IDE so peer mandatory reads drop removed globals.
 
 `update-extension(extension)` reads **`spawn/.extend/{extension}/source.yaml` only**:
 the CLI does **not** take a new source path argument. It re-resolves the stored

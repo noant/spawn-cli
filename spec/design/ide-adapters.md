@@ -8,9 +8,10 @@ conversion.
 
 The paths below are the initial adapter contract. Some IDE formats change
 quickly, so each adapter must implement `detect()` rather than silently assuming
-an IDE layout. Install-time warnings when skills or MCP capabilities are
-insufficient are handled by the utility layer during `add-ide`, not by a free-form
-warning list on `detect()` itself.
+an IDE layout. Install-time and extension-driven refresh warnings when skills or MCP
+capabilities are insufficient are handled by the utility layer (`add-ide`,
+`_refresh_extension_core`, `refresh_extension_for_ide` when “the gap matters”),
+not by a free-form warning list on `detect()` itself.
 
 ## Adapter Registry
 
@@ -77,18 +78,23 @@ IDE project footprint or usage signals for this adapter (config dirs, marker
 files, etc.). It replaces separate availability, confidence, and ad hoc warning
 lists from earlier drafts.
 
-Spawn evaluates skill and MCP capability limits when **installing** an IDE
-(`add-ide` / `spawn ide add`), not inside `detect()`:
+Spawn evaluates skill and MCP capability limits **outside** ``detect()``,
+before utility-layer refresh orchestration (**`add-ide`**, **`_refresh_extension_core`**,
+and **`refresh_extension_for_ide`**) :
 
 - If `capabilities.skills` is insufficient for Spawn's intended skill rendering
   (`unsupported`, or another value documented by the adapter as degraded),
-  Spawn prints a **warning** before running refresh.
+  Spawn prints a **warning** before running refresh **when installed extensions expose skill files**.
 - If `capabilities.mcp` is insufficient for repository-scoped MCP rendering
   (`unsupported`, or documented degraded values such as `external` when no
-  safe project target exists), Spawn prints a **warning** before running refresh.
+  safe project target exists), Spawn prints a **warning** before running refresh
+  **when the merge would touch MCP servers** (predicate scope matches that path:
+  aggregation for `add-ide`, the core call’s extension for `_refresh_extension_core`,
+  the named extension for `refresh_extension_for_ide`).
 
-Those warnings are emitted once at IDE registration time when the gap matters;
-later `refresh-skills` / `refresh-mcp` continue to warn per operation if needed.
+Those **`SpawnWarning`** lines are emitted at most once per IDE per invocation
+when the gap matters; adapter internals may still emit other warnings inside
+individual operations.
 
 Capability values:
 

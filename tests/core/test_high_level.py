@@ -11,8 +11,9 @@ from ruamel.yaml import YAML
 
 from spawn_cli.core import high_level as hl
 from spawn_cli.core import low_level as ll
-from spawn_cli.core.errors import SpawnError
+from spawn_cli.core.errors import SpawnError, SpawnWarning
 from spawn_cli.ide.registry import DetectResult, IdeCapabilities
+from spawn_cli.ide.windsurf import WindsurfAdapter
 
 from spawn_cli.io.yaml_io import configure_yaml_dump, load_yaml
 
@@ -77,12 +78,55 @@ def _stub_ide():
     return A()
 
 
+def _stub_with_caps(skills_cap: str = "native", mcp_cap: str = "project"):
+    """Minimal IDE stub with configurable skill/MCP capability flags."""
+
+    from spawn_cli.models.mcp import NormalizedMcp
+    from spawn_cli.models.skill import SkillMetadata
+
+    class A:
+        key = "cursor"
+
+        def detect(self, root: Path):
+            return DetectResult(
+                False,
+                IdeCapabilities(skills_cap, mcp_cap, "native", "agents-md"),
+            )
+
+        def add_skills(self, root: Path, metas: list[SkillMetadata]):
+            return [{"skill": m.name, "path": f".t/{m.name}"} for m in metas]
+
+        def remove_skills(self, root: Path, rendered: list[dict]):
+            return None
+
+        def add_mcp(self, root: Path, normalized_mcp: NormalizedMcp):
+            return [s.name for s in normalized_mcp.servers]
+
+        def remove_mcp(self, root: Path, names: list[str]):
+            return None
+
+        def add_agent_ignore(self, root: Path, globs: list[str]):
+            return None
+
+        def remove_agent_ignore(self, root: Path, globs: list[str]):
+            return None
+
+        def rewrite_entry_point(self, root: Path, prompt: str):
+            return "AGENTS.md"
+
+        def finalize_repo_after_ide_removed(self, root: Path):
+            return None
+
+    return A()
+
+
 def _install_ext(
     target_root: Path,
     name: str,
     *,
     git_ignore: list[str] | None = None,
     skills: dict | None = None,
+    files: dict | None = None,
     mcp_servers: list | None = None,
     setup: dict | None = None,
 ) -> None:
@@ -92,7 +136,7 @@ def _install_ext(
         "name": name,
         "version": "1.0.0",
         "schema": 1,
-        "files": {},
+        "files": files or {},
         "folders": {},
         "agent-ignore": [],
         "git-ignore": git_ignore or [],
@@ -172,6 +216,113 @@ def test_refresh_skills_duplicate_name_errors(target: Path) -> None:
         hl.refresh_skills(target, "cursor", "b")
 
 
+BETA_GLOBAL_READ_FILE = "docs/beta-global.md"
+_BETA_GLOBAL_META = {
+    BETA_GLOBAL_READ_FILE: {
+        "description": "Beta global context.",
+        "mode": "static",
+        "globalRead": "required",
+        "localRead": "no",
+    }
+}
+
+
+@patch("spawn_cli.core.high_level.ide_get", lambda *_a, **_k: _stub_ide())
+def test_refresh_extension_core_rebuilds_peer_skills_when_new_ext_adds_global_read(
+    target: Path,
+) -> None:
+    """Installing a second extension must re-render the first extension's skills
+    so merged global ``required_read`` lists stay current.
+    """
+    ll.add_ide_to_list(target, "cursor")
+    _install_ext(target, "alpha", skills={"a.md": {"name": "alpha-skill", "description": "d"}})
+    hl._refresh_extension_core(target, "alpha")
+    m_alpha_only = ll.generate_skills_metadata(target, "alpha")[0]
+    assert BETA_GLOBAL_READ_FILE not in {r.file for r in m_alpha_only.required_read}
+
+    _install_ext(target, "beta", files=dict(_BETA_GLOBAL_META))
+    hl._refresh_extension_core(target, "beta")
+    m_after = ll.generate_skills_metadata(target, "alpha")[0]
+    assert BETA_GLOBAL_READ_FILE in {r.file for r in m_after.required_read}
+
+
+@patch("spawn_cli.core.high_level.ide_get", lambda *_a, **_k: _stub_ide())
+def test_remove_extension_rebuilds_survivor_skills_without_removed_global_read(
+    target: Path,
+) -> None:
+    ll.add_ide_to_list(target, "cursor")
+    _install_ext(target, "alpha", skills={"a.md": {"name": "alpha-skill", "description": "d"}})
+    _install_ext(target, "beta", files=dict(_BETA_GLOBAL_META))
+    hl._refresh_extension_core(target, "beta")
+    assert BETA_GLOBAL_READ_FILE in {
+        r.file for r in ll.generate_skills_metadata(target, "alpha")[0].required_read
+    }
+
+    hl.remove_extension(target, "beta")
+    m_survivor = ll.generate_skills_metadata(target, "alpha")[0]
+    assert BETA_GLOBAL_READ_FILE not in {r.file for r in m_survivor.required_read}
+
+
+@patch("spawn_cli.core.high_level.warnings.warn")
+@patch("spawn_cli.core.high_level.ide_get", lambda *_a, **_k: _stub_with_caps("native", "unsupported"))
+def test_refresh_extension_core_warns_limited_mcp_when_servers_present(
+    mock_warn: MagicMock, target: Path
+) -> None:
+    ll.add_ide_to_list(target, "cursor")
+    _install_ext(
+        target,
+        "e1",
+        mcp_servers=[
+            {"name": "srv-one", "transport": {"type": "stdio", "command": "true"}},
+        ],
+    )
+    hl._refresh_extension_core(target, "e1")
+    mock_warn.assert_called_once()
+    assert "limited MCP support" in str(mock_warn.call_args[0][0])
+    assert mock_warn.call_args[0][1] is SpawnWarning
+
+
+@patch("spawn_cli.core.high_level.warnings.warn")
+@patch("spawn_cli.core.high_level.ide_get", lambda *_a, **_k: _stub_with_caps("unsupported", "project"))
+def test_refresh_extension_core_warns_skills_unsupported_when_skill_files_present(
+    mock_warn: MagicMock, target: Path
+) -> None:
+    ll.add_ide_to_list(target, "cursor")
+    _install_ext(target, "e1", skills={"a.md": {"name": "s", "description": "d"}})
+    hl._refresh_extension_core(target, "e1")
+    mock_warn.assert_called_once()
+    assert "does not support skills" in str(mock_warn.call_args[0][0])
+    assert mock_warn.call_args[0][1] is SpawnWarning
+
+
+@patch("spawn_cli.core.high_level.warnings.warn")
+@patch("spawn_cli.core.high_level.ide_get", lambda *_a, **_k: _stub_with_caps("unsupported", "unsupported"))
+def test_add_ide_no_capability_warnings_when_no_extensions(mock_warn: MagicMock, target: Path) -> None:
+    hl.add_ide(target, "cursor")
+    mock_warn.assert_not_called()
+
+
+@patch("spawn_cli.core.high_level.warnings.warn")
+@patch("spawn_cli.core.high_level.ide_get", lambda *_a, **_k: _stub_with_caps("native", "unsupported"))
+def test_refresh_extension_for_ide_mcp_warn_only_when_named_ext_has_servers(
+    mock_warn: MagicMock, target: Path
+) -> None:
+    ll.add_ide_to_list(target, "cursor")
+    _install_ext(
+        target,
+        "srv",
+        mcp_servers=[
+            {"name": "one", "transport": {"type": "stdio", "command": "true"}},
+        ],
+    )
+    _install_ext(target, "skills_only", skills={"k.md": {"name": "k", "description": "d"}})
+    hl.refresh_extension_for_ide(target, "cursor", "skills_only")
+    mock_warn.assert_not_called()
+    hl.refresh_extension_for_ide(target, "cursor", "srv")
+    mock_warn.assert_called_once()
+    assert "limited MCP support" in str(mock_warn.call_args[0][0])
+
+
 @patch("spawn_cli.core.high_level.ide_get", lambda *_a, **_k: _stub_ide())
 def test_refresh_mcp(target: Path) -> None:
     ll.add_ide_to_list(target, "cursor")
@@ -186,6 +337,98 @@ def test_refresh_mcp(target: Path) -> None:
         ],
     )
     hl.refresh_mcp(target, "cursor", "e1")
+    assert ll.get_rendered_mcp(target, "cursor", "e1") == ["srv-one"]
+
+
+@patch("spawn_cli.core.high_level.ide_get", lambda *_a, **_k: _stub_ide())
+def test_refresh_mcp_stdout_exact_merged_notice(capsys: pytest.CaptureFixture[str], target: Path) -> None:
+    ll.add_ide_to_list(target, "cursor")
+    _install_ext(
+        target,
+        "e1",
+        mcp_servers=[
+            {"name": "srv-one", "transport": {"type": "stdio", "command": "true"}},
+        ],
+    )
+    hl.refresh_mcp(target, "cursor", "e1")
+    assert capsys.readouterr().out == hl.MCP_MERGED_NOTICE + "\n"
+
+
+@patch("spawn_cli.core.high_level.ide_get", return_value=WindsurfAdapter())
+def test_refresh_mcp_no_stdout_notice_windsurf_noop_mcp(
+    capsys: pytest.CaptureFixture[str],
+    target: Path,
+) -> None:
+    ll.add_ide_to_list(target, "windsurf")
+    _install_ext(
+        target,
+        "e1",
+        mcp_servers=[
+            {"name": "srv-one", "transport": {"type": "stdio", "command": "true"}},
+        ],
+    )
+    hl.refresh_mcp(target, "windsurf", "e1")
+    assert hl.MCP_MERGED_NOTICE not in capsys.readouterr().out
+    assert ll.get_rendered_mcp(target, "windsurf", "e1") == []
+
+
+@patch("spawn_cli.core.high_level.ide_get", lambda *_a, **_k: _stub_ide())
+@pytest.mark.parametrize("empty_mcp_kind", ["missing_file", "empty_servers_key"])
+def test_refresh_mcp_no_stdout_notice_without_mcp_servers(
+    capsys: pytest.CaptureFixture[str],
+    target: Path,
+    empty_mcp_kind: str,
+) -> None:
+    ll.add_ide_to_list(target, "cursor")
+    _install_ext(target, "e1")
+    ext_root = target / "spawn" / ".extend" / "e1"
+    if empty_mcp_kind == "empty_servers_key":
+        (ext_root / "mcp.json").write_text(json.dumps({"servers": []}), encoding="utf-8")
+    hl.refresh_mcp(target, "cursor", "e1")
+    assert hl.MCP_MERGED_NOTICE not in capsys.readouterr().out
+
+
+@patch("spawn_cli.core.high_level.ide_get", lambda *_a, **_k: _stub_ide())
+def test_add_ide_prints_merged_notice_once_with_two_mcp_extensions(
+    capsys: pytest.CaptureFixture[str],
+    target: Path,
+) -> None:
+    _install_ext(
+        target,
+        "e1",
+        mcp_servers=[
+            {"name": "srv-a", "transport": {"type": "stdio", "command": "true"}},
+        ],
+    )
+    _install_ext(
+        target,
+        "e2",
+        mcp_servers=[
+            {"name": "srv-b", "transport": {"type": "stdio", "command": "true"}},
+        ],
+    )
+    mock = MagicMock(wraps=_stub_ide())
+    with patch("spawn_cli.core.high_level.ide_get", return_value=mock):
+        hl.add_ide(target, "cursor")
+    out = capsys.readouterr().out
+    assert out.count(hl.MCP_MERGED_NOTICE) == 1
+
+
+@patch("spawn_cli.core.high_level.ide_get", lambda *_a, **_k: _stub_ide())
+def test_refresh_mcp_skip_notice_still_persists_rendered_mcp(
+    capsys: pytest.CaptureFixture[str],
+    target: Path,
+) -> None:
+    ll.add_ide_to_list(target, "cursor")
+    _install_ext(
+        target,
+        "e1",
+        mcp_servers=[
+            {"name": "srv-one", "transport": {"type": "stdio", "command": "true"}},
+        ],
+    )
+    hl.refresh_mcp(target, "cursor", "e1", emit_mcp_merged_notice=False)
+    assert hl.MCP_MERGED_NOTICE not in capsys.readouterr().out
     assert ll.get_rendered_mcp(target, "cursor", "e1") == ["srv-one"]
 
 

@@ -9,7 +9,7 @@ from spawn_cli.core import download as dl
 from spawn_cli.core import low_level as ll
 from spawn_cli.core import scripts
 from spawn_cli.core.errors import SpawnError, SpawnWarning
-from spawn_cli.ide.registry import get as ide_get
+from spawn_cli.ide.registry import IdeCapabilities, get as ide_get
 from spawn_cli.io.json_io import load_json
 from spawn_cli.io.paths import ensure_dir, safe_path
 from spawn_cli.io.yaml_io import load_yaml, save_yaml
@@ -20,6 +20,37 @@ Before working, read `spawn/navigation.yaml`.
 Read every file listed under `read-required`.
 Inspect `read-contextual` descriptions and read only files relevant to the current task.
 """
+
+MCP_MERGED_NOTICE = (
+    "MCP was merged for this workspace; you may need to press Enable in your IDE MCP UI."
+)
+
+
+def _any_extension_has_skill_files(target_root: Path) -> bool:
+    return any(ll.list_skills(target_root, ext) for ext in ll.list_extensions(target_root))
+
+
+def _any_extension_has_mcp_servers(target_root: Path) -> bool:
+    return any(ll.list_mcp(target_root, ext).servers for ext in ll.list_extensions(target_root))
+
+
+def _warn_capability_gaps(
+    ide_key: str,
+    caps: IdeCapabilities,
+    *,
+    needs_skill_render: bool,
+    needs_mcp_merge: bool,
+) -> None:
+    if needs_skill_render and caps.skills == "unsupported":
+        warnings.warn(
+            f"IDE {ide_key!r} does not support skills; skills were skipped",
+            SpawnWarning,
+        )
+    if needs_mcp_merge and caps.mcp in ("unsupported", "external"):
+        warnings.warn(
+            f"IDE {ide_key!r} has limited MCP support ({caps.mcp})",
+            SpawnWarning,
+        )
 
 
 def _require_init(target_root: Path) -> None:
@@ -85,6 +116,16 @@ def refresh_skills(target_root: Path, ide: str, extension: str) -> None:
     ll.save_skills_rendered(target_root, ide, extension, rendered)
 
 
+def _refresh_skills_all_extensions_for_ide(target_root: Path, ide: str) -> None:
+    """Re-render every extension's skills on *ide*.
+
+    Skill metadata merges global reads from all installed extensions; peers must
+    be rebuilt when any extension's global read set changes.
+    """
+    for ext in ll.list_extensions(target_root):
+        refresh_skills(target_root, ide, ext)
+
+
 def remove_skills(target_root: Path, ide: str, extension: str) -> None:
     _require_init(target_root)
     prior = ll.get_rendered_skills(target_root, ide, extension)
@@ -92,7 +133,20 @@ def remove_skills(target_root: Path, ide: str, extension: str) -> None:
     ll.save_skills_rendered(target_root, ide, extension, [])
 
 
-def refresh_mcp(target_root: Path, ide: str, extension: str) -> None:
+def refresh_mcp(
+    target_root: Path,
+    ide: str,
+    extension: str,
+    *,
+    emit_mcp_merged_notice: bool = True,
+) -> list[str]:
+    """Merge extension MCP into the IDE project config.
+
+    Persisted rendered server names from ``adapter.add_mcp`` are returned.
+    When ``emit_mcp_merged_notice`` is true and that list is non-empty, prints
+    ``MCP_MERGED_NOTICE`` once to stdout (callers that batch refreshes, e.g.
+    ``add_ide``, should pass ``emit_mcp_merged_notice=False`` and print once).
+    """
     _require_init(target_root)
     prior = ll.get_rendered_mcp(target_root, ide, extension)
     ll.validate_rendered_identity(target_root)
@@ -101,6 +155,9 @@ def refresh_mcp(target_root: Path, ide: str, extension: str) -> None:
     adapter.remove_mcp(target_root, prior)
     new_names = adapter.add_mcp(target_root, nm)
     ll.save_mcp_rendered(target_root, ide, extension, new_names)
+    if new_names and emit_mcp_merged_notice:
+        print(MCP_MERGED_NOTICE)
+    return new_names
 
 
 def remove_mcp(target_root: Path, ide: str, extension: str) -> None:
@@ -116,8 +173,24 @@ def refresh_entry_point(target_root: Path, ide: str) -> None:
 
 
 def refresh_extension_for_ide(target_root: Path, ide: str, extension: str) -> None:
+    """Merge *extension* MCP on *ide* and re-render skills for every extension.
+
+    Mandatory reads in rendered skills are merged from all extensions'
+    ``globalRead`` metadata, so updating one extension can require re-rendering
+    skills owned by other extensions even when only this extension's MCP changed.
+    """
+    needs_skill = _any_extension_has_skill_files(target_root)
+    needs_mcp = bool(ll.list_mcp(target_root, extension).servers)
+    adapter = ide_get(ide)
+    dr = adapter.detect(target_root)
+    _warn_capability_gaps(
+        ide,
+        dr.capabilities,
+        needs_skill_render=needs_skill,
+        needs_mcp_merge=needs_mcp,
+    )
     refresh_mcp(target_root, ide, extension)
-    refresh_skills(target_root, ide, extension)
+    _refresh_skills_all_extensions_for_ide(target_root, ide)
     refresh_agent_ignore(target_root, ide)
 
 
@@ -150,9 +223,19 @@ def refresh_rules_navigation(target_root: Path) -> None:
 
 
 def _refresh_extension_core(target_root: Path, extension: str) -> None:
+    needs_skill = _any_extension_has_skill_files(target_root)
+    needs_mcp = bool(ll.list_mcp(target_root, extension).servers)
+    for ide in ll.list_ides(target_root):
+        adapter = ide_get(ide)
+        _warn_capability_gaps(
+            ide,
+            adapter.detect(target_root).capabilities,
+            needs_skill_render=needs_skill,
+            needs_mcp_merge=needs_mcp,
+        )
     for ide in ll.list_ides(target_root):
         refresh_mcp(target_root, ide, extension)
-        refresh_skills(target_root, ide, extension)
+        _refresh_skills_all_extensions_for_ide(target_root, ide)
     for ide in ll.list_ides(target_root):
         refresh_agent_ignore(target_root, ide)
     refresh_gitignore(target_root)
@@ -194,6 +277,8 @@ def remove_extension(target_root: Path, extension: str) -> None:
     for ide in ll.list_ides(target_root):
         refresh_agent_ignore(target_root, ide)
         refresh_entry_point(target_root, ide)
+    for ide in ll.list_ides(target_root):
+        _refresh_skills_all_extensions_for_ide(target_root, ide)
     scripts.run_after_uninstall_from_snapshot(target_root, extension, after_spec)
 
 
@@ -397,21 +482,21 @@ def add_ide(target_root: Path, ide: str) -> None:
     ll.add_ide_to_list(target_root, ide)
     adapter = ide_get(ide)
     dr = adapter.detect(target_root)
-    caps = dr.capabilities
-    if caps.skills == "unsupported":
-        warnings.warn(
-            f"IDE {ide!r} does not support skills; skills were skipped",
-            SpawnWarning,
-        )
-    if caps.mcp in ("unsupported", "external"):
-        warnings.warn(
-            f"IDE {ide!r} has limited MCP support ({caps.mcp})",
-            SpawnWarning,
-        )
+    _warn_capability_gaps(
+        ide,
+        dr.capabilities,
+        needs_skill_render=_any_extension_has_skill_files(target_root),
+        needs_mcp_merge=_any_extension_has_mcp_servers(target_root),
+    )
     refresh_entry_point(target_root, ide)
+    merged_any = False
     for ext in ll.list_extensions(target_root):
-        refresh_mcp(target_root, ide, ext)
-        refresh_skills(target_root, ide, ext)
+        new_names = refresh_mcp(target_root, ide, ext, emit_mcp_merged_notice=False)
+        if new_names:
+            merged_any = True
+    _refresh_skills_all_extensions_for_ide(target_root, ide)
+    if merged_any:
+        print(MCP_MERGED_NOTICE)
     refresh_agent_ignore(target_root, ide)
 
 
@@ -435,6 +520,7 @@ def install_extension(target_root: Path, path: str, branch: str | None = None) -
 
 
 __all__ = [
+    "MCP_MERGED_NOTICE",
     "SPAWN_ENTRY_POINT_PROMPT",
     "_refresh_extension_core",
     "add_ide",
