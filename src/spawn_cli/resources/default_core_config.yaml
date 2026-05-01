@@ -1,5 +1,5 @@
 version: "0.1.0"
 agent-ignore:
-  - spawn/**
-  - "!spawn/navigation.yaml"
-  - "!spawn/rules/**"
+  - spawn/.core/**
+  - spawn/.metadata/**
+  - spawn/.extend/**
