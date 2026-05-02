@@ -54,8 +54,7 @@ as `spawn ide list-supported-ides` and `spawn extension check`) must acquire the
 same repository-local Spawn lock **before** doing any work. Two `spawn`
 invocations must never run concurrently against the same repository: there is
 **no** waiting or queue. If the lock is already held, fail immediately with
-**`SpawnError`** and a user-visible message that includes **`Операция в процессе
-(файл lock detected)`**.
+**`SpawnError`** and a user-visible message that includes **`Another Spawn operation is in progress (repository lock held)`**.
 
 Use a **cross-platform** file lock (`filelock` is the baseline dependency) with
 **non-blocking** acquisition (for example `timeout=0`) so attempts while another

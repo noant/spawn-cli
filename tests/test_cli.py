@@ -62,7 +62,9 @@ def test_spawn_lock_busy(tmp_path, monkeypatch, capsys):
     def counting_lock(_target_root: Path):
         count["n"] += 1
         if count["n"] == 2:
-            raise SpawnError("Операция в процессе (файл lock detected)")
+            raise SpawnError(
+                "Another Spawn operation is in progress (repository lock held)"
+            )
         yield
 
     with patch("spawn_cli.cli.spawn_lock", counting_lock), patch(
@@ -71,7 +73,7 @@ def test_spawn_lock_busy(tmp_path, monkeypatch, capsys):
         assert main(["rules", "refresh"]) == 0
         assert main(["rules", "refresh"]) == 1
 
-    assert "Операция в процессе" in capsys.readouterr().err
+    assert "Another Spawn operation is in progress" in capsys.readouterr().err
 
 
 def test_spawn_rules_refresh(tmp_path, monkeypatch):

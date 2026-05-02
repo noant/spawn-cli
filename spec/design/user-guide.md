@@ -7,7 +7,7 @@ How to install and run the **`spawn`** command against a target repository. Comm
 - **Python** 3.10+ (see `pyproject.toml`).
 - Run commands from the **root of the repository** you are configuring: the CLI **does not** take `--target`; it uses the **current working directory** (see `utility.md`, Core Rules).
 - Except **`spawn init`**, a **`spawn/`** directory must already exist (otherwise **`SpawnError`** whose message includes **`need init before`**).
-- Only one Spawn process may use a repository at a time: if the lock is held, you get **`SpawnError`** whose message includes **`Операция в процессе (файл lock detected)`**.
+- Only one Spawn process may use a repository at a time: if the lock is held, you get **`SpawnError`** whose message includes **`Another Spawn operation is in progress (repository lock held)`**.
 
 ## Installation options
 

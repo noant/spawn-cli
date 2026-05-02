@@ -7,8 +7,7 @@ implementations typically map them to `snake_case` in code.
 
 Paths are relative to **target repository root** unless noted. **Lock:** **every**
 CLI command acquires `spawn/.metadata/.spawn.lock` **non-blocking** before doing
-any work; if acquisition fails, **`SpawnError`** including **`Операция в
-процессе (файл lock detected)`**. There is no lock-free fast path.
+any work; if acquisition fails, **`SpawnError`** including **`Another Spawn operation is in progress (repository lock held)`**. There is no lock-free fast path.
 
 **Initialization:** any command other than `spawn init` must verify `spawn/`
 exists; otherwise **`SpawnError`** including **`need init before`**.

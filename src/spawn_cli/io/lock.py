@@ -17,7 +17,9 @@ def spawn_lock(target_root: Path):
     try:
         lock.acquire(timeout=0)
     except Timeout:
-        raise SpawnError("Операция в процессе (файл lock detected)") from None
+        raise SpawnError(
+            "Another Spawn operation is in progress (repository lock held)"
+        ) from None
     try:
         yield
     finally:
