@@ -164,7 +164,7 @@ spawn extension init ./my-extension --name my-extension
 
 **Agent-guided scaffold** with **[spawn-ext-creator](https://github.com/noant/spawn-ext-creator)** (install the extension above, then `spawn ide add <ide>` so skills render into your IDE): invoke the **`spawn-ext-bootstrap`** skill so the agent lays out a fuller extension repo than the bare CLI skeleton—for example:
 
-> Use the **spawn-ext-bootstrap** skill to bootstrap a new Spawn extension with stable id `my-extension` under `./my-extension`.
+> Use the **spawn-ext-bootstrap** skill to bootstrap a new Spawn extension.
 
 Other creator skills (declaring `config.yaml`, skill sources, MCP, verification, etc.) ship under the same extension; see the rendered skill list after install.
 
@@ -172,25 +172,49 @@ Read **[spec/design/extension-author-guide.md](spec/design/extension-author-guid
 
 **Minimal mental model:**
 
-- `**extsrc/config.yaml`** — `schema`, `version`, stable `**name`** (install path `spawn/.extend/<name>/`), plus `files`, `skills`, ignores, optional `hints`, etc.
-- `**extsrc/files/**` — template tree mirrored into the target repo according to `files:` entries.
-- `**spawn extension check . --strict**` — validate before publishing or tagging a release.
+- `extsrc/config.yaml` — `schema`, `version`, stable `name` (install path `spawn/.extend/<name>/`), plus `files`, `skills`, ignores, optional `hints`, etc.
+- `extsrc/files/` — template tree mirrored into the target repo according to `files:` entries.
+- `spawn extension check . --strict` — validate before publishing or tagging a release.
 
 ## How to add rules without creating an extension
 
-Project-local conventions can live under **`spawn/rules/`** without packaging them as an extension. After **`spawn init`**, add any files there (for example `spawn/rules/team.md`); Spawn discovers **every file** under that directory tree.
+You can steer agents in two complementary ways that do **not** require an extension: **rule files** under **`spawn/rules/`** (content the agent must or may read), and **short hints** in **`spawn/navigation.yaml`** (reminders merged into rendered skills and IDE entry-point blocks such as **`AGENTS.md`**).
 
-Wire those paths into **`spawn/navigation.yaml`** so mandatory reads stay aligned with what is on disk:
+**After edits** to **`spawn/rules/**` or to rule rows / **`hint`** in **`spawn/navigation.yaml`**, run **`spawn refresh`** so navigation, skills, and entry points stay in sync. **`spawn rules refresh`** only syncs **`spawn/rules/**` into **`navigation.yaml`**—no skill or entry-point updates.
+
+### 1. Rule files
+
+Project-local conventions live as files under **`spawn/rules/`**. After **`spawn init`**, add any files there (for example **`spawn/rules/team.md`**); Spawn discovers **every file** under that directory tree.
+
+Wire those paths into **`spawn/navigation.yaml`** so reads stay aligned with what is on disk:
 
 ```bash
-spawn rules refresh
+spawn refresh
 ```
 
 That rescans **`spawn/rules/`**, attaches missing rule files under a **`rules`** group inside **`read-required`** (default description **`Local rule file.`** until you edit it), and drops stale entries whose files were deleted (you may see a warning).
 
-Rule files can be **mandatory** (**`read-required`**) or **contextual** (**`read-contextual`**). **`spawn rules refresh`** only auto-adds **new** paths into **`read-required` → `rules`**. To keep a rule **contextual**, declare it under **`read-contextual` → `rules`** in **`spawn/navigation.yaml`** with the same shape (`path`, `description`)—once a path appears in either rules list, refresh will not duplicate it into the other tier. You can move entries between **`read-required`** and **`read-contextual`** by editing **`spawn/navigation.yaml`**, then run **`spawn rules refresh`** so both lists stay consistent with files on disk.
+**Tiers:** list a rule under **`read-required` → `rules`** (always read) or **`read-contextual` → `rules`** (read when relevant). Use the same row shape (`path`, `description`). A path must not appear in both lists—after you move a row, rerun **`spawn refresh`** (or **`spawn rules refresh`** if you only need YAML). New files discovered on disk are appended to **`read-required` → `rules`** until you relocate them.
 
-Extension-backed reads (`ext:` entries) are unrelated—you only maintain **`spawn/rules/**`** plus **`spawn rules refresh`** for repo-local rules.
+**Extension reads:** **`ext:`** blocks are unrelated; repo-local rule paths live only under **`spawn/rules/**`** and the **`rules`** groups in **`spawn/navigation.yaml`**.
+
+### 2. Hints in `spawn/navigation.yaml`
+
+For **short, always-visible reminders** (tone, language, repo-specific habits), add an optional **`hint`** field on rows under **`read-required` → `rules`**—alongside **`path`** and **`description`**.
+
+Spawn merges those strings into the **Hints** section of **rendered skills** and into the **Hints** rollup in managed IDE entry points (for example **`AGENTS.md`**), using the same ordering and deduping rules as extension **`hints.global`**.
+
+Example:
+
+```yaml
+read-required:
+  - rules:
+      - path: spawn/rules/team.md
+        description: Team conventions.
+        hint: Prefer British spelling in user-facing copy.
+```
+
+Then run **`spawn refresh`** so skills and entry points pick up the hint.
 
 ## License
 

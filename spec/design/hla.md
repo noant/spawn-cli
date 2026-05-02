@@ -1,30 +1,99 @@
 # High-Level Architecture (HLA)
 
-This document describes how the Spawn CLI package is structured and how major pieces interact. Detailed behavior lives in `spec/design/utility.md`, `spec/design/data-structure.md`, and `spec/design/ide-adapters.md`.
+This note is the **map of the codebase**: packaging, layers under `spawn_cli/`, where state lives under `spawn/`, and how the main flows connect. **Behavioral detail** belongs in the linked design docs below, not duplicated here.
+
+## Related design documents
+
+| Document | Scope |
+| -------- | ----- |
+| [`utility.md`](utility.md) | CLI commands and repository transformations. |
+| [`utility-method-flows.md`](utility-method-flows.md) | Per-module data flow and persistence in the utility layer. |
+| [`data-structure.md`](data-structure.md) | Target repo and workspace data shapes. |
+| [`agentic-flow.md`](agentic-flow.md) | Navigation and rendered skills from an agent’s perspective. |
+| [`extensions.md`](extensions.md) | Extension packaging and AIDD methodology. |
+| [`extension-author-guide.md`](extension-author-guide.md) | Author-facing extension layout, config, workflows. |
+| [`ide-adapters.md`](ide-adapters.md) | IDE adapter matrix and rendering contracts. |
+| [`user-guide.md`](user-guide.md) | End-user install and invocation (pip, uvx, local). |
 
 ## Packaging and entry point
 
-The project is an installable Python package with a `src/` layout. Build and dependency metadata live in `pyproject.toml` (`setuptools`, `pytest`). The console script `spawn` maps to `spawn_cli.cli:main`. Maintainers can publish to PyPI with `scripts/publish.py` (requires `uv` on PATH): it bumps the patch segment of `[project].version`, rebuilds artifacts under `dist/`, and runs `uv publish` using `SPAWN_CLI_PYPI_TOKEN` or `--token` (passed to the child process as `UV_PUBLISH_TOKEN`).
+- **Layout**: installable Python package with `src/`; metadata in `pyproject.toml` (`setuptools`, `pytest`).
+- **Console script**: `spawn` → `spawn_cli.cli:main`.
+- **Publish**: `scripts/publish.py` (expects `uv` on PATH): bumps the patch segment of `[project].version`, rebuilds `dist/`, runs `uv publish` with `SPAWN_CLI_PYPI_TOKEN` or `--token` (child sees `UV_PUBLISH_TOKEN`).
 
-## Layering
+## Managed repository layout and concurrency
 
-1. **`spawn_cli.cli`** — Parses `argparse` subcommands (including top-level **`refresh`**, which syncs core config from bundled defaults and runs a full IDE/metadata rebuild, and `extension reinstall <name>`) with human-readable **`help`/description strings** per argument and nesting level (`build_parser`), resolves the target repository as `Path.cwd().resolve()`, enforces `spawn init` before other commands, and wraps (almost) all handlers in a non-blocking repository lock (`spawn_cli.io.lock.spawn_lock`). At process start, **`install_spawn_warning_format`** (`spawn_cli.warnings_display`) replaces `warnings.showwarning` so **`SpawnWarning`** lines print as `spawn: warning: ...` on stderr (no Python `file:line:` banner); other categories delegate to the prior handler.
-2. **`spawn_cli.core.high_level`** — Orchestration: refresh/remove skills, MCP, agent ignore, navigation, gitignore metadata; **`refresh_core_agent_ignore`** and **`refresh_extension_agent_ignore`** rebuild native IDE ignore files using two managed regions (`# spawn:core:*` and `# spawn:ext:*`), with **`agent-ignore.txt`** storing the extension merge only for those IDEs; project-style IDEs (e.g. Claude Code) still diff a full core+extension snapshot into JSON permissions; **`refresh_agent_ignore(ide)`** invokes core then extension; **`remove_ide`** calls **`clear_spawn_agent_ignore`** before **`finalize_repo_after_ide_removed`**; **`refresh_repository`** (CLI `spawn refresh`) runs **`low_level.sync_core_config_from_defaults`** then the same style of batched MCP/skills/ignore/navigation/gitignore/entry-point pass used after extension changes; IDE and extension lifecycle (install, update, remove, **reinstall** from recorded `source.yaml` under `spawn/.extend/{name}/`, refresh, healthcheck, init, etc.); coordinates IDE adapters with low-level persistence. **`_warn_capability_gaps`** can emit **`SpawnWarning`** once per IDE before orchestration proceeds when **`IdeCapabilities`** flag skills **`unsupported`** or MCP **`unsupported`/`external`**, gated on whether the caller's work matters: **`add_ide`** looks for **any** installed extension with skill files (skills warning) or MCP servers (`list_mcp` non-empty servers; MCP warning), so repos with zero extensions emit none; **`_refresh_extension_core`** uses the **same aggregated skill predicate** across extensions but MCP warnings only reference **the refreshed extension's** MCP payload; **`refresh_extension_for_ide`** aggregates skills **the same way** yet scopes MCP to **the named extension** only. **`_refresh_extension_core`** and **`remove_extension`** re-render **all** installed extensions' skills on each IDE when the extension set or global reads change (merged global mandatory reads in skill metadata are cross-extension); MCP refresh stays scoped to the extension(s) the current operation targets. After **`refresh_mcp`** merges extension MCP into an IDE's project config, if the adapter returns non-empty rendered server names and **`emit_mcp_merged_notice`** is true (default), **stdout** prints **`MCP_MERGED_NOTICE`** once—a fixed line that project MCP was merged and the IDE may still require **Enable** (or equivalent) in MCP UI; **`add_ide`** batches MCP across extensions with **`emit_mcp_merged_notice=False`**, then runs one full skill refresh for all extensions, and prints that line at most once if any merge wrote servers. **`refresh_repository`** batches MCP the same way and prints that notice at most once after the agent-ignore phase if any merge returned server names. No-op MCP adapters (e.g. Windsurf's **`add_mcp`** returning `[]`) emit nothing. **`remove_ide`** finishes by calling **`clear_spawn_agent_ignore`**, each adapter's `finalize_repo_after_ide_removed` (vacancy cleanup of Spawn-owned repo-root dirs), then drops the IDE from the list and removes `spawn/.metadata/<ide>/`.
-3. **`spawn_cli.core.download`** — Staging, source resolution (git, zip with safe extraction, local copy), version and conflict checks, build manifest install; **`_stage_extension`** invokes **`low_level.prune_metadata_temp`** on **`spawn/.metadata/temp`** before each new staging UUID directory so old staging trees age out (**24-hour** heuristic).
-4. **`spawn_cli.core.scripts`** — Subprocess hooks for extension setup/uninstall with `SPAWN_*` environment variables.
-5. **`spawn_cli.core.low_level`** — Direct filesystem and metadata operations: extension and IDE lists, skill/MCP/navigation helpers, rendered ownership YAML, `.gitignore` managed blocks, `init()` layout, **`sync_core_config_from_defaults`** (overwrite `spawn/.core/config.yaml` with bundled **`CoreConfig`** after validating existing file parses), **`remove_ide_metadata_dir`**, **`prune_metadata_temp`** (drops stale UUID directories under **`spawn/.metadata/temp/`** older than **24 hours** during extension staging). Defines **`CANONICAL_IDE_KEYS`** (single ordering source for the IDE registry). When building skill metadata and extension slices of `spawn/navigation.yaml`, the same repository-relative file is not listed as both mandatory and contextual: paths are compared normalized (`Path.as_posix`, slash rules), and **read-required** wins. Persisted `spawn/navigation.yaml` always emits top-level **`read-required` before `read-contextual`** (unknown keys after the pair): **`_ensure_navigation_root_key_order`** plus Ruamel reorder or dict rebuild before dump. **`generate_skills_metadata`** loads **`rules`** groups from the merged **`spawn/navigation.yaml`** and folds them into each skill's mandatory (**`read-required` → rules**) and contextual (**`read-contextual` → rules**) read lists, deduped with extension-driven reads the same way (mandatory wins when a path appears in both tiers).
-6. **`spawn_cli.ide`** — `IdeAdapter` ABC (optional **`rewrite_core_agent_ignore`**, **`rewrite_extension_agent_ignore`**, **`clear_spawn_agent_ignore`** with defaults; **`finalize_repo_after_ide_removed`**), registry (`get`, `register`, `detect_supported_ides`), vacancy helpers (**`spawn_cli.ide._vacancy`**: empty MCP payloads, guarded removal of vacant IDE dotdirs such as `.cursor`), shared rendering helpers including split agent-ignore blocks in **`_helpers`** (`render_skill_md`: after frontmatter, **skill body**, optional **Hints** bullet list from **`SkillMetadata.hints`**, then **Mandatory reads** with **`spawn/navigation.yaml` always last**, then **Contextual reads**), optional **`StubAdapter`** for tests or in-progress work, and concrete adapters (Cursor, Codex, Claude Code, GitHub Copilot, Gemini CLI, Windsurf) registered for every **`CANONICAL_IDE_KEYS`** entry.
-7. **`spawn_cli.models`** — Pydantic v2 models for configs, navigation, MCP, skills, and rendered metadata shapes.
-8. **`spawn_cli.io`** — YAML I/O via **`save_yaml`** and shared **`configure_yaml_dump`** (block-style nested collections; **`sort_base_mapping_type_on_output = False`** so dump order matches insertion order; comment-preserving navigation uses **`YAML(typ="rt")`** where `low_level.save_extension_navigation` loads/writes), JSON, TOML, text, path safety, and file locking under `spawn/.metadata/`.
-9. **`spawn_cli.errors`** — Defines `SpawnError` and `SpawnWarning`; `spawn_cli.core.errors` re-exports them. Path and lock helpers import from here so lightweight I/O modules avoid initializing `spawn_cli.core` during import ordering.
+**State** for a managed repo lives under `spawn/`: core config, `.extend/` (installed extensions), `.metadata/` (per-IDE artifacts, lists, lock file), `navigation.yaml`, `rules/`, etc.
 
-## Hints flow
+**Concurrency**: mutating or state-dependent CLI work runs under a **non-blocking** repository lock (`spawn_cli.io.lock.spawn_lock`); contention uses the fixed user-facing message defined in design (see [`utility.md`](utility.md)).
 
-Short plain-text hints start in **extension** `extsrc/config.yaml` (**`hints.global`** / **`hints.local`**, see `extension-author-guide.md`) and in **maintainer-authored** **`read-required` → `rules`** rows (**optional `hint`**). On navigation refresh, Spawn mirrors each extension’s **`hints.global`** into the merged **`spawn/navigation.yaml`** under that extension’s **`- ext:`** stanza as a **`hints`** string list (strip, dedupe, length normalization). **`SkillMetadata.hints`** for rendered skills merges **every** installed extension's **`hints.global`** (sorted extension id order), then **`hints.local`** only for the skill's owning extension, then maintainer **`read-required` → `rules`** hints (deterministic dedupe; see `low_level.generate_skills_metadata`). IDE entry points (**`rollup_hints_for_agents`**) list **global** extension hints across installed packs (extension order) plus the same maintainer rule hints; **`hints.local`** appears in skills only, not in AGENTS. Treat **`- ext:`** blocks in `spawn/navigation.yaml` as **machine-owned** (rewritten on refresh). **`rules`** groups are the surface for durable hand-edits (paths, descriptions, **`hint`** on **read-required** rows).
+## Layered architecture
 
-## Data and concurrency
+Numbered bottom-up dependency style: higher layers call lower ones; `spawn_cli.errors` stays lightweight so import order does not pull in all of `core` early.
 
-State for a managed repository lives under `spawn/`: core config, `.extend/` (installed extensions), `.metadata/` (per-IDE rendered metadata, lists, lock file), `navigation.yaml`, and `rules/`. CLI operations that mutate or depend on that tree run under a **non-blocking** file lock; contention surfaces a fixed user-facing message per design.
+### 1. `spawn_cli.errors`
+
+Defines `SpawnError` and `SpawnWarning`. `spawn_cli.core.errors` re-exports them. Path and lock helpers import from here so shallow modules avoid initializing all of `core` during imports.
+
+### 2. `spawn_cli.io`
+
+YAML (including Ruamel comment-preserving paths for navigation), JSON, TOML, text, path safety, and locking under `spawn/.metadata/`. Shared dump configuration: block-style nested mappings, insertion order preserved where relevant.
+
+### 3. `spawn_cli.models`
+
+Pydantic v2 models for configs, navigation, MCP, skills, and rendered metadata shapes.
+
+### 4. `spawn_cli.ide`
+
+- **`IdeAdapter`** ABC: optional `rewrite_core_agent_ignore`, `rewrite_extension_agent_ignore`, `clear_spawn_agent_ignore` (defaults), `finalize_repo_after_ide_removed`.
+- **Registry**: `get`, `register`, `detect_supported_ides`.
+- **Vacancy / cleanup**: e.g. `spawn_cli.ide._vacancy` (empty MCP payloads, guarded removal of vacant IDE dotdirs).
+- **Rendering helpers**: `_helpers` (including `render_skill_md`: frontmatter, skill body, optional **Hints**, **Mandatory reads** with `spawn/navigation.yaml` last, **Contextual reads**).
+- **`StubAdapter`** for tests or in-progress work.
+- **Concrete adapters** (Cursor, Codex, Claude Code, GitHub Copilot, Gemini CLI, Windsurf) registered for every key in **`CANONICAL_IDE_KEYS`** (defined in `low_level` as the single ordering source for the IDE registry).
+
+### 5. `spawn_cli.core.low_level`
+
+Direct filesystem and metadata: extension and IDE lists, skill/MCP/navigation helpers, rendered ownership YAML, `.gitignore` managed blocks, `init()` layout, **`sync_core_config_from_defaults`** (overwrite `spawn/.core/config.yaml` from bundled **`CoreConfig`** after validating parse of any existing file), **`remove_ide_metadata_dir`**, **`prune_metadata_temp`** (stale UUID dirs under `spawn/.metadata/temp/` older than **24 hours** during extension staging).
+
+**Navigation / skills metadata**: when building skill metadata and extension slices of `spawn/navigation.yaml`, the same repo-relative path is not both mandatory and contextual (normalized comparison; **read-required** wins). Persisted `spawn/navigation.yaml` keeps top-level **`read-required`** then **`read-contextual`** (unknown keys after), via **`_ensure_navigation_root_key_order`** and reorder before dump. **`generate_skills_metadata`** loads **`rules`** groups from merged navigation and folds them into each skill’s mandatory and contextual read lists, deduped with extension-driven reads the same way.
+
+### 6. `spawn_cli.core.download`
+
+Staging, source resolution (git, zip with safe extraction, local copy), version and conflict checks, build manifest install. **`_stage_extension`** calls **`low_level.prune_metadata_temp`** on `spawn/.metadata/temp` before each new staging UUID so old trees age out (**24-hour** heuristic).
+
+### 7. `spawn_cli.core.scripts`
+
+Subprocess hooks for extension setup/uninstall with `SPAWN_*` environment variables.
+
+### 8. `spawn_cli.core.high_level`
+
+**Orchestration** for refresh/remove flows: skills, MCP, agent ignore, navigation, gitignore metadata; IDE and extension lifecycle (install, update, remove, **reinstall** from `spawn/.extend/{name}/source.yaml`, refresh, healthcheck, init, etc.); coordinates adapters with `low_level` persistence.
+
+**Agent ignore**: **`refresh_core_agent_ignore`** and **`refresh_extension_agent_ignore`** maintain two managed regions (`# spawn:core:*` and `# spawn:ext:*`). **`agent-ignore.txt`** holds the extension merge only for IDEs that use it; project-style IDEs (e.g. Claude Code) diff a full core+extension snapshot into JSON permissions. **`refresh_agent_ignore(ide)`** runs core then extension. **`remove_ide`** calls **`clear_spawn_agent_ignore`**, then **`finalize_repo_after_ide_removed`**. **`refresh_repository`** (CLI `spawn refresh`) runs **`sync_core_config_from_defaults`**, then the same batched MCP/skills/ignore/navigation/gitignore/entry-point pass used after extension changes.
+
+**Capability warnings (`SpawnWarning`)**: **`_warn_capability_gaps`** can warn once per IDE when **`IdeCapabilities`** marks skills **`unsupported`** or MCP **`unsupported`/`external`**, only if the caller’s work is affected — e.g. **`add_ide`** checks any installed extension with skill files or non-empty MCP (**`list_mcp`**); **`_refresh_extension_core`** uses the same aggregated skill predicate but MCP warnings target **the refreshed extension**; **`refresh_extension_for_ide`** aggregates skills the same way while scoping MCP to **that** extension. **`_refresh_extension_core`** and **`remove_extension`** re-render **all** installed extensions’ skills on each IDE when the extension set or global reads change; MCP refresh stays scoped to the operation’s target extension(s).
+
+**MCP merge notice**: after **`refresh_mcp`** merges extension MCP, if the adapter returns non-empty server names and **`emit_mcp_merged_notice`** is true (default), **stdout** prints **`MCP_MERGED_NOTICE`** once (fixed line that project MCP was merged and the IDE may still require Enable in UI). **`add_ide`** and **`refresh_repository`** batch with **`emit_mcp_merged_notice=False`**, then print **at most once** if any merge wrote servers. No-op MCP adapters (e.g. Windsurf **`add_mcp`** → `[]`) emit nothing.
+
+### 9. `spawn_cli.cli`
+
+- **`argparse`** subcommands (including top-level **`refresh`** and `extension reinstall <name>`), human-readable help at each nesting level (`build_parser`).
+- Resolves target repo as `Path.cwd().resolve()`, enforces `spawn init` before other commands.
+- Wraps almost all handlers in the non-blocking repository lock.
+- At startup, **`install_spawn_warning_format`** (`spawn_cli.warnings_display`) replaces `warnings.showwarning` so **`SpawnWarning`** prints as `spawn: warning: ...` on stderr (no Python `file:line:` banner); other categories delegate to the prior handler.
+
+## Hints flow (summary)
+
+Short hints originate in extension **`config.yaml`** (`hints.global` / `hints.local`, see [`extension-author-guide.md`](extension-author-guide.md)) and in maintainer **`read-required` → `rules`** rows (optional **`hint`**). On navigation refresh, each extension’s **`hints.global`** is mirrored under that extension’s **`- ext:`** stanza in **`spawn/navigation.yaml`** as a **`hints`** string list (normalize, dedupe).
+
+**Rendered skills**: **`SkillMetadata.hints`** merges every installed extension’s **`hints.global`** (sorted extension id), then **`hints.local`** for the owning extension, then maintainer rule hints (deterministic dedupe; see **`generate_skills_metadata`**).
+
+**IDE entry points**: **`rollup_hints_for_agents`** lists global extension hints across installed packs plus maintainer rule hints; **`hints.local`** appears in skills only, not in AGENTS.
+
+Treat **`- ext:`** blocks in `spawn/navigation.yaml` as **machine-owned** (rewritten on refresh). **`rules`** groups are for durable hand-edits (paths, descriptions, **`hint`** on **read-required** rows).
+
+Full detail: [`agentic-flow.md`](agentic-flow.md), [`extension-author-guide.md`](extension-author-guide.md).
 
 ## Tests
 

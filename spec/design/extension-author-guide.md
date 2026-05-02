@@ -1,8 +1,4 @@
-# Spawn extension author guide (standalone)
-
-This guide is **self-contained**: you can copy it elsewhere without sibling files or source trees. It describes how to author a **Spawn extension** — the `extsrc/` package installed into a target repository by the **Spawn CLI** (`spawn`).
-
----
+# Spawn extension author guide
 
 ## 1. Concepts
 
