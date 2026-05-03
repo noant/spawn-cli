@@ -1,6 +1,6 @@
 schema: 1
 name: spectask
-version: "1.2.0"
+version: "1.2.1"
 
 folders:
   spec/tasks:
@@ -9,9 +9,7 @@ folders:
     mode: artifact
 
 agent-ignore:
-  - spec/seeds/**/_DONE_*/
   - spec/seeds/**/_DONE_*/**
-  - spec/tasks/**/_DONE_*/
   - spec/tasks/**/_DONE_*/**
 
 files:
