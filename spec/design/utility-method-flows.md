@@ -327,6 +327,10 @@ operation.
 | `run-after-uninstall-scripts(extension)` | Same | Same | — | Warning on failure. |
 | `run-healthcheck-scripts(extension)` | Same | Same | None | Non-mutating validation signal for CI/human. |
 
+**I/O:** Each `subprocess` run uses the default inherited **stdin, stdout, and
+stderr** of the Spawn process (no capture), so hook output is visible immediately
+and prompts can read interactive input when the CLI has a TTY.
+
 **Progress:** Each run prints one line to **stderr** before `subprocess`:
 `spawn: running {phase} script: {filename}`, where `{phase}` is `before-install`,
 `after-install`, `before-uninstall`, `after-uninstall`, or `healthcheck`, and

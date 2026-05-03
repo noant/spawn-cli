@@ -65,6 +65,9 @@ Staging, source resolution (git, zip with safe extraction, local copy), version 
 ### 7. `spawn_cli.core.scripts`
 
 Subprocess hooks for extension setup/uninstall with `SPAWN_*` environment variables.
+Hook and healthcheck subprocesses **inherit** the parent process **stdin, stdout,
+and stderr** (no output capture), so terminal users see live script output and
+can use interactive prompts when Spawn runs interactively.
 Immediately before each configured hook or healthcheck subprocess, **stderr** prints
 `spawn: running {phase} script: {filename}` (`phase` matches `config.yaml` setup keys;
 `filename` is the script basename).

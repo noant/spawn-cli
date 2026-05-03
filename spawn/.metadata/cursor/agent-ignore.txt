@@ -1,2 +1,2 @@
-spec/seeds/**/_DONE_*/**
-spec/tasks/**/_DONE_*/**
+spec/seeds/_DONE_*.md
+spec/tasks/**/_DONE_*/_DONE_*.md

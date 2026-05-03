@@ -102,11 +102,13 @@ def test_env_vars_passed(tmp_path: Path) -> None:
         setup={"before-install": "hook.py"},
         script_rel="hook.py",
     )
-    fake = CompletedProcess(args=[], returncode=0, stdout="", stderr="")
+    fake = CompletedProcess(args=[], returncode=0, stdout=None, stderr=None)
     with patch("spawn_cli.core.scripts.subprocess.run", return_value=fake) as run:
         scripts.run_before_install_scripts(tmp_path, "e")
     run.assert_called_once()
     kwargs = run.call_args.kwargs
+    assert kwargs.get("capture_output") is not True
+    assert "stdin" not in kwargs and "stdout" not in kwargs and "stderr" not in kwargs
     assert kwargs["env"]["SPAWN_EXT_NAME"] == "e"
     assert kwargs["env"]["SPAWN_TARGET_ROOT"] == str(tmp_path.resolve())
     assert "SPAWN_EXT_PATH" in kwargs["env"]
@@ -120,7 +122,7 @@ def test_run_before_install_prints_progress_to_stderr(tmp_path: Path, capsys: py
         setup={"before-install": "hook.py"},
         script_rel="hook.py",
     )
-    fake = CompletedProcess(args=[], returncode=0, stdout="", stderr="")
+    fake = CompletedProcess(args=[], returncode=0, stdout=None, stderr=None)
     with patch("spawn_cli.core.scripts.subprocess.run", return_value=fake):
         scripts.run_before_install_scripts(tmp_path, "e")
     err = capsys.readouterr().err

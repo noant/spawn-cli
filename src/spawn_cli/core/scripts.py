@@ -70,7 +70,7 @@ def _run_script(
     *,
     ext_layout: Path,
     blocking: bool,
-) -> subprocess.CompletedProcess[str]:
+) -> subprocess.CompletedProcess[str | None]:
     script_path = _setup_script_path(ext_layout, script_filename)
     if not script_path.is_file():
         raise SpawnError(f"setup script missing: {script_path}")
@@ -92,14 +92,13 @@ def _run_script(
         [sys.executable, str(script_path)],
         cwd=str(target_root),
         env=env,
-        capture_output=True,
-        text=True,
         check=False,
     )
     if proc.returncode != 0:
-        msg = f"Setup script {script_filename!r} exited with status {proc.returncode}"
-        if proc.stderr.strip():
-            msg = f"{msg}: {proc.stderr.strip()}"
+        msg = (
+            f"Setup script {script_filename!r} exited with status {proc.returncode} "
+            "(output above)"
+        )
         if blocking:
             raise SpawnError(msg)
         warnings.warn(msg, SpawnWarning)
@@ -208,14 +207,13 @@ def run_after_uninstall_from_snapshot(
         [sys.executable, str(snap.script_path)],
         cwd=str(target_root),
         env=env,
-        capture_output=True,
-        text=True,
         check=False,
     )
     if proc.returncode != 0:
-        msg = f"After-uninstall script exited with status {proc.returncode}"
-        if proc.stderr.strip():
-            msg = f"{msg}: {proc.stderr.strip()}"
+        msg = (
+            f"After-uninstall script exited with status {proc.returncode} "
+            "(output above)"
+        )
         warnings.warn(msg, SpawnWarning)
 
 
@@ -242,8 +240,6 @@ def run_healthcheck_scripts(target_root: Path, extension: str, *, ext_layout: Pa
             "SPAWN_EXT_VERSION": cfg.version,
             "SPAWN_TARGET_VERSION": _core_version(target_root),
         },
-        capture_output=True,
-        text=True,
         check=False,
     )
     return proc.returncode == 0

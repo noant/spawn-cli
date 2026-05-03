@@ -4,6 +4,6 @@ spawn/.metadata/**
 spawn/.extend/**
 # spawn:core:end
 # spawn:ext:start
-spec/seeds/**/_DONE_*/**
-spec/tasks/**/_DONE_*/**
+spec/seeds/_DONE_*.md
+spec/tasks/**/_DONE_*/_DONE_*.md
 # spawn:ext:end

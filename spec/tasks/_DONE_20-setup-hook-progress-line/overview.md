@@ -1,4 +1,4 @@
-# 1: Setup hook progress line on stderr
+# 20: Setup hook progress line on stderr
 
 ## Source seed
 - Path: none

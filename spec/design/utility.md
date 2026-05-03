@@ -375,8 +375,11 @@ mutate repository state.
 Setup scripts run with the target repository root as the working directory.
 Spawn passes the installed extension path, extension name, current version, and
 target version through arguments or environment variables defined by the script
-runner contract. Immediately before each hook or healthcheck subprocess, Spawn
-prints to **stderr** `spawn: running {phase} script: {filename}` (see
+runner contract. Hook and healthcheck subprocesses inherit the Spawn process
+**stdin, stdout, and stderr** (no captured streams), so script output is live
+and interactive input works in a normal terminal. Immediately before each hook or
+healthcheck subprocess, Spawn prints to **stderr**
+`spawn: running {phase} script: {filename}` (see
 `utility-method-flows.md` setup scripts section).
 
 ## High-Level Modules
