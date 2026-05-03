@@ -327,6 +327,12 @@ operation.
 | `run-after-uninstall-scripts(extension)` | Same | Same | — | Warning on failure. |
 | `run-healthcheck-scripts(extension)` | Same | Same | None | Non-mutating validation signal for CI/human. |
 
+**Progress:** Each run prints one line to **stderr** before `subprocess`:
+`spawn: running {phase} script: {filename}`, where `{phase}` is `before-install`,
+`after-install`, `before-uninstall`, `after-uninstall`, or `healthcheck`, and
+`{filename}` is the basename from config. The temporary copy path used for post-uninstall
+hooks still reports `after-uninstall` with the original script basename.
+
 ---
 
 ## 15. High-level: `refresh-gitignore`

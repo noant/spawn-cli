@@ -111,3 +111,17 @@ def test_env_vars_passed(tmp_path: Path) -> None:
     assert kwargs["env"]["SPAWN_TARGET_ROOT"] == str(tmp_path.resolve())
     assert "SPAWN_EXT_PATH" in kwargs["env"]
     assert kwargs["env"]["SPAWN_EXT_VERSION"] == "1.0.0"
+
+
+def test_run_before_install_prints_progress_to_stderr(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    _write_ext(
+        tmp_path,
+        "e",
+        setup={"before-install": "hook.py"},
+        script_rel="hook.py",
+    )
+    fake = CompletedProcess(args=[], returncode=0, stdout="", stderr="")
+    with patch("spawn_cli.core.scripts.subprocess.run", return_value=fake):
+        scripts.run_before_install_scripts(tmp_path, "e")
+    err = capsys.readouterr().err
+    assert "spawn: running before-install script: hook.py" in err

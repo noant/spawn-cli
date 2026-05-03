@@ -66,6 +66,7 @@ def _run_script(
     target_root: Path,
     extension: str,
     script_filename: str,
+    phase: str,
     *,
     ext_layout: Path,
     blocking: bool,
@@ -83,6 +84,10 @@ def _run_script(
     env["SPAWN_EXT_PATH"] = str(ext_layout.resolve())
     env["SPAWN_EXT_VERSION"] = ext_ver
     env["SPAWN_TARGET_VERSION"] = tgt_ver
+    print(
+        f"spawn: running {phase} script: {Path(script_filename).name}",
+        file=sys.stderr,
+    )
     proc = subprocess.run(
         [sys.executable, str(script_path)],
         cwd=str(target_root),
@@ -110,6 +115,7 @@ def run_before_install_scripts(target_root: Path, extension: str, *, ext_layout:
         target_root,
         extension,
         cfg.setup.before_install,
+        "before-install",
         ext_layout=layout,
         blocking=True,
     )
@@ -124,6 +130,7 @@ def run_after_install_scripts(target_root: Path, extension: str, *, ext_layout: 
         target_root,
         extension,
         cfg.setup.after_install,
+        "after-install",
         ext_layout=layout,
         blocking=False,
     )
@@ -140,6 +147,7 @@ def run_before_uninstall_scripts(target_root: Path, extension: str, *, ext_layou
         target_root,
         extension,
         cfg.setup.before_uninstall,
+        "before-uninstall",
         ext_layout=layout,
         blocking=True,
     )
@@ -156,6 +164,7 @@ def run_after_uninstall_scripts(target_root: Path, extension: str, *, ext_layout
         target_root,
         extension,
         cfg.setup.after_uninstall,
+        "after-uninstall",
         ext_layout=layout,
         blocking=False,
     )
@@ -191,6 +200,10 @@ def run_after_uninstall_from_snapshot(
     env["SPAWN_EXT_PATH"] = str(ghost_ext.resolve())
     env["SPAWN_EXT_VERSION"] = snap.ext_version
     env["SPAWN_TARGET_VERSION"] = _core_version(target_root)
+    print(
+        f"spawn: running after-uninstall script: {snap.script_path.name}",
+        file=sys.stderr,
+    )
     proc = subprocess.run(
         [sys.executable, str(snap.script_path)],
         cwd=str(target_root),
@@ -211,6 +224,10 @@ def run_healthcheck_scripts(target_root: Path, extension: str, *, ext_layout: Pa
     cfg = _extension_config_at(layout)
     if not cfg.setup or not cfg.setup.healthcheck:
         return True
+    print(
+        f"spawn: running healthcheck script: {Path(cfg.setup.healthcheck).name}",
+        file=sys.stderr,
+    )
     proc = subprocess.run(
         [
             sys.executable,
