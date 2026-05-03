@@ -57,7 +57,10 @@ An Extension repository uses this source layout:
 extend-repo/
   extsrc/
     config.yaml
-    mcp.json
+    mcp/
+      windows.json
+      linux.json
+      macos.json
     skills/
       {skill}.md
     files/
@@ -75,7 +78,7 @@ Optional:
 - `extsrc/skills/{skill}.md`
 - `extsrc/files/{file}`
 - `extsrc/setup/{script}.py`
-- `extsrc/mcp.json`
+- `extsrc/mcp/windows.json`, `linux.json`, `macos.json`
 
 During install, the full Extension source tree is copied into
 `target-repo/spawn/.extend/{ext}/` as an Installed extension.
@@ -88,7 +91,7 @@ Extension names should be stable, lowercase identifiers, preferably
 kebab-case. The name in `extsrc/config.yaml` should match the installed folder
 name under `spawn/.extend/{ext}`.
 
-Skill names (`skills` keys / `name` field) and MCP server names (`mcp.json`)
+Skill names (`skills` keys / `name` field) and MCP server names (from **`extsrc/mcp/*.json`**, same **`name`** set across platforms)
 must be **unique across all extensions installed in the same target repository**
 after normalization (see `utility.md`, Cross-extension rendered identity). A
 second extension that reuses another extension's skill name or MCP server key
@@ -233,9 +236,8 @@ skill body itself.
 
 ## MCP
 
-`extsrc/mcp.json` defines MCP connections supplied by the extension. Spawn
-parses this file into a normalized internal MCP structure, then each IDE adapter
-renders that structure into its own MCP configuration format.
+`extsrc/mcp/windows.json`, `linux.json`, and `macos.json` define MCP connections per OS family. Spawn reads the file for the host platform, parses it into a normalized internal MCP structure, then each IDE adapter
+renders that structure into its own MCP configuration format. The same server **`name`** set must appear in all three files; transport fields may differ by platform. Root **`extsrc/mcp.json`** is not supported.
 
 Rendered MCP names are stored in
 `spawn/.metadata/{ide}/rendered-mcp.yaml` so uninstall and rebuild operations

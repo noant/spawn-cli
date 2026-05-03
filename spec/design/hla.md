@@ -54,7 +54,7 @@ Pydantic v2 models for configs, navigation, MCP, skills, and rendered metadata s
 
 ### 5. `spawn_cli.core.low_level`
 
-Direct filesystem and metadata: extension and IDE lists, skill/MCP/navigation helpers, rendered ownership YAML, `.gitignore` managed blocks, `init()` layout, **`sync_core_config_from_defaults`** (overwrite `spawn/.core/config.yaml` from bundled **`CoreConfig`** after validating parse of any existing file), **`remove_ide_metadata_dir`**, **`prune_metadata_temp`** (stale UUID dirs under `spawn/.metadata/temp/` older than **24 hours** during extension staging).
+Direct filesystem and metadata: extension and IDE lists, skill/MCP/navigation helpers (`list_mcp` reads `spawn/.extend/{name}/mcp/{windows,linux,macos}.json` for the host OS), rendered ownership YAML, `.gitignore` managed blocks, `init()` layout, **`sync_core_config_from_defaults`** (overwrite `spawn/.core/config.yaml` from bundled **`CoreConfig`** after validating parse of any existing file), **`remove_ide_metadata_dir`**, **`prune_metadata_temp`** (stale UUID dirs under `spawn/.metadata/temp/` older than **24 hours** during extension staging).
 
 **Navigation / skills metadata**: when building skill metadata and extension slices of `spawn/navigation.yaml`, the same repo-relative path is not both mandatory and contextual (normalized comparison; **read-required** wins). Persisted `spawn/navigation.yaml` keeps top-level **`read-required`** then **`read-contextual`** (unknown keys after), via **`_ensure_navigation_root_key_order`** and reorder before dump. **`generate_skills_metadata`** loads **`rules`** groups from merged navigation and folds them into each skill’s mandatory and contextual read lists, deduped with extension-driven reads the same way.
 

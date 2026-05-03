@@ -190,7 +190,7 @@ Prints one installed extension name per line.
 
 #### `spawn extension check [PATH] [--strict]`
 
-**`PATH`**: extension project root (default **`.`**). Resolves **`extsrc/`** or extension root with **`config.yaml`**, validates config, and checks skills, file descriptions, **`mcp.json`** parseability, etc. **Default**: non-fatal issues become **warnings** printed to stdout (`Warning: ...`); exit **0**. **`--strict`**: issues that are warnings by default become **errors** (**`SpawnError`**), non-zero exit.
+**`PATH`**: extension project root (default **`.`**). Resolves **`extsrc/`** or extension root with **`config.yaml`**, validates config, and checks skills, file descriptions, **`extsrc/mcp/*.json`**, etc. **Default**: non-fatal issues become **warnings** printed to stdout (`Warning: ...`); exit **0**. **`--strict`**: issues that are warnings by default become **errors** (**`SpawnError`**), non-zero exit.
 
 #### `spawn extension from-rules SOURCE --name ID [--branch REV] [--output DIR]`
 

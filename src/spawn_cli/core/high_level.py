@@ -10,7 +10,7 @@ from spawn_cli.core import low_level as ll
 from spawn_cli.core import scripts
 from spawn_cli.core.errors import SpawnError, SpawnWarning
 from spawn_cli.ide.registry import IdeCapabilities, get as ide_get
-from spawn_cli.io.json_io import load_json
+from spawn_cli.io.json_io import save_json
 from spawn_cli.io.paths import ensure_dir, safe_path
 from spawn_cli.io.yaml_io import load_yaml, save_yaml
 from spawn_cli.models.config import ExtensionConfig, ReadFlag
@@ -417,6 +417,16 @@ def extension_healthcheck(target_root: Path, extension: str) -> bool:
     return scripts.run_healthcheck_scripts(target_root, extension)
 
 
+def _ensure_empty_mcp_platform_files(extsrc: Path) -> None:
+    mdir = extsrc / "mcp"
+    ensure_dir(mdir)
+    empty: dict = {"servers": []}
+    for stem in ("windows", "linux", "macos"):
+        p = mdir / f"{stem}.json"
+        if not p.is_file():
+            save_json(p, empty)
+
+
 def extension_init(path: Path, name: str) -> None:
     extsrc = path / "extsrc"
     cfg_path = extsrc / "config.yaml"
@@ -429,6 +439,7 @@ def extension_init(path: Path, name: str) -> None:
     ensure_dir(extsrc / "skills")
     ensure_dir(extsrc / "files")
     ensure_dir(extsrc / "setup")
+    _ensure_empty_mcp_platform_files(extsrc)
     template = {
         "name": name,
         "schema": 1,
@@ -475,15 +486,49 @@ def extension_check(path: Path, strict: bool = False) -> list[str]:
                 if strict:
                     raise SpawnError(msg)
                 warnings_out.append(msg)
-    mcp_path = extsrc / "mcp.json"
-    if mcp_path.is_file():
-        try:
-            load_json(mcp_path)
-        except Exception as e:
-            msg = f"mcp.json not parseable: {e}"
+    root_mcp = extsrc / "mcp.json"
+    if root_mcp.is_file():
+        msg = (
+            "obsolete extsrc/mcp.json is not used; remove it and use "
+            "extsrc/mcp/windows.json, linux.json, and macos.json only"
+        )
+        if strict:
+            raise SpawnError(msg)
+        warnings_out.append(msg)
+    mcp_dir = extsrc / "mcp"
+    if not mcp_dir.is_dir():
+        msg = "missing extsrc/mcp/ directory (expected windows.json, linux.json, macos.json)"
+        if strict:
+            raise SpawnError(msg)
+        warnings_out.append(msg)
+    else:
+        paths = ll.extension_mcp_platform_json_paths(extsrc)
+        if not all(p.is_file() for p in paths):
+            missing = [p.name for p in paths if not p.is_file()]
+            msg = f"incomplete extsrc/mcp layout (missing {', '.join(missing)})"
             if strict:
-                raise SpawnError(msg) from e
+                raise SpawnError(msg)
             warnings_out.append(msg)
+        else:
+            name_sets: list[frozenset[str]] = []
+            for p in paths:
+                try:
+                    nm = ll.normalized_mcp_from_mcp_json_path(p, cfg.name or "extension")
+                except Exception as e:
+                    if strict:
+                        raise SpawnError(f"MCP file invalid ({p}): {e}") from e
+                    warnings_out.append(f"MCP file invalid ({p}): {e}")
+                    name_sets = []
+                    break
+                name_sets.append(frozenset(s.name for s in nm.servers))
+            if name_sets and len(set(name_sets)) != 1:
+                msg = (
+                    "MCP server names must match across mcp/windows.json, "
+                    "linux.json, and macos.json"
+                )
+                if strict:
+                    raise SpawnError(msg)
+                warnings_out.append(msg)
     if cfg.setup:
         for _phase, rel in (
             ("before-install", cfg.setup.before_install),
@@ -555,6 +600,7 @@ def extension_from_rules(source: str, output_path: Path, name: str, branch: str 
         )
         ensure_dir(extsrc / "skills")
         ensure_dir(extsrc / "setup")
+        _ensure_empty_mcp_platform_files(extsrc)
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 

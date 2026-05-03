@@ -24,7 +24,10 @@ Only **`extsrc/`** is copied into the target as the installed extension. The res
 your-extension-repo/
   extsrc/
     config.yaml       # required
-    mcp.json          # optional
+    mcp/              # optional; cross-platform MCP (see §6)
+      windows.json
+      linux.json
+      macos.json
     skills/
       *.md            # skill sources; filename = key in config.yaml
     files/
@@ -227,19 +230,21 @@ If `config.yaml` already sets `name` and `description` for this filename, the fr
 
 ---
 
-## 6. Extension `mcp.json` (MCP servers)
+## 6. Extension MCP (`extsrc/mcp/*.json`)
 
-Path: **`extsrc/mcp.json`**. Must be **valid JSON**.
+Use **three** JSON files under **`extsrc/mcp/`**: **`windows.json`**, **`linux.json`**, **`macos.json`**. Each must be valid JSON with the shape below. Spawn selects the file for the host OS when merging MCP. The set of server **`name`** values must be **identical** in all three files (order may differ); **`transport`** (and similar) may differ per platform.
+
+**Do not** add **`extsrc/mcp.json`**: it is obsolete and not read. `spawn extension check` reports it. **`spawn extension init`** and **`spawn extension from-rules`** scaffold **`extsrc/mcp/`** with three empty `{"servers": []}` files.
 
 ### 6.1 Not the same as IDE project MCP
 
-Many IDEs use a root **`mcpServers`** object (e.g. Cursor, Claude Code). The **extension** format uses a top-level **`servers` array**. Spawn parses this, normalizes it, then **adapters** rewrite into each IDE’s project format.
+Many IDEs use a root **`mcpServers`** object (e.g. Cursor, Claude Code). The **extension** format uses a top-level **`servers` array** in each platform file. Spawn parses the host file, normalizes it, then **adapters** rewrite into each IDE's project format.
 
-### 6.2 Top level
+### 6.2 Top level (in each platform file)
 
 | Field | Type | Meaning |
 |-------|------|---------|
-| `servers` | array | Each element is one MCP server. Missing or `[]` means no MCP from this extension. |
+| `servers` | array | Each element is one MCP server. Missing or `[]` is allowed only when all three platform files share the same server **names** (typically all empty). |
 
 ### 6.3 Each server object
 
@@ -270,7 +275,7 @@ Each **value** is either:
 
 **A. A non-object scalar** (string, number, etc.) or any JSON value that is **not** a mapping  
 
-- Treated as a **user-supplied secret**: when writing IDE config, the value is represented as a **placeholder** (e.g. `${VAR}`), not a literal secret. **Never commit real secrets** in `mcp.json`.
+- Treated as a **user-supplied secret**: when writing IDE config, the value is represented as a **placeholder** (e.g. `${VAR}`), not a literal secret. **Never commit real secrets** in `extsrc/mcp/*.json`.
 
 **B. An object** with the following optional fields (defaults shown):
 
@@ -293,7 +298,7 @@ Optional. Defaults if omitted or partial:
 
 ### 6.7 Examples
 
-All snippets use the extension schema: top-level **`servers`** array, each server with a **globally unique** `name` in the target (across every installed extension).
+All snippets are the contents of **one** platform file (`windows.json`, `linux.json`, or `macos.json`): top-level **`servers`** array, each server with a **globally unique** `name` in the target (across every installed extension). For a real extension, replicate the same **`servers`** list into **all three** files when transport is identical, or adjust **`transport`** per file when it differs by OS.
 
 **1 — Stdio via `npx`, structured `env` (secret object), explicit `capabilities`:**
 
@@ -404,7 +409,7 @@ You can swap `"command": "python"` for e.g. **`uv`** / **`pipx`**-backed wrapper
 }
 ```
 
-**6 — Two servers in one `mcp.json` (each `name` must still be unique in the whole target):**
+**6 — Two servers in one platform file (each `name` must still be unique in the whole target); repeat the same structure in the other two platform files:**
 
 ```json
 {
@@ -453,7 +458,7 @@ An empty string still marks the key for placeholder-style injection in many adap
 
 ### 6.8 Validation note
 
-`spawn extension check` typically ensures `mcp.json` **parses as JSON**. Full semantic checks (e.g. missing `name`) may surface when MCP is loaded for rendering.
+`spawn extension check` validates **`extsrc/mcp/`**: all three files present, parseable JSON, matching server **`name`** sets, and no stray **`extsrc/mcp.json`**. Full semantic checks (e.g. missing `name` on a server object) also apply when MCP is loaded for rendering.
 
 ---
 
@@ -520,7 +525,7 @@ setup:
 - `extsrc/files/spec/design/notes.md`
 - `extsrc/skills/acme-run-task.md`
 - Optional: `extsrc/setup/after_install.py`, `extsrc/setup/healthcheck.py`
-- Optional: `extsrc/mcp.json` (§6)
+- Optional: `extsrc/mcp/*.json` (§6)
 
 ---
 
@@ -545,7 +550,7 @@ After `spawn extension add ...` (from the target root, after `spawn init`):
    - merged MCP config under IDE-specific paths,
    - agent-ignore and entry-point snippets as implemented by each adapter.
 
-Exact IDE paths and formats are adapter-specific; they are always **derived** from your `config.yaml`, skill sources, and `mcp.json`.
+Exact IDE paths and formats are adapter-specific; they are always **derived** from your `config.yaml`, skill sources, and **`extsrc/mcp/*.json`** (host OS file).
 
 ---
 
@@ -559,8 +564,8 @@ Run **`spawn`** from the **root of the target repository** (the CLI uses the cur
 
 **Extension source (authoring):**
 
-- **`spawn extension init . --name <id>`** — create `extsrc/` skeleton with empty `config.yaml`.
-- **`spawn extension check .`** — validate layout; add **`--strict`** to promote issues to errors (missing listed skills, undeclared files under `extsrc/files/`, missing descriptions when read flags are set, invalid JSON for `mcp.json`, missing setup scripts when referenced).
+- **`spawn extension init . --name <id>`** — create `extsrc/` skeleton with empty `config.yaml` and empty **`extsrc/mcp/*.json`** files.
+- **`spawn extension check .`** — validate layout; add **`--strict`** to promote issues to errors (missing listed skills, undeclared files under `extsrc/files/`, missing descriptions when read flags are set, invalid or mismatched **`extsrc/mcp/*.json`**, missing setup scripts when referenced).
 - **`spawn extension from-rules <source> --name <id> --output <dir>`** — bootstrap `extsrc/` from an existing repo’s `spawn/rules/` (optional workflow).
 
 **Target install:**
@@ -598,7 +603,7 @@ Each entry is resolved to something containing **`extsrc/`** with `config.yaml`.
 1. `spawn extension init . --name my-pack`
 2. Add templates under `extsrc/files/`; declare every path in `files` with correct `mode` and read flags.
 3. Add `extsrc/skills/*.md`; list each filename under `skills` if you need overrides or `required-read`.
-4. Optionally add `extsrc/mcp.json` using **`servers`** (§6).
+4. Optionally edit **`extsrc/mcp/`** platform files using **`servers`** (§6).
 5. Optionally add `setup/` scripts and reference them in `setup:`.
 6. `spawn extension check . --strict`
 7. In a disposable target: `spawn init`, `spawn extension add <your-source>`, add IDE if needed, verify navigation and skills.

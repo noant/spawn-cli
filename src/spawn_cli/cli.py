@@ -210,7 +210,7 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help=(
             "Fail on issues that default to warnings "
-            "(missing skill files, bad mcp.json, empty file descriptions)."
+            "(missing skill files, invalid extsrc/mcp/*.json, empty file descriptions)."
         ),
     )
 

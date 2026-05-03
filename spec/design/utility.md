@@ -82,7 +82,7 @@ of rendered names, or install an unsupported config schema.
 ## Cross-extension rendered identity
 
 Rendered **skill** names (after `normalize_skill_name`) and **MCP server** names
-(from each extension's `mcp.json`) must be **pairwise distinct across all
+(from each extension's host `mcp/{windows,linux,macos}.json` file) must be **pairwise distinct across all
 installed extensions** in the same target repository for a given refresh
 operation. Before calling `add_skills` / `add_mcp`, Spawn validates the union of
 names from every extension that contributes to that IDE surface. If two
@@ -174,7 +174,7 @@ config. Artifact files and folders are not removable by default.
 `list-skills(extension)` returns Markdown files from
 `spawn/.extend/{extension}/skills/`.
 
-`list-mcp(extension)` parses `spawn/.extend/{extension}/mcp.json` into the
+`list-mcp(extension)` parses `spawn/.extend/{extension}/mcp/{platform}.json` for the current OS (`windows` / `linux` / `macos`) into the
 normalized MCP shape described below.
 
 `get-skill-raw-info(extension, skillPath)` returns:
@@ -410,7 +410,7 @@ generates fresh skill metadata, renders through the IDE adapter, and saves the
 new rendered paths.
 
 `refresh-mcp(ide, extension)` removes old rendered MCP entries for the
-extension, normalizes `mcp.json`, renders through the IDE adapter, and saves the
+extension, normalizes the extension's platform MCP JSON, renders through the IDE adapter, and saves the
 new rendered MCP names.
 
 `refresh-entry-point(ide)` builds the standard Spawn entry point prompt and
@@ -460,7 +460,7 @@ declared files/folders.
 `extension_init(path, name)` creates a development extension skeleton at
 `{path}/extsrc/`. It creates `config.yaml`, `skills/`, `files/`, and `setup/`
 when missing. The generated config includes `name`, `schema`, `version`, and
-empty sections for files, folders, ignores, skills, and setup. The command must
+empty sections for files, folders, ignores, skills, setup, and **`extsrc/mcp/*.json`**. The command must
 not overwrite existing author files; if `extsrc/config.yaml` already exists it
 emits a warning and leaves it unchanged.
 
@@ -469,7 +469,7 @@ checks that `extsrc/config.yaml` exists, that referenced skills exist under
 `extsrc/skills/`, referenced setup scripts exist under `extsrc/setup/`, declared
 files either exist under `extsrc/files/` or are clearly script-created, folder
 and file modes use valid enum values, read flags use valid enum values,
-required/auto reads have descriptions, `mcp.json` is parseable when present,
+required/auto reads have descriptions, `extsrc/mcp/*.json` is valid when present,
 and no copied files are left undeclared except as warnings in non-strict mode.
 
 `extension_from_rules(source, outputPath, name, branch)` creates extension

@@ -498,12 +498,48 @@ def test_list_mcp(tmp_path: Path) -> None:
     _write_yaml(root / "config.yaml", {"name": "spectask", "version": "1.0.0", "schema": 1})
     import json
 
-    (root / "mcp.json").write_text(json.dumps(mcp), encoding="utf-8")
+    mdir = root / "mcp"
+    mdir.mkdir(parents=True)
+    body = json.dumps(mcp)
+    for plat in ("windows", "linux", "macos"):
+        (mdir / f"{plat}.json").write_text(body, encoding="utf-8")
 
     nm = ll.list_mcp(tmp_path, "spectask")
     assert len(nm.servers) == 1
     assert nm.servers[0].name == "test-srv"
     assert nm.servers[0].extension == "spectask"
+
+
+def test_list_mcp_empty_without_mcp_dir_ignores_root_json(tmp_path: Path) -> None:
+    ll.init(tmp_path)
+    root = tmp_path / "spawn" / ".extend" / "spectask"
+    root.mkdir(parents=True)
+    _write_yaml(root / "config.yaml", {"name": "spectask", "version": "1.0.0", "schema": 1})
+    (root / "mcp.json").write_text('{"servers": [{"name": "ignored"}]}', encoding="utf-8")
+    nm = ll.list_mcp(tmp_path, "spectask")
+    assert nm.servers == []
+
+
+def test_list_mcp_raises_when_platform_file_missing(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("spawn_cli.core.low_level.sys.platform", "linux")
+    ll.init(tmp_path)
+    root = tmp_path / "spawn" / ".extend" / "spectask"
+    root.mkdir(parents=True)
+    _write_yaml(root / "config.yaml", {"name": "spectask", "version": "1.0.0", "schema": 1})
+    mdir = root / "mcp"
+    mdir.mkdir(parents=True)
+    import json
+
+    (mdir / "windows.json").write_text(json.dumps({"servers": []}), encoding="utf-8")
+    (mdir / "macos.json").write_text(json.dumps({"servers": []}), encoding="utf-8")
+    with pytest.raises(SpawnError, match="missing MCP platform file"):
+        ll.list_mcp(tmp_path, "spectask")
+
+
+def test_mcp_host_platform_stem_unsupported(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("spawn_cli.core.low_level.sys.platform", "freebsd14")
+    with pytest.raises(SpawnError, match="unsupported platform"):
+        ll.mcp_host_platform_stem()
 
 
 def test_save_get_rendered_skills(tmp_path: Path) -> None:
@@ -706,11 +742,15 @@ def test_validate_rendered_identity_duplicate_mcp(tmp_path: Path) -> None:
     import json
 
     srv = {"name": "dup", "transport": {"type": "stdio"}, "capabilities": {}}
+    body = json.dumps({"servers": [srv]})
     for name in ("a", "b"):
         root = tmp_path / "spawn" / ".extend" / name
         root.mkdir(parents=True)
         _write_yaml(root / "config.yaml", {"name": name, "version": "1", "schema": 1})
-        (root / "mcp.json").write_text(json.dumps({"servers": [srv]}), encoding="utf-8")
+        mdir = root / "mcp"
+        mdir.mkdir(parents=True)
+        for plat in ("windows", "linux", "macos"):
+            (mdir / f"{plat}.json").write_text(body, encoding="utf-8")
     with pytest.raises(SpawnError):
         ll.validate_rendered_identity(tmp_path)
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import shutil
 
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -29,6 +30,14 @@ def _write_yaml(path: Path, data: dict) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8") as fh:
         YAML_W.dump(data, fh)
+
+
+def _write_mcp_trio(ext_root: Path, servers: list) -> None:
+    mdir = ext_root / "mcp"
+    mdir.mkdir(parents=True, exist_ok=True)
+    body = json.dumps({"servers": servers})
+    for plat in ("windows", "linux", "macos"):
+        (mdir / f"{plat}.json").write_text(body, encoding="utf-8")
 
 
 @pytest.fixture
@@ -166,11 +175,8 @@ def _install_ext(
     sk.mkdir(exist_ok=True)
     for k in (skills or {}):
         (sk / k).write_text("---\nname: sn\n---\nbody\n", encoding="utf-8")
-    if mcp_servers:
-        (root / "mcp.json").write_text(
-            json.dumps({"servers": mcp_servers}),
-            encoding="utf-8",
-        )
+    if mcp_servers is not None:
+        _write_mcp_trio(root, mcp_servers)
     if setup:
         (root / "setup").mkdir(exist_ok=True)
 
@@ -410,7 +416,7 @@ def test_refresh_mcp_no_stdout_notice_without_mcp_servers(
     _install_ext(target, "e1")
     ext_root = target / "spawn" / ".extend" / "e1"
     if empty_mcp_kind == "empty_servers_key":
-        (ext_root / "mcp.json").write_text(json.dumps({"servers": []}), encoding="utf-8")
+        _write_mcp_trio(ext_root, [])
     hl.refresh_mcp(target, "cursor", "e1")
     assert hl.MCP_MERGED_NOTICE not in capsys.readouterr().out
 
@@ -715,6 +721,12 @@ def test_extension_init_creates_skeleton(tmp_path: Path) -> None:
     raw = _load_cfg_dict(cfg)
     assert raw.get("name") == "my-pack"
     assert (tmp_path / "extsrc" / "skills").is_dir()
+    mdir = tmp_path / "extsrc" / "mcp"
+    assert mdir.is_dir()
+    for plat in ("windows", "linux", "macos"):
+        p = mdir / f"{plat}.json"
+        assert p.is_file()
+        assert json.loads(p.read_text(encoding="utf-8")) == {"servers": []}
 
 
 def test_extension_init_idempotent(tmp_path: Path) -> None:
@@ -756,4 +768,31 @@ def test_extension_check_missing_description(tmp_path: Path) -> None:
     }
     _write_yaml(extsrc / "config.yaml", cfg)
     with pytest.raises(SpawnError, match="description"):
+        hl.extension_check(tmp_path, strict=True)
+
+
+def test_extension_check_missing_mcp_dir_strict(tmp_path: Path) -> None:
+    hl.extension_init(tmp_path, "p")
+    shutil.rmtree(tmp_path / "extsrc" / "mcp")
+    with pytest.raises(SpawnError, match="missing extsrc/mcp"):
+        hl.extension_check(tmp_path, strict=True)
+
+
+def test_extension_check_obsolete_root_mcp_strict(tmp_path: Path) -> None:
+    hl.extension_init(tmp_path, "p")
+    (tmp_path / "extsrc" / "mcp.json").write_text("{}", encoding="utf-8")
+    with pytest.raises(SpawnError, match="obsolete"):
+        hl.extension_check(tmp_path, strict=True)
+
+
+def test_extension_check_mcp_name_mismatch_strict(tmp_path: Path) -> None:
+    hl.extension_init(tmp_path, "p")
+    extsrc = tmp_path / "extsrc" / "mcp"
+    (extsrc / "windows.json").write_text(
+        json.dumps({"servers": [{"name": "a", "transport": {"type": "stdio"}}]}),
+        encoding="utf-8",
+    )
+    (extsrc / "linux.json").write_text(json.dumps({"servers": []}), encoding="utf-8")
+    (extsrc / "macos.json").write_text(json.dumps({"servers": []}), encoding="utf-8")
+    with pytest.raises(SpawnError, match="must match"):
         hl.extension_check(tmp_path, strict=True)

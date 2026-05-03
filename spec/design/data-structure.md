@@ -30,7 +30,10 @@ target-repo/
       {ext}/
         config.yaml
         source.yaml
-        mcp.json
+        mcp/
+          windows.json
+          linux.json
+          macos.json
         skills/
           {skill}.md
         files/
@@ -152,7 +155,10 @@ An extension development repository stores the extension source under
 extend-repo/
   extsrc/
     config.yaml
-    mcp.json
+    mcp/
+      windows.json
+      linux.json
+      macos.json
     skills/
       {skill}.md
     files/

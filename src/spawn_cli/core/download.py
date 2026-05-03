@@ -21,7 +21,6 @@ from ruamel.yaml import YAML
 from spawn_cli.core import low_level as ll
 from spawn_cli.core.errors import SpawnError, SpawnWarning
 from spawn_cli.core import scripts
-from spawn_cli.io.json_io import load_json
 from spawn_cli.io.paths import ensure_dir, safe_path
 from spawn_cli.io.yaml_io import load_yaml, save_yaml
 from spawn_cli.models.config import ExtensionConfig, ExtensionsMeta, FileMode, SourceYaml
@@ -128,15 +127,7 @@ def _candidate_norm_skill_names(extsrc_dir: Path) -> list[str]:
 
 
 def _candidate_mcp_server_names(extsrc_dir: Path) -> list[str]:
-    path = extsrc_dir / "mcp.json"
-    if not path.is_file():
-        return []
-    data = load_json(path)
-    names: list[str] = []
-    for s in data.get("servers") or []:
-        if isinstance(s, dict) and s.get("name"):
-            names.append(str(s["name"]))
-    return names
+    return ll.extsrc_mcp_server_names_for_staging(extsrc_dir)
 
 
 def _validate_render_identity_for_new_extension(target_root: Path, new_name: str, extsrc_dir: Path) -> None:

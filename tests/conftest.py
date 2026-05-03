@@ -64,17 +64,20 @@ Do the work.
         encoding="utf-8",
     )
 
-    (ext_dir / "mcp.json").write_text(
-        """
-{
-  "mcpServers": {
-    "test-server": {
-      "command": "uvx",
-      "args": ["test-server-mcp"]
-    }
-  }
-}
-""",
-        encoding="utf-8",
+    import json
+
+    mdir = ext_dir / "mcp"
+    mdir.mkdir(parents=True)
+    body = json.dumps(
+        {
+            "servers": [
+                {
+                    "name": "test-server",
+                    "transport": {"type": "stdio", "command": "uvx", "args": ["test-server-mcp"]},
+                },
+            ],
+        }
     )
+    for plat in ("windows", "linux", "macos"):
+        (mdir / f"{plat}.json").write_text(body, encoding="utf-8")
     return "test-ext"

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 import shutil
+import sys
 import time
 import uuid
 import warnings
@@ -21,6 +22,8 @@ from spawn_cli.io.yaml_io import configure_yaml_dump, load_yaml, save_yaml
 from spawn_cli.models.config import CoreConfig, ExtensionConfig, FileMode, IdeList, ReadFlag
 from spawn_cli.models.mcp import McpCapabilities, McpEnvVar, McpServer, McpTransport, NormalizedMcp
 from spawn_cli.models.skill import SkillFileRef, SkillMetadata, SkillRawInfo
+
+MCP_PLATFORM_STEMS: tuple[str, ...] = ("windows", "linux", "macos")
 
 CANONICAL_IDE_KEYS: tuple[str, ...] = (
     "cursor",
@@ -658,9 +661,25 @@ def _mcp_capabilities(raw: dict[str, Any]) -> McpCapabilities:
     return McpCapabilities.model_validate(c) if isinstance(c, dict) else McpCapabilities()
 
 
-def list_mcp(target_root: Path, extension: str) -> NormalizedMcp:
-    path = _extend_root(target_root) / extension / "mcp.json"
-    data = load_json(path)
+def mcp_host_platform_stem() -> str:
+    plat = sys.platform
+    if plat == "win32":
+        return "windows"
+    if plat == "darwin":
+        return "macos"
+    if plat.startswith("linux"):
+        return "linux"
+    raise SpawnError(
+        f"unsupported platform for MCP selection: {plat!r} (expected Windows, Linux, or macOS)"
+    )
+
+
+def extension_mcp_platform_json_paths(extension_root: Path) -> tuple[Path, Path, Path]:
+    d = extension_root / "mcp"
+    return tuple(d / f"{s}.json" for s in MCP_PLATFORM_STEMS)
+
+
+def _normalized_mcp_from_loaded(data: dict, path: Path, extension: str) -> NormalizedMcp:
     servers_out: list[McpServer] = []
     for s in data.get("servers") or []:
         if not isinstance(s, dict):
@@ -688,6 +707,49 @@ def list_mcp(target_root: Path, extension: str) -> NormalizedMcp:
             )
         )
     return NormalizedMcp(servers=servers_out)
+
+
+def normalized_mcp_from_mcp_json_path(path: Path, extension: str) -> NormalizedMcp:
+    data = load_json(path)
+    return _normalized_mcp_from_loaded(data, path, extension)
+
+
+def list_mcp(target_root: Path, extension: str) -> NormalizedMcp:
+    ext_root = _extend_root(target_root) / extension
+    mcp_dir = ext_root / "mcp"
+    if not mcp_dir.is_dir():
+        return NormalizedMcp(servers=[])
+    stem = mcp_host_platform_stem()
+    path = mcp_dir / f"{stem}.json"
+    if not path.is_file():
+        raise SpawnError(f"missing MCP platform file for this OS: {path}")
+    return normalized_mcp_from_mcp_json_path(path, extension)
+
+
+def extsrc_mcp_server_names_for_staging(extsrc_dir: Path) -> list[str]:
+    """Return sorted MCP server names from extsrc ``mcp/*.json`` or [] if ``mcp/`` is absent.
+
+    When ``mcp/`` exists, all three platform files must be present and declare the same
+    server ``name`` set.
+    """
+    mcp_dir = extsrc_dir / "mcp"
+    if not mcp_dir.is_dir():
+        return []
+    paths = list(extension_mcp_platform_json_paths(extsrc_dir))
+    if not all(p.is_file() for p in paths):
+        missing = [p.name for p in paths if not p.is_file()]
+        raise SpawnError(
+            f"extsrc/mcp layout incomplete (missing {', '.join(missing)}) under {mcp_dir}"
+        )
+    name_sets: list[frozenset[str]] = []
+    for p in paths:
+        nm = normalized_mcp_from_mcp_json_path(p, "_staging")
+        name_sets.append(frozenset(s.name for s in nm.servers))
+    if len(set(name_sets)) != 1:
+        raise SpawnError(
+            "MCP server names must be identical across mcp/windows.json, linux.json, macos.json"
+        )
+    return sorted(name_sets[0])
 
 
 def get_navigation_metadata(target_root: Path, extension: str) -> dict:
@@ -1205,14 +1267,18 @@ __all__ = [
     "get_required_read_global_all",
     "get_skill_raw_info",
     "init",
+    "extsrc_mcp_server_names_for_staging",
+    "extension_mcp_platform_json_paths",
     "list_extensions",
     "list_ides",
     "list_mcp",
     "list_skills",
+    "mcp_host_platform_stem",
     "sync_core_config_from_defaults",
     "merge_core_and_extension_agent_ignore",
     "METADATA_TEMP_MAX_AGE_SECONDS",
     "normalize_skill_name",
+    "normalized_mcp_from_mcp_json_path",
     "prune_metadata_temp",
     "push_to_global_gitignore",
     "remove_from_global_gitignore",

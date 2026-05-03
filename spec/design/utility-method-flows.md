@@ -155,7 +155,7 @@ config files. |
 
 | Aspect | Detail |
 | --- | --- |
-| **Reads** | `spawn/.extend/{extension}/mcp.json`. |
+| **Reads** | `spawn/.extend/{extension}/mcp/{windows,linux,macos}.json` (host selects one file). |
 | **How** | Parse JSON → **NormalizedMcp** (servers, transport, env with `secret` / `source: user`, capabilities). Inject extension identity for ownership. |
 | **Writes** | None. |
 | **Meaning** | IDE-agnostic MCP graph; adapters map to Cursor `.cursor/mcp.json`, Codex TOML, VS Code `servers`/`inputs`, etc. Secrets are never written as literal values in repo files. |
@@ -551,7 +551,7 @@ failures before copy phase.
 
 ### `extension_check(path)`
 
-| **Reads** | `extsrc/` tree — config, skills, scripts, `mcp.json`, declared files modes. |
+| **Reads** | `extsrc/` tree — config, skills, scripts, `mcp/*.json`, declared files modes. |
 | **Writes** | None. |
 | **Meaning** | CI/local validation without mutating a target repo. |
 
