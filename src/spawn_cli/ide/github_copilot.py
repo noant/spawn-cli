@@ -7,6 +7,7 @@ import warnings
 from pathlib import Path
 
 from spawn_cli.ide import _vacancy as _vac
+from spawn_cli.ide.mcp_stdio_argv import mcp_stdio_argv
 from spawn_cli.ide.registry import (
     DetectResult,
     IdeAdapter,
@@ -31,8 +32,12 @@ def _build_vscode_mcp_entry(server: McpServer) -> tuple[dict, list[dict]]:
 
     if transport.type == "stdio":
         entry["type"] = "stdio"
-        entry["command"] = transport.command
-        entry["args"] = list(transport.args)
+        if server.spawn_stdio_proxy:
+            entry["command"] = "spawn"
+            entry["args"] = mcp_stdio_argv(server.extension, server.name)
+        else:
+            entry["command"] = transport.command
+            entry["args"] = list(transport.args)
     else:
         entry["type"] = transport.type
         entry["url"] = transport.url

@@ -251,6 +251,7 @@ Many IDEs use a root **`mcpServers`** object (e.g. Cursor, Claude Code). The **e
 | Field | Type | Required | Meaning |
 |-------|------|----------|---------|
 | `name` | string | **yes** | Stable server id. Must be **unique across all installed extensions** in the same target. |
+| `spawn_stdio_proxy` | boolean | no | Default **`false`**. When **`true`**, `transport.type` **must** be **`stdio`**. Spawn renders IDE MCP with **`command`**: **`spawn`** and **`args`** that invoke **`mcp_stdio`** for **`extension`** (installed directory id) **`name`** (this server's **`name`**), so inner **`transport.command`** / **`args`** stay out of IDE project files. See **`ide-adapters.md`**. |
 | `transport` | object | implicitly | Connection details; see §6.4. If omitted, defaults are applied inside the parser (`type` defaults to `stdio`). |
 | `env` | object | no | Environment variables for the server; see §6.5. |
 | `capabilities` | object | no | Feature flags; see §6.6. |
@@ -458,7 +459,7 @@ An empty string still marks the key for placeholder-style injection in many adap
 
 ### 6.8 Validation note
 
-`spawn extension check` validates **`extsrc/mcp/`**: all three files present, parseable JSON, matching server **`name`** sets, and no stray **`extsrc/mcp.json`**. Full semantic checks (e.g. missing `name` on a server object) also apply when MCP is loaded for rendering.
+`spawn extension check` validates **`extsrc/mcp/`**: all three files present, parseable JSON, matching server **`name`** sets, and no stray **`extsrc/mcp.json`**. It flags **`spawn_stdio_proxy`** paired with non-**`stdio`** transports. Full semantic checks (e.g. missing `name` on a server object) also apply when MCP is loaded for rendering.
 
 ---
 

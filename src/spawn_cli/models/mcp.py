@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Optional
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, StrictBool
 
 
 class McpEnvVar(BaseModel):
@@ -39,6 +39,7 @@ class McpServer(BaseModel):
     name: str
     extension: str
     transport: McpTransport
+    spawn_stdio_proxy: StrictBool = False
     env: dict[str, McpEnvVar] = Field(default_factory=dict)
     capabilities: McpCapabilities = Field(default_factory=McpCapabilities)
 

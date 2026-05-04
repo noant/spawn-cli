@@ -51,7 +51,10 @@ cleans remnants) and retries step 4 until convergence.
 
 **Repository lock:** **Every** CLI command (including read-only diagnostics such
 as `spawn ide list-supported-ides` and `spawn extension check`) must acquire the
-same repository-local Spawn lock **before** doing any work. Two `spawn`
+same repository-local Spawn lock **before** doing any work, **except**
+`spawn mcp_stdio …` — that command is intentionally **excluded**: it may run as a
+long-lived stdio MCP bridge and **must not** block mutating commands (such as
+`spawn refresh`) for the lifetime of an IDE-attached MCP session. Two ordinary `spawn`
 invocations must never run concurrently against the same repository: there is
 **no** waiting or queue. If the lock is already held, fail immediately with
 **`SpawnError`** and a user-visible message that includes **`Another Spawn operation is in progress (repository lock held)`**.
@@ -628,7 +631,7 @@ codex:
     entryPoint: agents-md
 ```
 
-It uses the same **non-blocking Spawn lock** as all other commands (Core Rules).
+It uses the **non-blocking Spawn lock** matching the usual CLI rules (**Core Rules** repository lock paragraph; excludes **`spawn mcp_stdio`** which never takes the lock).
 
 `spawn refresh` replaces `spawn/.core/config.yaml` with the bundled default core
 config (`version` and `agent-ignore` exactly match the packaged resource;
@@ -672,6 +675,11 @@ directory.
 
 `spawn extension healthcheck "extensionName"` runs extension health validation
 and the optional healthcheck setup script.
+
+`spawn mcp_stdio extension {extension_id} name {server_name}` resolves the MCP
+server for the **current OS** under `spawn/.extend/{extension_id}/mcp/` and starts
+the inner **stdio** process with MCP traffic on stdin/stdout. Requires **`spawn
+init`** and `spawn` on **PATH**. **Does not** acquire the Spawn repository lock.
 
 `spawn build install "path" [--branch "branch"]` installs or refreshes
 extensions from a build manifest source.

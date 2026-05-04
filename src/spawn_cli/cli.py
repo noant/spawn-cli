@@ -8,6 +8,7 @@ from spawn_cli import __version__
 from spawn_cli.core import download as dl
 from spawn_cli.core import high_level as hl
 from spawn_cli.core import low_level as ll
+from spawn_cli.core import mcp_stdio
 from spawn_cli.core.errors import SpawnError
 from spawn_cli.ide.registry import DetectResult, detect_supported_ides
 from spawn_cli.io.lock import spawn_lock
@@ -298,6 +299,38 @@ def build_parser() -> argparse.ArgumentParser:
         help="Fallback Git revision applied when entries lack branch.",
     )
 
+    mcp_stdio_p = sub.add_parser(
+        "mcp_stdio",
+        help="Run stdio MCP for an extension server (IDE-stable wrapper)",
+        description=(
+            "Resolve the inner stdio command from installed extension MCP JSON for this OS "
+            "and relay MCP traffic on stdin/stdout. Intended as the IDE MCP entrypoint when "
+            "spawn_stdio_proxy is enabled; does not acquire the repository lock."
+        ),
+    )
+    mcp_stdio_l1 = mcp_stdio_p.add_subparsers(dest="mcp_stdio_l1", required=True)
+    mcp_stdio_ext = mcp_stdio_l1.add_parser(
+        "extension",
+        help="Pick installed extension id",
+        description="Extension directory name under spawn/.extend/ (same ids as spawn extension list).",
+    )
+    mcp_stdio_ext.add_argument(
+        "mcp_stdio_extension_id",
+        metavar="EXTENSION_ID",
+        help="Installed extension id (folder under spawn/.extend/).",
+    )
+    mcp_stdio_l2 = mcp_stdio_ext.add_subparsers(dest="mcp_stdio_l2", required=True)
+    mcp_stdio_name = mcp_stdio_l2.add_parser(
+        "name",
+        help="Pick MCP server by declared name",
+        description="Must match servers[].name in mcp/<platform>.json for the current OS.",
+    )
+    mcp_stdio_name.add_argument(
+        "mcp_stdio_server_name",
+        metavar="SERVER_NAME",
+        help="MCP server name from the extension platform MCP file.",
+    )
+
     return parser
 
 
@@ -327,6 +360,9 @@ def _dispatch(args: argparse.Namespace, target_root: Path) -> int:
 
     _require_init(target_root)
 
+    if cmd == "mcp_stdio":
+        return _dispatch_mcp_stdio(args, target_root)
+
     with spawn_lock(target_root):
         if cmd == "rules":
             return _dispatch_rules(args, target_root)
@@ -341,6 +377,12 @@ def _dispatch(args: argparse.Namespace, target_root: Path) -> int:
             return _dispatch_build(args, target_root)
 
     return 1
+
+
+def _dispatch_mcp_stdio(args: argparse.Namespace, target_root: Path) -> int:
+    return mcp_stdio.run_mcp_stdio_proxy(
+        target_root, args.mcp_stdio_extension_id, args.mcp_stdio_server_name
+    )
 
 
 def _dispatch_rules(args: argparse.Namespace, target_root: Path) -> int:

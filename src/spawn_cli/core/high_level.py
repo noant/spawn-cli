@@ -520,6 +520,15 @@ def extension_check(path: Path, strict: bool = False) -> list[str]:
                     warnings_out.append(f"MCP file invalid ({p}): {e}")
                     name_sets = []
                     break
+                for srv in nm.servers:
+                    if srv.spawn_stdio_proxy and srv.transport.type != "stdio":
+                        msg = (
+                            f"MCP server {srv.name!r} in {p}: spawn_stdio_proxy requires "
+                            f"transport.type 'stdio' (got {srv.transport.type!r})"
+                        )
+                        if strict:
+                            raise SpawnError(msg)
+                        warnings_out.append(msg)
                 name_sets.append(frozenset(s.name for s in nm.servers))
             if name_sets and len(set(name_sets)) != 1:
                 msg = (

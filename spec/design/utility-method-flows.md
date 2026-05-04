@@ -156,9 +156,9 @@ config files. |
 | Aspect | Detail |
 | --- | --- |
 | **Reads** | `spawn/.extend/{extension}/mcp/{windows,linux,macos}.json` (host selects one file). |
-| **How** | Parse JSON → **NormalizedMcp** (servers, transport, env with `secret` / `source: user`, capabilities). Inject extension identity for ownership. |
+| **How** | Parse JSON → **NormalizedMcp** (servers, transport, **`spawn_stdio_proxy`** when `transport.type` is **`stdio`**, env with `secret` / `source: user`, capabilities). Inject extension identity for ownership. |
 | **Writes** | None. |
-| **Meaning** | IDE-agnostic MCP graph; adapters map to Cursor `.cursor/mcp.json`, Codex TOML, VS Code `servers`/`inputs`, etc. Secrets are never written as literal values in repo files. |
+| **Meaning** | IDE-agnostic MCP graph; adapters map to Cursor `.cursor/mcp.json`, Codex TOML, VS Code `servers`/`inputs`, etc. For **`spawn_stdio_proxy: true`** stdio servers, adapters substitute **`command`/`args`** with a **`spawn`** wrapper that invokes **`mcp_stdio`** (`ide-adapters.md`). Secrets are never written as literal values in repo files. |
 
 ---
 

@@ -349,3 +349,67 @@ def test_spawn_error_exit_code(tmp_path, monkeypatch, capsys):
         assert main(["rules", "refresh"]) == 1
 
     assert "planned failure" in capsys.readouterr().err
+
+
+@contextlib.contextmanager
+def _lock_must_not_be_used(_target_root: Path):
+    raise AssertionError("spawn_lock must not be used for mcp_stdio")
+
+
+def test_spawn_mcp_stdio_parses_nested_argv_fragments(tmp_path, monkeypatch):
+    """Argv may arrive shell-fragmented; argparse still sees one token list."""
+    monkeypatch.chdir(tmp_path)
+    from spawn_cli.core import low_level as ll
+
+    ll.init(tmp_path)
+    root = tmp_path.resolve()
+    mock_run = MagicMock(return_value=0)
+    pieces = (["mcp_stdio", "extension"], ["myext"], ["name"], ["srv_name"])
+    argv = [tok for part in pieces for tok in part]
+
+    with patch("spawn_cli.cli.spawn_lock", _lock_must_not_be_used), patch(
+        "spawn_cli.cli.mcp_stdio.run_mcp_stdio_proxy", mock_run
+    ):
+        assert main(argv) == 0
+
+    mock_run.assert_called_once_with(root, "myext", "srv_name")
+
+
+def test_spawn_mcp_stdio_never_calls_spawn_lock_factory(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    from spawn_cli.core import low_level as ll
+
+    ll.init(tmp_path)
+    root = tmp_path.resolve()
+    lock_factory = MagicMock()
+    mock_run = MagicMock(return_value=0)
+    with patch("spawn_cli.cli.spawn_lock", lock_factory), patch(
+        "spawn_cli.cli.mcp_stdio.run_mcp_stdio_proxy", mock_run
+    ):
+        assert main(["mcp_stdio", "extension", "e1", "name", "n1"]) == 0
+
+    lock_factory.assert_not_called()
+    mock_run.assert_called_once_with(root, "e1", "n1")
+
+
+def test_spawn_mcp_stdio_parses_nested_argv(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "spawn").mkdir()
+    root = tmp_path.resolve()
+    mock_run = MagicMock(return_value=0)
+
+    with patch("spawn_cli.cli.spawn_lock", _lock_must_not_be_used), patch(
+        "spawn_cli.cli.mcp_stdio.run_mcp_stdio_proxy", mock_run
+    ):
+        assert main(["mcp_stdio", "extension", "myext", "name", "srv"]) == 0
+
+    mock_run.assert_called_once_with(root, "myext", "srv")
+
+
+def test_spawn_mcp_stdio_help(capsys):
+    with pytest.raises(SystemExit) as exc:
+        main(["mcp_stdio", "--help"])
+    assert exc.value.code == 0
+    out = capsys.readouterr().out
+    assert "mcp_stdio" in out
+    assert "repository lock" in out.lower() or "lock" in out.lower()

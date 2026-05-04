@@ -656,6 +656,16 @@ def _parse_mcp_env(env_raw: dict[str, Any]) -> dict[str, McpEnvVar]:
     return out
 
 
+def merged_os_environ_with_mcp_env(
+    base: dict[str, str], mcp_env: dict[str, McpEnvVar]
+) -> dict[str, str]:
+    out = dict(base)
+    for key, spec in mcp_env.items():
+        if spec.value is not None:
+            out[key] = spec.value
+    return out
+
+
 def _mcp_capabilities(raw: dict[str, Any]) -> McpCapabilities:
     c = raw.get("capabilities") or {}
     return McpCapabilities.model_validate(c) if isinstance(c, dict) else McpCapabilities()
@@ -679,6 +689,17 @@ def extension_mcp_platform_json_paths(extension_root: Path) -> tuple[Path, Path,
     return tuple(d / f"{s}.json" for s in MCP_PLATFORM_STEMS)
 
 
+def _mcp_spawn_stdio_proxy_from_server(server: dict, path: Path, server_name: str) -> bool:
+    if "spawn_stdio_proxy" not in server:
+        return False
+    v = server["spawn_stdio_proxy"]
+    if isinstance(v, bool):
+        return v
+    raise SpawnError(
+        f"spawn_stdio_proxy must be a boolean for server {server_name!r} in {path}"
+    )
+
+
 def _normalized_mcp_from_loaded(data: dict, path: Path, extension: str) -> NormalizedMcp:
     servers_out: list[McpServer] = []
     for s in data.get("servers") or []:
@@ -687,6 +708,8 @@ def _normalized_mcp_from_loaded(data: dict, path: Path, extension: str) -> Norma
         nm = s.get("name")
         if nm is None:
             raise SpawnError(f"missing MCP server name in {path}")
+        str_name = str(nm)
+        spawn_proxy = _mcp_spawn_stdio_proxy_from_server(s, path, str_name)
         tr_raw = s.get("transport") or {}
         transport = McpTransport(
             type=str(tr_raw.get("type", "stdio")),
@@ -699,9 +722,10 @@ def _normalized_mcp_from_loaded(data: dict, path: Path, extension: str) -> Norma
         env = _parse_mcp_env(env_in) if isinstance(env_in, dict) else {}
         servers_out.append(
             McpServer(
-                name=str(nm),
+                name=str_name,
                 extension=extension,
                 transport=transport,
+                spawn_stdio_proxy=spawn_proxy,
                 env=env,
                 capabilities=_mcp_capabilities(s),
             )

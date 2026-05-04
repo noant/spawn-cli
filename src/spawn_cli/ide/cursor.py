@@ -7,6 +7,7 @@ import warnings
 from pathlib import Path
 
 from spawn_cli.ide import _vacancy as _vac
+from spawn_cli.ide.mcp_stdio_argv import mcp_stdio_argv
 from spawn_cli.ide._helpers import (
     clear_split_agent_ignore_file,
     remove_ignore_block,
@@ -31,7 +32,10 @@ def _build_mcp_server_entry(server: McpServer) -> dict:
     """Convert McpServer to .cursor/mcp.json entry (mcpServers format)."""
     transport = server.transport
     if transport.type == "stdio":
-        entry: dict = {"command": transport.command, "args": transport.args}
+        if server.spawn_stdio_proxy:
+            entry = {"command": "spawn", "args": mcp_stdio_argv(server.extension, server.name)}
+        else:
+            entry = {"command": transport.command, "args": transport.args}
     elif transport.type in ("streamable-http", "sse"):
         entry = {"type": transport.type, "url": transport.url}
         if transport.headers:

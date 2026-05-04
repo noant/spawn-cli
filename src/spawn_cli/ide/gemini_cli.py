@@ -7,6 +7,7 @@ import warnings
 from pathlib import Path
 
 from spawn_cli.ide import _vacancy as _vac
+from spawn_cli.ide.mcp_stdio_argv import mcp_stdio_argv
 from spawn_cli.ide._helpers import (
     clear_split_agent_ignore_file,
     remove_ignore_block,
@@ -31,8 +32,12 @@ def _build_gemini_mcp_entry(server: McpServer) -> dict:
     transport = server.transport
     entry: dict = {}
     if transport.type == "stdio":
-        entry["command"] = transport.command
-        entry["args"] = list(transport.args)
+        if server.spawn_stdio_proxy:
+            entry["command"] = "spawn"
+            entry["args"] = mcp_stdio_argv(server.extension, server.name)
+        else:
+            entry["command"] = transport.command
+            entry["args"] = list(transport.args)
     elif transport.type == "streamable-http":
         entry["httpUrl"] = transport.url or ""
         if transport.headers:

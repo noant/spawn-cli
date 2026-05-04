@@ -508,6 +508,67 @@ def test_list_mcp(tmp_path: Path) -> None:
     assert len(nm.servers) == 1
     assert nm.servers[0].name == "test-srv"
     assert nm.servers[0].extension == "spectask"
+    assert nm.servers[0].spawn_stdio_proxy is False
+
+
+def test_list_mcp_spawn_stdio_proxy_round_trip(tmp_path: Path) -> None:
+    ll.init(tmp_path)
+    root = tmp_path / "spawn" / ".extend" / "spectask"
+    root.mkdir(parents=True)
+    mcp = {
+        "servers": [
+            {
+                "name": "proxied",
+                "spawn_stdio_proxy": True,
+                "transport": {
+                    "type": "stdio",
+                    "command": "uvx",
+                    "args": ["tool"],
+                    "cwd": ".",
+                },
+                "env": {},
+            },
+        ]
+    }
+    _write_yaml(root / "config.yaml", {"name": "spectask", "version": "1.0.0", "schema": 1})
+    import json
+
+    mdir = root / "mcp"
+    mdir.mkdir(parents=True)
+    body = json.dumps(mcp)
+    for plat in ("windows", "linux", "macos"):
+        (mdir / f"{plat}.json").write_text(body, encoding="utf-8")
+    nm = ll.list_mcp(tmp_path, "spectask")
+    assert nm.servers[0].spawn_stdio_proxy is True
+
+
+def test_merged_os_environ_with_mcp_env() -> None:
+    from spawn_cli.models.mcp import McpEnvVar
+
+    base = {"PATH": "/usr/bin", "KEEP": "1", "SECRET": "from-parent", "TOKEN": "from-ide"}
+    mcp_env = {
+        "FOO": McpEnvVar(value="bar"),
+        "SECRET": McpEnvVar(value="literal"),
+        "TOKEN": McpEnvVar(secret=True),
+        "NODEFAULT": McpEnvVar(value=None),
+    }
+    out = ll.merged_os_environ_with_mcp_env(base, mcp_env)
+    assert out["FOO"] == "bar"
+    assert out["SECRET"] == "literal"
+    assert out["TOKEN"] == "from-ide"
+    assert out["KEEP"] == "1"
+    assert "NODEFAULT" not in out
+
+
+def test_normalized_mcp_spawn_stdio_proxy_non_boolean_errors(tmp_path: Path) -> None:
+    p = tmp_path / "mcp.json"
+    p.write_text(
+        '{"servers": [{"name": "bad", "spawn_stdio_proxy": 1, '
+        '"transport": {"type": "stdio", "command": "x"}}]}',
+        encoding="utf-8",
+    )
+    with pytest.raises(SpawnError, match="spawn_stdio_proxy must be a boolean"):
+        ll.normalized_mcp_from_mcp_json_path(p, "ext")
 
 
 def test_list_mcp_empty_without_mcp_dir_ignores_root_json(tmp_path: Path) -> None:

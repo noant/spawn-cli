@@ -36,6 +36,31 @@ def test_mcp_server_minimal() -> None:
     assert s.name == "n"
     assert s.extension == "e"
     assert s.transport.command == "uvx"
+    assert s.spawn_stdio_proxy is False
+
+
+def test_mcp_server_spawn_stdio_proxy() -> None:
+    s = McpServer.model_validate(
+        {
+            "name": "n",
+            "extension": "e",
+            "spawn_stdio_proxy": True,
+            "transport": {"type": "stdio", "command": "uvx"},
+        }
+    )
+    assert s.spawn_stdio_proxy is True
+
+
+def test_mcp_server_spawn_stdio_proxy_rejects_non_boolean() -> None:
+    with pytest.raises(ValidationError):
+        McpServer.model_validate(
+            {
+                "name": "n",
+                "extension": "e",
+                "spawn_stdio_proxy": 1,
+                "transport": {"type": "stdio", "command": "uvx"},
+            }
+        )
 
 
 def test_normalized_mcp_empty() -> None:

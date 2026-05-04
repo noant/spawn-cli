@@ -796,3 +796,53 @@ def test_extension_check_mcp_name_mismatch_strict(tmp_path: Path) -> None:
     (extsrc / "macos.json").write_text(json.dumps({"servers": []}), encoding="utf-8")
     with pytest.raises(SpawnError, match="must match"):
         hl.extension_check(tmp_path, strict=True)
+
+
+@pytest.mark.parametrize(
+    "transport",
+    [
+        {"type": "sse", "url": "https://example.com/mcp"},
+        {"type": "streamable-http", "url": "https://example.com/http"},
+    ],
+)
+def test_extension_check_spawn_stdio_proxy_requires_stdio_strict(
+    tmp_path: Path,
+    transport: dict,
+) -> None:
+    hl.extension_init(tmp_path, "p")
+    extsrc = tmp_path / "extsrc" / "mcp"
+    srv = {
+        "name": "srv",
+        "spawn_stdio_proxy": True,
+        "transport": transport,
+    }
+    body = json.dumps({"servers": [srv]})
+    for plat in ("windows", "linux", "macos"):
+        (extsrc / f"{plat}.json").write_text(body, encoding="utf-8")
+    with pytest.raises(SpawnError, match="spawn_stdio_proxy requires"):
+        hl.extension_check(tmp_path, strict=True)
+
+
+@pytest.mark.parametrize(
+    "transport",
+    [
+        {"type": "sse", "url": "https://example.com/mcp"},
+        {"type": "streamable-http", "url": "https://example.com/http"},
+    ],
+)
+def test_extension_check_spawn_stdio_proxy_requires_stdio_loose(
+    tmp_path: Path,
+    transport: dict,
+) -> None:
+    hl.extension_init(tmp_path, "p")
+    extsrc = tmp_path / "extsrc" / "mcp"
+    srv = {
+        "name": "srv",
+        "spawn_stdio_proxy": True,
+        "transport": transport,
+    }
+    body = json.dumps({"servers": [srv]})
+    for plat in ("windows", "linux", "macos"):
+        (extsrc / f"{plat}.json").write_text(body, encoding="utf-8")
+    warnings_out = hl.extension_check(tmp_path, strict=False)
+    assert any("spawn_stdio_proxy" in m and "transport.type" in m for m in warnings_out)

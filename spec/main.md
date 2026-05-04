@@ -15,10 +15,11 @@
 
 1. Under `spec/`, only paths allowed by this Folder Structure; no other files.
 2. Do not create READMEs or extra docs under `spec/`.
-3. **New spec tasks:** follow **Step 1** and the **[overview.md Template](#overviewmd-template)** at the end of this file. Older `spec/tasks/_DONE_*` overviews may predate the template; **do not** copy their structure unless it already matches the template.
-4. **`read-required` (and contextual reads) in `spawn/navigation.yaml`:** obey Spawn’s merged navigation — treat required entries like **`read: required`** on the old registry.
-5. **Task-scoped reads:** from `spawn/navigation.yaml`, read every path the active task context clearly needs (not only globally required entries).
-6. **Process:** follow the workflow in this document — Steps 1–7, status marks, and user prompts as written.
+3. **Next task `X`:** 1 + max task id from every `spec/tasks/` subfolder (`{id}-*` and `_DONE_{id}-*`); if none, **1**.
+4. **New spec tasks:** follow **Step 1** and the **[overview.md Template](#overviewmd-template)** at the end of this file. Older `spec/tasks/_DONE_*` overviews may predate the template; **do not** copy their structure unless it already matches the template.
+5. **`read-required` (and contextual reads) in `spawn/navigation.yaml`:** obey Spawn’s merged navigation — treat required entries like **`read: required`** on the old registry.
+6. **Task-scoped reads:** from `spawn/navigation.yaml`, read every path the active task context clearly needs (not only globally required entries).
+7. **Process:** follow the workflow in this document — Steps 1–7, status marks, and user prompts as written.
 
 ---
 

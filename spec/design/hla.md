@@ -86,7 +86,7 @@ Immediately before each configured hook or healthcheck subprocess, **stderr** pr
 
 - **`argparse`** subcommands (including top-level **`refresh`** and `extension reinstall <name>`), human-readable help at each nesting level (`build_parser`).
 - Resolves target repo as `Path.cwd().resolve()`, enforces `spawn init` before other commands.
-- Wraps almost all handlers in the non-blocking repository lock.
+- Wraps almost all handlers in the non-blocking repository lock; **`spawn mcp_stdio`** is dispatched **without** the lock (`spawn_cli.core.mcp_stdio` runs the relay).
 - At startup, **`install_spawn_warning_format`** (`spawn_cli.warnings_display`) replaces `warnings.showwarning` so **`SpawnWarning`** prints as `spawn: warning: ...` on stderr (no Python `file:line:` banner); other categories delegate to the prior handler.
 
 ## Hints flow (summary)

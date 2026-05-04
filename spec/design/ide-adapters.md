@@ -154,6 +154,8 @@ servers:
       prompts: false
 ```
 
+Optional **`spawn_stdio_proxy`** (boolean, default **`false`**) applies only when **`transport.type`** is **`stdio`**; **`extension check`** rejects the flag on HTTP/SSE-style transports.
+
 The entry point prompt is generated once by Spawn core and passed to every
 adapter. It must tell the agent to read `spawn/navigation.yaml`, read all
 `read-required` entries, and choose `read-contextual` entries by task relevance.
@@ -317,6 +319,17 @@ The adapter records both files in `rendered-skills.yaml` when it mutates them.
 
 Spawn normalizes MCP once and each adapter maps transport fields into the IDE
 schema.
+
+### Stdio Spawn proxy (`spawn_stdio_proxy`)
+
+When **`spawn_stdio_proxy`** is **`true`** on a **`stdio`** server, adapters emit the **same IDE fields they would emit for ordinary stdio MCP** (`cwd`, `env`, and schema-specific knobs such as `type` and `inputs` for VS Code / Copilot) **except**:
+
+- **`command`** is **`spawn`** (the console script from **`pyproject.toml`**; authors assume **`spawn`** on **PATH** in the IDE's MCP environment).
+- **`args`** follow **`spawn mcp_stdio extension <extension> name <server.name>`**, produced via shared helper **`spawn_cli.ide.mcp_stdio_argv`**: **`["mcp_stdio", "extension", <extension_directory_under_spawn_extend>, "name", <servers[].name>]`** (the extension directory matches **`NormalizedMcp` / `server.extension`**).
+
+At MCP session runtime **`spawn mcp_stdio`** reads the host **`mcp/{platform}.json`**, merges **`env`** placeholders with **`os.environ`**, and starts **`[transport.command, *transport.args]`** without shell (**`spawn_cli.core.mcp_stdio`**). That command **does not** acquire the Spawn repository lock (long-lived stdin/stdout bridge; see **`utility.md`**).
+
+Transport fields stay in extension JSON only; merged IDE MCP config can be shared across developer machines regardless of differing OS transports.
 
 ### Generic JSON MCP Shape
 

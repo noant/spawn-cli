@@ -14,6 +14,7 @@ from .codex import CodexAdapter
 from .cursor import CursorAdapter
 from .gemini_cli import GeminiCliAdapter
 from .github_copilot import GitHubCopilotAdapter
+from .mcp_stdio_argv import mcp_stdio_argv
 from .windsurf import WindsurfAdapter
 from .registry import (
     ALIASES,
@@ -55,6 +56,7 @@ __all__ = [
     "IGNORE_BLOCK_START",
     "IdeAdapter",
     "IdeCapabilities",
+    "mcp_stdio_argv",
     "SPAWN_BLOCK_END",
     "SPAWN_BLOCK_START",
     "StubAdapter",

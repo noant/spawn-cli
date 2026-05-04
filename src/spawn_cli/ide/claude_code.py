@@ -8,6 +8,7 @@ from pathlib import Path
 
 from spawn_cli.core import low_level as ll
 from spawn_cli.ide import _vacancy as _vac
+from spawn_cli.ide.mcp_stdio_argv import mcp_stdio_argv
 from spawn_cli.ide.registry import (
     DetectResult,
     IdeAdapter,
@@ -24,7 +25,10 @@ from spawn_cli.models.skill import SkillMetadata
 def _build_generic_mcp_entry(server: McpServer) -> dict:
     transport = server.transport
     if transport.type == "stdio":
-        entry: dict = {"command": transport.command, "args": list(transport.args)}
+        if server.spawn_stdio_proxy:
+            entry = {"command": "spawn", "args": mcp_stdio_argv(server.extension, server.name)}
+        else:
+            entry = {"command": transport.command, "args": list(transport.args)}
     elif transport.type in ("streamable-http", "sse"):
         entry = {"type": transport.type, "url": transport.url}
         if transport.headers:

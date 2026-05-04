@@ -237,7 +237,7 @@ skill body itself.
 ## MCP
 
 `extsrc/mcp/windows.json`, `linux.json`, and `macos.json` define MCP connections per OS family. Spawn reads the file for the host platform, parses it into a normalized internal MCP structure, then each IDE adapter
-renders that structure into its own MCP configuration format. The same server **`name`** set must appear in all three files; transport fields may differ by platform. Root **`extsrc/mcp.json`** is not supported.
+renders that structure into its own MCP configuration format. The same server **`name`** set must appear in all three files; transport fields may differ by platform. Optional **`spawn_stdio_proxy`** (**boolean**, **`stdio`** only) makes IDE MCP entries launch **`spawn mcp_stdio extension … name …`** so the real **`command`** / **`args`** live only in disk JSON resolved at runtime on each host (cross-platform merged IDE configs). **`extension check`** rejects **`spawn_stdio_proxy`** with non-**`stdio`** transports. Root **`extsrc/mcp.json`** is not supported.
 
 Rendered MCP names are stored in
 `spawn/.metadata/{ide}/rendered-mcp.yaml` so uninstall and rebuild operations
