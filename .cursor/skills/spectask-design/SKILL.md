@@ -26,9 +26,14 @@ If the user only wants a registry row, still ensure the target **`.md` exists** 
 New paths are discoverable from **`spec/design.yaml`** once that file is read. For mandatory or default context at session start, paths still need **`globalRead` / `localRead`** (and non-empty **`description`**) in a Spawn extension **`config.yaml`** for the repo. If the user maintains this methodology pack, add a matching `files:` entry under **`extsrc/config.yaml`** and reinstall/update the extension; otherwise note the requirement for a companion extension or local config.
 
 
+Hints:
+- When finishing a task that involved editing this repo's code or docs: call mempalace_mine (mempalace-mine-mcp), then mempalace_reconnect on mempalace-mcp if already connected.
+- Prefer codebase search via mempalace-mcp first; use workspace full-text / ripgrep only if MemPalace is unavailable or insufficient.
+
 Mandatory reads:
 - `spec/main.md` - Spec-Tasks methodology — folder structure, seven-step process, overview template.
 - `spec/design.yaml` - Index of architecture documents under spec/design/ — path and description per entry.
+- `.mempalace/wakeup.md` - Bounded MemPalace wake-up context from the palace.
 - `spawn/rules/00-general.md` - General language-agnostic conventions (ASCII, documentation, chat language).
 - `spawn/navigation.yaml` - Merged Spawn navigation (read-required, read-contextual).
 

@@ -1,1 +1,4 @@
-extensions: {}
+extensions:
+  mempalace-ext:
+  - name: mempalace-mcp
+  - name: mempalace-mine-mcp

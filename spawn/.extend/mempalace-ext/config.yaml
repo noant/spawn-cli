@@ -1,0 +1,58 @@
+schema: 1
+name: mempalace-ext
+version: "0.3.1"
+hints:
+  global:
+    - "When finishing a task that involved editing this repo's code or docs: call mempalace_mine (mempalace-mine-mcp), then mempalace_reconnect on mempalace-mcp if already connected."
+    - "Prefer codebase search via mempalace-mcp first; use workspace full-text / ripgrep only if MemPalace is unavailable or insufficient."
+files:
+  .mempalace/guides/guide.md:
+    description: "MemPalace in the target repo — install, init, MCP mine/wake-up workflow, links to official docs."
+    mode: static
+    globalRead: no
+    localRead: required
+  .mempalace/guides/configuration.md:
+    description: "Reference for config.json, mempalace.yaml, env vars, and repo-local palace_path."
+    mode: static
+    globalRead: no
+    localRead: required
+  .mempalace/wakeup.md:
+    description: "Bounded MemPalace wake-up context from the palace."
+    mode: artifact
+    globalRead: required
+    localRead: no
+  .mempalace/ext/requirements-mempalace.txt:
+    description: "Minimal pip dependency line for installing mempalace in the project."
+    mode: static
+    globalRead: no
+    localRead: no
+  .mempalace/ext/mine_mcp_server.py:
+    description: "Optional MCP stdio server exposing mempalace mine as tool mempalace_mine."
+    mode: static
+    globalRead: no
+    localRead: no
+folders:
+  .mempalace/guides:
+    mode: static
+  .mempalace/ext:
+    mode: static
+skills:
+  mempalace-configure-palace.md:
+    name: mempalace-configure-palace
+    description: "Configure MemPalace for a repo-local palace (YAML, palace_path, identity, room merges/splits, alternate slices with apply flow)."
+  mempalace-diagnose-palace.md:
+    name: mempalace-diagnose-palace
+    description: "Diagnose MemPalace install, palace path alignment, CLI/MCP, and wake-up context in the target repo."
+  mempalace-search.md:
+    name: mempalace-search
+    description: "MemPalace MCP or CLI search first; workspace grep only as fallback."
+agent-ignore:
+  - "**/.mempalace/chroma/**"
+  - "**/.mempalace/palace/**"
+  - "**/.mempalace/ext/mine_mcp_server.py"
+git-ignore:
+  - "**/.mempalace/chroma/"
+  - "**/.mempalace/palace/"
+setup:
+  after-install: after_install.py
+  healthcheck: healthcheck.py

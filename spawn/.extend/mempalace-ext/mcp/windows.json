@@ -1,0 +1,50 @@
+{
+  "servers": [
+    {
+      "name": "mempalace-mcp",
+      "spawn_stdio_proxy": true,
+      "transport": {
+        "type": "stdio",
+        "command": "py",
+        "args": ["-3", "-X", "utf8", "-m", "mempalace.mcp_server"],
+        "cwd": "."
+      },
+      "env": {
+        "MEMPALACE_PALACE_PATH": {
+          "source": "pack",
+          "required": false,
+          "secret": false,
+          "value": ".mempalace/palace"
+        }
+      },
+      "capabilities": {
+        "tools": true,
+        "resources": false,
+        "prompts": false
+      }
+    },
+    {
+      "name": "mempalace-mine-mcp",
+      "spawn_stdio_proxy": true,
+      "transport": {
+        "type": "stdio",
+        "command": "py",
+        "args": ["-3", "-X", "utf8", ".mempalace/ext/mine_mcp_server.py"],
+        "cwd": "."
+      },
+      "env": {
+        "MEMPALACE_PALACE_PATH": {
+          "source": "pack",
+          "required": false,
+          "secret": false,
+          "value": ".mempalace/palace"
+        }
+      },
+      "capabilities": {
+        "tools": true,
+        "resources": false,
+        "prompts": false
+      }
+    }
+  ]
+}

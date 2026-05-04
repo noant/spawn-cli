@@ -1,2 +1,5 @@
+**/.mempalace/chroma/**
+**/.mempalace/palace/**
+**/.mempalace/ext/mine_mcp_server.py
 spec/seeds/_DONE_*.md
 spec/tasks/**/_DONE_*/_DONE_*.md

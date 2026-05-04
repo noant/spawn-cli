@@ -1,0 +1,7 @@
+extension: mempalace-ext
+source:
+  type: git
+  path: https://github.com/noant/spawn-ext-mempalace.git
+installed:
+  version: 0.3.1
+  installedAt: '2026-05-04T01:09:44+00:00'

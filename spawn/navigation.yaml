@@ -2,6 +2,13 @@ read-required:
 - rules:
   - path: spawn/rules/00-general.md
     description: General language-agnostic conventions (ASCII, documentation, chat language).
+- ext: mempalace-ext
+  files:
+  - path: .mempalace/wakeup.md
+    description: Bounded MemPalace wake-up context from the palace.
+  hints:
+  - "When finishing a task that involved editing this repo's code or docs: call mempalace_mine (mempalace-mine-mcp), then mempalace_reconnect on mempalace-mcp if already connected."
+  - Prefer codebase search via mempalace-mcp first; use workspace full-text / ripgrep only if MemPalace is unavailable or insufficient.
 read-contextual:
 - ext: spectask
   files:

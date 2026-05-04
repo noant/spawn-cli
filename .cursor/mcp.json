@@ -1,3 +1,30 @@
 {
-  "mcpServers": {}
+  "mcpServers": {
+    "mempalace-mcp": {
+      "command": "spawn",
+      "args": [
+        "mcp_stdio",
+        "extension",
+        "mempalace-ext",
+        "name",
+        "mempalace-mcp"
+      ],
+      "env": {
+        "MEMPALACE_PALACE_PATH": ".mempalace/palace"
+      }
+    },
+    "mempalace-mine-mcp": {
+      "command": "spawn",
+      "args": [
+        "mcp_stdio",
+        "extension",
+        "mempalace-ext",
+        "name",
+        "mempalace-mine-mcp"
+      ],
+      "env": {
+        "MEMPALACE_PALACE_PATH": ".mempalace/palace"
+      }
+    }
+  }
 }
