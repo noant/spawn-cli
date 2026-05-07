@@ -27,6 +27,7 @@ from spawn_cli.models.metadata import (
 from spawn_cli.models.navigation import (
     NavExtGroup,
     NavFile,
+    NavRuleRow,
     NavRulesGroup,
     NavigationFile,
 )
@@ -55,6 +56,7 @@ __all__ = [
     "RenderedSkillsMeta",
     "NavExtGroup",
     "NavFile",
+    "NavRuleRow",
     "NavRulesGroup",
     "NavigationFile",
     "SkillFileRef",

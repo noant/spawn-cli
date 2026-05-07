@@ -24,6 +24,25 @@ def test_nav_rules_group() -> None:
     assert g.rules[0].path == "spawn/rules/a.yaml"
 
 
+def test_nav_rules_group_hint_only_row() -> None:
+    g = NavRulesGroup.model_validate({"rules": [{"hint": "standalone"}]})
+    assert len(g.rules) == 1
+    assert g.rules[0].hint == "standalone"
+    assert g.rules[0].path is None
+
+
+def test_nav_rules_group_rejects_empty_row() -> None:
+    with pytest.raises(ValidationError):
+        NavRulesGroup.model_validate({"rules": [{"description": "orphan"}]})
+
+
+def test_nav_rules_group_rejects_path_and_hint_together() -> None:
+    with pytest.raises(ValidationError):
+        NavRulesGroup.model_validate(
+            {"rules": [{"path": "spawn/rules/a.yaml", "description": "r", "hint": "extra"}]}
+        )
+
+
 def test_navigation_file_aliases() -> None:
     n = NavigationFile.model_validate(
         {

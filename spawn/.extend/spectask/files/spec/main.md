@@ -8,7 +8,7 @@
 - spec/design/{name}.md — other architecture documents (optional; ADRs, notes, etc.); register in **spec/design.yaml** and declare as readable paths for agents — typically by adding them under a Spawn extension’s `files:` (with appropriate reads) so they appear in `spawn/navigation.yaml`.
 - spec/tasks/{X}-{name}/ — task folder (artifact tree in this methodology pack).
 - spec/tasks/{X}-{name}/overview.md — task overview (required).
-- spec/tasks/{X}-{name}/{N}-{description}.md — subtask files (optional).
+- spec/tasks/{X}-{name}/{N}-{description}.md — subtask files (optional; required when `## Execution Scheme` defines 2+ steps); see [Subtask file template](#subtask-file-template).
 - spec/seeds/{X}-{slug}.md — seed file (artifact tree in this methodology pack).
 
 **Embedded rules:**
@@ -41,7 +41,7 @@ Mark each status [V] on completion. Prompt the user after steps 2, 5, and 6.
 1.2 **Design overview** — in task `overview.md`, add **Design overview** section: affected modules, data flow changes, integration points.
 1.3 **Overview** — `spec/tasks/{X}-{name}/overview.md` must follow [overview.md Template](#overviewmd-template): sections through `## Details` (before/after and code examples go there); **Goal** = one sentence. Add `## Execution Scheme` only when work splits into 2+ steps.
 1.4 **Execution Plan** — If 2+ steps: `## Execution Scheme` step ids must match `{N}-{description}.md` from 1.5.
-1.5 **Decomposition** — create {N}-{description}.md per step: goal, approach, affected files, code examples.
+1.5 **Decomposition** — create {N}-{description}.md per step: goal, approach, affected files, code changes (before/after). You may launch a **New sub-agent** for read-only codebase analysis to determine accurate **Before** / **After** text, then merge its findings into the step files (analysis only; parent agent owns decomposition and the spec).
 
 → set [V] "Spec created"
 
@@ -164,6 +164,45 @@ Do not start Step 7 until **Code review passed** is marked (Step 6).
 ```
 
 Omit `## Execution Scheme` if no decomposition (single-file spec).
+
+---
+
+## Subtask file template
+
+Filename must match the step id from `## Execution Scheme` (e.g. `1-abstractions.md`). One file per step.
+
+```markdown
+# Step {N}: {Short title}
+
+## Goal
+{One sentence — outcome of this step.}
+
+## Approach
+{Order of work, constraints, references to spec/design if needed.}
+
+## Affected files
+- `{path/relative/to/repo/root}` — {what changes}
+- `{...}` — {...}
+
+## Code changes (before / after)
+
+### `{path/to/file.ext}` — {where: function name, heading, line range, or “new file”}
+
+**Before**
+{current code or prose to replace; use a minimal contiguous excerpt, or the exact line(s)}
+
+**After**
+{replacement or new block; must correspond one-to-one to Before when editing existing text}
+
+### `{path/to/other.ext}` — {where}
+**Before**
+{...}
+**After**
+{...}
+
+## Additional actions
+{Optional: shell commands, manual verification steps, follow-up tasks, or other non–file-edit work for this step.}
+```
 
 ---
 

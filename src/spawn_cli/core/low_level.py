@@ -194,9 +194,12 @@ def _merge_hint_streams_ordered(streams: list[list[str]]) -> list[str]:
 
 
 def _navigation_read_required_rule_hints_ordered(target_root: Path) -> list[str]:
-    """Plain-text hints from maintainer-authored read-required ``rules`` rows only (YAML order).
+    """Plain-text hints from maintainer-authored ``read-required`` ``rules`` rows (YAML order).
 
+    Only **hint-only** rows (no non-empty stripped ``path``) contribute; ``hint`` on file-backed
+    rows is ignored here (and dropped on navigation refresh).
     Hint fields on ``read-contextual`` rules are ignored here.
+    Strips each hint; whitespace-only hints are omitted.
     """
     path = _spawn(target_root) / "navigation.yaml"
     raw = load_yaml(path)
@@ -215,9 +218,14 @@ def _navigation_read_required_rule_hints_ordered(target_root: Path) -> list[str]
         for entry in rules_raw:
             if not isinstance(entry, dict):
                 continue
+            path_val = entry.get("path")
+            if isinstance(path_val, str) and path_val.strip():
+                continue
             hint_val = entry.get("hint")
             if isinstance(hint_val, str):
-                out.append(hint_val)
+                stripped = hint_val.strip()
+                if stripped:
+                    out.append(stripped)
     return out
 
 
@@ -1202,7 +1210,64 @@ def save_rules_navigation(target_root: Path) -> None:
     def posix_norm(p: str) -> str:
         return Path(p).as_posix().replace('\\', '/')
 
-    def prune(lst: list[Any]) -> None:
+    def prune_read_required_rules(lst: list[Any]) -> None:
+        """Keep file-backed rows with existing paths (no ``hint`` on those rows); keep hint-only rows."""
+
+        out: list[Any] = []
+        for entry in lst:
+            if not isinstance(entry, dict):
+                continue
+            hint_raw = entry.get('hint')
+            hint_is_str = isinstance(hint_raw, str)
+            hint_stripped = hint_raw.strip() if hint_is_str else ''
+            path_in_entry = 'path' in entry
+            path_raw = entry.get('path')
+
+            if path_in_entry:
+                if isinstance(path_raw, str) and path_raw.strip():
+                    rk = posix_norm(path_raw.strip())
+                    exists = rk in paths_on_disk and (Path(target_root) / Path(rk)).is_file()
+                    if exists:
+                        row: dict[str, Any] = {
+                            'path': rk,
+                            'description': str(entry.get('description') or 'Local rule file.'),
+                        }
+                        out.append(row)
+                        if hint_stripped:
+                            warnings.warn(
+                                f'Moved maintainer hint from file-backed rule row to standalone '
+                                f'hint row: {rk}',
+                                SpawnWarning,
+                            )
+                            out.append({'hint': hint_stripped})
+                    else:
+                        warnings.warn(
+                            f"Removed missing rule path from navigation: {rk}",
+                            SpawnWarning,
+                        )
+                else:
+                    warnings.warn(
+                        'Removed invalid rule row from navigation (empty path field).',
+                        SpawnWarning,
+                    )
+                continue
+
+            if hint_stripped:
+                row_h: dict[str, Any] = {'hint': hint_stripped}
+                desc_raw = entry.get('description')
+                if isinstance(desc_raw, str) and desc_raw.strip():
+                    row_h['description'] = desc_raw.strip()
+                out.append(row_h)
+                continue
+
+            warnings.warn(
+                'Removed invalid rule row from navigation (no path and no hint).',
+                SpawnWarning,
+            )
+
+        lst[:] = out
+
+    def prune_contextual_rules(lst: list[Any]) -> None:
         out: list[Any] = []
         for entry in lst:
             if not isinstance(entry, dict) or 'path' not in entry:
@@ -1225,9 +1290,9 @@ def save_rules_navigation(target_root: Path) -> None:
                 )
         lst[:] = out
 
-    prune(rq_rules_list)
+    prune_read_required_rules(rq_rules_list)
     if cq_rules_list is not None:
-        prune(cq_rules_list)
+        prune_contextual_rules(cq_rules_list)
 
     raw["read-required"] = rr
     raw["read-contextual"] = rc

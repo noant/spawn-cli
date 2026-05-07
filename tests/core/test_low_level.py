@@ -310,8 +310,10 @@ def test_generate_skills_metadata_hints_merge_and_contextual_ignored(tmp_path: P
             "read-required": [
                 {
                     "rules": [
-                        {"path": "spawn/rules/r1.md", "description": "", "hint": "from required"},
-                        {"path": "spawn/rules/r2.md", "description": "", "hint": "global dup"},
+                        {"path": "spawn/rules/r1.md", "description": ""},
+                        {"hint": "from required"},
+                        {"path": "spawn/rules/r2.md", "description": ""},
+                        {"hint": "global dup"},
                     ],
                 },
             ],
@@ -739,7 +741,7 @@ def test_save_extension_navigation_oversized_global_hint_warns_and_truncates(tmp
     assert rq["hints"] == ["x" * 512]
 
 
-def test_save_rules_navigation_preserves_hint_on_rules_rows(tmp_path: Path) -> None:
+def test_save_rules_navigation_migrates_required_rule_hint_to_standalone(tmp_path: Path) -> None:
     ll.init(tmp_path)
     req_rule = tmp_path / "spawn" / "rules" / "req.md"
     req_rule.parent.mkdir(parents=True, exist_ok=True)
@@ -773,14 +775,170 @@ def test_save_rules_navigation_preserves_hint_on_rules_rows(tmp_path: Path) -> N
             ],
         },
     )
-    ll.save_rules_navigation(tmp_path)
+    with warnings.catch_warnings(record=True) as wrec:
+        warnings.simplefilter("always")
+        ll.save_rules_navigation(tmp_path)
+    assert any("standalone hint row" in str(w.message) for w in wrec)
     nav = YAML_W.load((tmp_path / "spawn" / "navigation.yaml").read_text(encoding="utf-8"))
     rq_rules = next(g for g in nav["read-required"] if isinstance(g, dict) and "rules" in g)["rules"]
     cq_rules = next(g for g in nav["read-contextual"] if isinstance(g, dict) and "rules" in g)["rules"]
-    req_row = next(r for r in rq_rules if ll._norm_read_path(str(r["path"])) == ll._norm_read_path("spawn/rules/req.md"))
+    req_idx = next(
+        i
+        for i, r in enumerate(rq_rules)
+        if "path" in r and ll._norm_read_path(str(r["path"])) == ll._norm_read_path("spawn/rules/req.md")
+    )
+    assert "hint" not in rq_rules[req_idx]
+    assert rq_rules[req_idx + 1] == {"hint": "Keep required concise."}
     ctx_row = next(r for r in cq_rules if ll._norm_read_path(str(r["path"])) == ll._norm_read_path("spawn/rules/ctx.md"))
-    assert req_row["hint"] == "Keep required concise."
     assert ctx_row["hint"] == "Context hint preserved."
+
+
+def test_save_rules_navigation_preserves_read_required_hint_only_rows(tmp_path: Path) -> None:
+    ll.init(tmp_path)
+    req_rule = tmp_path / "spawn" / "rules" / "req.md"
+    req_rule.parent.mkdir(parents=True, exist_ok=True)
+    req_rule.write_text("x\n", encoding="utf-8")
+    _write_yaml(
+        tmp_path / "spawn" / "navigation.yaml",
+        {
+            "read-required": [
+                {
+                    "rules": [
+                        {"hint": "alpha"},
+                        {"path": "spawn/rules/req.md", "description": "R.", "hint": "beta"},
+                        {"hint": "gamma"},
+                    ],
+                },
+            ],
+            "read-contextual": [],
+        },
+    )
+    with warnings.catch_warnings(record=True) as wrec:
+        warnings.simplefilter("always")
+        ll.save_rules_navigation(tmp_path)
+    assert any("standalone hint row" in str(w.message) for w in wrec)
+    nav = YAML_W.load((tmp_path / "spawn" / "navigation.yaml").read_text(encoding="utf-8"))
+    rq_rules = next(g for g in nav["read-required"] if isinstance(g, dict) and "rules" in g)["rules"]
+    assert rq_rules == [
+        {"hint": "alpha"},
+        {"path": "spawn/rules/req.md", "description": "R."},
+        {"hint": "beta"},
+        {"hint": "gamma"},
+    ]
+    hints = ll._navigation_read_required_rule_hints_ordered(tmp_path)
+    assert hints == ["alpha", "beta", "gamma"]
+    req_refs, _ctx = ll._navigation_yaml_rules_refs(tmp_path)
+    assert len(req_refs) == 1
+    assert ll._norm_read_path(req_refs[0].file) == ll._norm_read_path("spawn/rules/req.md")
+
+
+def test_save_rules_navigation_missing_path_with_hint_does_not_salvage_hint(tmp_path: Path) -> None:
+    ll.init(tmp_path)
+    _write_yaml(
+        tmp_path / "spawn" / "navigation.yaml",
+        {
+            "read-required": [
+                {"rules": [{"path": "spawn/rules/nope.md", "description": "gone", "hint": "orphan hint"}]},
+            ],
+            "read-contextual": [],
+        },
+    )
+    with warnings.catch_warnings(record=True) as wrec:
+        warnings.simplefilter("always")
+        ll.save_rules_navigation(tmp_path)
+    assert any(isinstance(w.message, SpawnWarning) for w in wrec)
+    nav = YAML_W.load((tmp_path / "spawn" / "navigation.yaml").read_text(encoding="utf-8"))
+    rq_rules = next(g for g in nav["read-required"] if isinstance(g, dict) and "rules" in g)["rules"]
+    assert rq_rules == []
+    assert ll._navigation_read_required_rule_hints_ordered(tmp_path) == []
+
+
+def test_save_rules_navigation_empty_path_field_drops_row_without_salvaging_hint(tmp_path: Path) -> None:
+    ll.init(tmp_path)
+    _write_yaml(
+        tmp_path / "spawn" / "navigation.yaml",
+        {
+            "read-required": [{"rules": [{"path": "", "hint": "should not appear"}]}],
+            "read-contextual": [],
+        },
+    )
+    with warnings.catch_warnings(record=True) as wrec:
+        warnings.simplefilter("always")
+        ll.save_rules_navigation(tmp_path)
+    assert any(isinstance(w.message, SpawnWarning) for w in wrec)
+    rq_rules = next(
+        g for g in YAML_W.load((tmp_path / "spawn" / "navigation.yaml").read_text(encoding="utf-8"))["read-required"]
+        if isinstance(g, dict) and "rules" in g
+    )["rules"]
+    assert rq_rules == []
+    assert ll._navigation_read_required_rule_hints_ordered(tmp_path) == []
+
+
+def test_save_rules_navigation_junk_required_rule_row_warns(tmp_path: Path) -> None:
+    ll.init(tmp_path)
+    _write_yaml(
+        tmp_path / "spawn" / "navigation.yaml",
+        {
+            "read-required": [{"rules": [{"description": "only description"}]}],
+            "read-contextual": [],
+        },
+    )
+    with warnings.catch_warnings(record=True) as wrec:
+        warnings.simplefilter("always")
+        ll.save_rules_navigation(tmp_path)
+    assert any(isinstance(w.message, SpawnWarning) for w in wrec)
+    rq_rules = next(
+        g
+        for g in YAML_W.load((tmp_path / "spawn" / "navigation.yaml").read_text(encoding="utf-8"))["read-required"]
+        if isinstance(g, dict) and "rules" in g
+    )["rules"]
+    assert rq_rules == []
+
+
+def test_save_rules_navigation_whitespace_hint_only_row_warns(tmp_path: Path) -> None:
+    ll.init(tmp_path)
+    _write_yaml(
+        tmp_path / "spawn" / "navigation.yaml",
+        {
+            "read-required": [{"rules": [{"hint": "   \t"}]}],
+            "read-contextual": [],
+        },
+    )
+    with warnings.catch_warnings(record=True) as wrec:
+        warnings.simplefilter("always")
+        ll.save_rules_navigation(tmp_path)
+    assert any(isinstance(w.message, SpawnWarning) for w in wrec)
+    rq_rules = next(
+        g
+        for g in YAML_W.load((tmp_path / "spawn" / "navigation.yaml").read_text(encoding="utf-8"))["read-required"]
+        if isinstance(g, dict) and "rules" in g
+    )["rules"]
+    assert rq_rules == []
+
+
+def test_save_rules_navigation_contextual_hint_only_row_dropped(tmp_path: Path) -> None:
+    ll.init(tmp_path)
+    ctx_rule = tmp_path / "spawn" / "rules" / "ctx.md"
+    ctx_rule.parent.mkdir(parents=True, exist_ok=True)
+    ctx_rule.write_text("y\n", encoding="utf-8")
+    _write_yaml(
+        tmp_path / "spawn" / "navigation.yaml",
+        {
+            "read-required": [],
+            "read-contextual": [
+                {
+                    "rules": [
+                        {"hint": "contextual standalone dropped"},
+                        {"path": "spawn/rules/ctx.md", "description": "C."},
+                    ],
+                },
+            ],
+        },
+    )
+    ll.save_rules_navigation(tmp_path)
+    nav = YAML_W.load((tmp_path / "spawn" / "navigation.yaml").read_text(encoding="utf-8"))
+    cq_rules = next(g for g in nav["read-contextual"] if isinstance(g, dict) and "rules" in g)["rules"]
+    assert cq_rules == [{"path": "spawn/rules/ctx.md", "description": "C."}]
 
 
 def test_validate_rendered_identity_duplicate_skill(tmp_path: Path) -> None:

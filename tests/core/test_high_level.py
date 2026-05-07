@@ -509,11 +509,8 @@ def test_refresh_entry_point_hints_rollup_skips_local(tmp_path: Path) -> None:
             "read-required": [
                 {
                     "rules": [
-                        {
-                            "path": "spawn/rules/r.md",
-                            "description": "r",
-                            "hint": " maintainer-required ",
-                        }
+                        {"path": "spawn/rules/r.md", "description": "r"},
+                        {"hint": "maintainer-required"},
                     ]
                 },
             ],

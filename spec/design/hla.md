@@ -91,13 +91,13 @@ Immediately before each configured hook or healthcheck subprocess, **stderr** pr
 
 ## Hints flow (summary)
 
-Short hints originate in extension **`config.yaml`** (`hints.global` / `hints.local`, see [`extension-author-guide.md`](extension-author-guide.md)) and in maintainer **`read-required` → `rules`** rows (optional **`hint`**). On navigation refresh, each extension’s **`hints.global`** is mirrored under that extension’s **`- ext:`** stanza in **`spawn/navigation.yaml`** as a **`hints`** string list (normalize, dedupe).
+Short hints originate in extension **`config.yaml`** (`hints.global` / `hints.local`, see [`extension-author-guide.md`](extension-author-guide.md)) and in maintainer **`read-required` → `rules`** **hint-only** rows (no **`path`** on that row), which contribute hints only and do not add mandatory reads. File-backed rule rows carry **`path`** and **`description`** only; legacy **`path`+`hint`** pairs are split on refresh. On navigation refresh, each extension’s **`hints.global`** is mirrored under that extension’s **`- ext:`** stanza in **`spawn/navigation.yaml`** as a **`hints`** string list (normalize, dedupe).
 
-**Rendered skills**: **`SkillMetadata.hints`** merges every installed extension’s **`hints.global`** (sorted extension id), then **`hints.local`** for the owning extension, then maintainer rule hints (deterministic dedupe; see **`generate_skills_metadata`**).
+**Rendered skills**: **`SkillMetadata.hints`** merges every installed extension’s **`hints.global`** (sorted extension id), then **`hints.local`** for the owning extension, then maintainer **hint-only** rule rows from **`read-required`** (deterministic dedupe; see **`generate_skills_metadata`**).
 
 **IDE entry points**: **`rollup_hints_for_agents`** lists global extension hints across installed packs plus maintainer rule hints; **`hints.local`** appears in skills only, not in AGENTS.
 
-Treat **`- ext:`** blocks in `spawn/navigation.yaml` as **machine-owned** (rewritten on refresh). **`rules`** groups are for durable hand-edits (paths, descriptions, **`hint`** on **read-required** rows).
+Treat **`- ext:`** blocks in `spawn/navigation.yaml` as **machine-owned** (rewritten on refresh). **`rules`** groups are for durable hand-edits (paths, descriptions, **hint-only** rows under **`read-required`**).
 
 Full detail: [`agentic-flow.md`](agentic-flow.md), [`extension-author-guide.md`](extension-author-guide.md).
 

@@ -1,4 +1,4 @@
-Wake-up text (~800 tokens):
+Wake-up text (~796 tokens):
 ==================================================
 ## L0 — IDENTITY
 No identity configured. Create ~/.mempalace/identity.txt
@@ -7,19 +7,19 @@ No identity configured. Create ~/.mempalace/identity.txt
 
 [mempalace]
   - <!-- spawn:start --> Before working, read `spawn/navigation.yaml`. Read every file listed under `read-required`. Inspect `read-contextual` descriptions and read only files relevant to the current t...  (AGENTS.md)
+  - {   "mcpServers": {     "mempalace-mcp": {       "command": "spawn",       "args": [         "mcp_stdio",         "extension",         "mempalace-ext",         "name",         "mempalace-mcp"      ...  (mcp.json)
+  - --- name: mempalace-configure-palace description: Configure MemPalace for a repo-local palace (YAML, palace_path, identity, room merges/splits, alternate slices with apply flow). ---     When the u...  (SKILL.md)
+  - otes on **`~/.mempalace/config.json`**, **`MEMPALACE_EXTENSION_GLOBAL_PALACE`**, and other overrides live in **`.mempalace/guides/configuration.md`** — **do not** open a competing “prefer global pa...  (SKILL.md)
+  - ote for ignores), **`tests`** / **`spec`**, infra (`infra`, `deploy`, `.github`), and docs (`docs`).     - **Primary mapping (topology cut):** group **wings** at the grain of loosely coupled subtre...  (SKILL.md)
+  - opose adjusting granularity so the palace tracks how humans navigate the repo, not duplicating junk:       - **Merge candidates** — folders or existing rooms whose **labels or roles overlap** by na...  (SKILL.md)
+  - ementation). Prefer one room per cohesive navigational locus unless separation clarifies onboarding.       - **Split candidates** — a single directory that **bundles unrelated concerns by name** (m...  (SKILL.md)
+  - rms), adjust room keys and paths together so **`mempalace search`** and mental map stay predictable.       - Deliver a short **reshape plan**: bullets like **merge →** one room target, **split →** ...  (SKILL.md)
+  - iffer.       - **Layer or concern** — API vs domain core vs adapters vs persistence vs presentation.       - **Lifecycle / artifact type** — production runtime vs tooling & scripts vs CI vs fixture...  (SKILL.md)
+  - palace_mine`** will use **`wing`** when mining additional slices (**`.mempalace/guides/guide.md`**).     - **Immediate apply path for slices:** When the topology default or **any alternate cut** is...  (SKILL.md)
+  - **`mine`** (and MCP **`mempalace_reconnect`** when the main server stays hot across layout changes).     - If the repo is tiny or flat, propose a minimal 1‑wing scaffold and revisit after growth.  ...  (SKILL.md)
+  - palace mine .`**; later changes to paths or wing/room layout usually imply running **`mine`** again.  4. For multilingual entity extraction when needed, set **`MEMPALACE_ENTITY_LANGUAGES`** (see Py...  (SKILL.md)
+  - nsions UI — labels differ by Cursor/VS Code lineage — then reload/restart MCP per vendor guidance.    Keep secrets and personal data out of static extension templates; do not commit private memory ...  (SKILL.md)
+  - alace-mcp first; use workspace full-text / ripgrep only if MemPalace is unavailable or insufficient.  Mandatory reads: - `.mempalace/guides/guide.md` - MemPalace in the target repo — install, init,...  (SKILL.md)
 
 [spawn]
-  - [build-system] requires = ["setuptools>=68"] build-backend = "setuptools.build_meta"  [project] name = "spawn-cli" version = "0.1.15" description = "A minimal installable Python CLI package." readm...  (pyproject.toml)
-  - ## What is Spawn?  Spawn is a framework for building **AIDD** (AI-driven development) methodologies. It supports both **authoring** methodologies and **applying** them in a project. Within a single...  (README.md)
-  - ogether (navigation, IDE-facing outputs, optional lifecycle hooks). Extensions can also declare **MCP servers**, **agent-ignore** patterns, **git-ignore** entries, and similar integration points—se...  (README.md)
-  - es refresh`). Agents are steered through that file instead of chasing disconnected README fragments.  On each install or refresh, the CLI **regenerates IDE-facing artifacts** so skills and entry po...  (README.md)
-  - ch other. Optional `hints` add short reminders to rendered skills and the Spawn-managed entry block.  **Example:** [**spawn-ext-spectask**](https://github.com/noant/spawn-ext-spectask) (Spec-Tasks ...  (README.md)
-  - emeral **uvx**):  ```bash uvx --from spawn-cli spawn --help ```  **Upgrade** the persistent uv tool:  ```bash uv tool upgrade spawn-cli && spawn --help ```  Force a fresh resolver for a one-shot ru...  (README.md)
-  - touch a repo at a time (file lock).  ### Initialize a repo  ```bash spawn init ```  ### IDE adapters  For each **supported IDE** adapter, show whether it **looks used in the current repository** an...  (README.md)
-  - tension add https://github.com/noant/spawn-ext-spectask --branch main ```  Maintain installed packs:  ```bash spawn extension list spawn extension update spectask spawn extension reinstall spectask...  (README.md)
-  - n `spawn/navigation.yaml`:  ```bash spawn rules refresh ```  ### Batch install from a build manifest  `spawn build list` / `spawn build install` take a **build source** (positional argument; there ...  (README.md)
-  - ctly one top-level subdirectory, under that folder (`extensions.yaml not found` if neither applies).  Each manifest entry is an extension source; optional per-entry `branch` overrides the CLI defau...  (README.md)
-  - methodology-bundle spawn build install https://github.com/org/team-methodology.git --branch main ```  The **`--branch`** flag applies when the **build source** is Git (clone revision). Entries that...  (README.md)
-  - /user-guide.md) and [spec/design/utility.md](spec/design/utility.md).  ## How to create an extension  An extension can be a **full** AIDD methodology, **team** conventions (review rules, codestyle)...  (README.md)
-  - ion after `spawn init`):  ```bash spawn extension add https://github.com/noant/spawn-ext-creator ```  **Scaffold an empty extension** with the CLI (requires `spawn init` in the repo you run from — ...  (README.md)
   ... (more in L3 search)

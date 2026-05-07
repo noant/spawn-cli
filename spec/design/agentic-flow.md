@@ -77,7 +77,7 @@ Navigation is generated from two sources:
 - extension files with `globalRead: required` or `globalRead: auto`;
 - user-maintained local rules under `spawn/rules/`.
 
-Merged **`spawn/navigation.yaml`** may also carry **hints**: each extension’s **`- ext:`** entry can include a **`hints`** list (mirrored from that pack’s **`hints.global`** in **`config.yaml`**). Optional **`hint`** on **`rules`** rows applies to **maintainer edits**; only hints on **`read-required` → `rules`** are merged into **skills** and the IDE **Hints:** rollup for **`AGENTS.md`** (**`hint`** on **`read-contextual` → `rules`** is ignored for those pipelines). Deduping is by exact stripped string (first occurrence wins ordering across streams).
+Merged **`spawn/navigation.yaml`** may also carry **hints**: each extension’s **`- ext:`** entry can include a **`hints`** list (mirrored from that pack’s **`hints.global`** in **`config.yaml`**). Under **`read-required` → `rules`**, maintainer reminders use **hint-only** rows (a **`hint`** mapping with **no** mandatory **`path`**); file-backed rows list **`path`** and **`description`** only—**`hint`** must not sit on the same row as **`path`** (refresh moves any legacy **`path`+`hint`** pair into a separate hint-only row). Only these maintainer hints and extension **`hints`** are merged into **skills** and the IDE **Hints:** rollup for **`AGENTS.md`** (**`hint`** on **`read-contextual` → `rules`** is ignored for those pipelines). Deduping is by exact stripped string (first occurrence wins ordering across streams).
 
 Example:
 
@@ -92,7 +92,8 @@ read-required:
   - rules:
       - path: spawn/rules/team.yaml
         description: Team rules.
-        hint: Keep replies concise for this repo.
+      - hint: Keep replies concise for this repo (standalone reminder).
+      - hint: Another maintainer reminder without a rule file path.
 read-contextual:
   - ext: spectask
     files:
@@ -126,7 +127,7 @@ and dedup rules as navigation (mandatory tier wins when a path appears in
 both). That way agents opening a skill in the IDE still see repo rule files listed
 explicitly without maintaining a parallel list in extension config.
 
-**Hints in rendered skills:** normalized metadata adds a **Hints:** section **after** the skill **body** and **before** **Mandatory reads**. Hint strings are plain text, merged from **each** installed extension’s **`hints.global`** (installed-extension order), then **`hints.local`** only for the extension that owns the skill, then **`read-required` `rules`** row **`hint`** values (deduped; first occurrence wins across streams). **Rendered skills** apply a per-hint and combined-size budget: **`SpawnWarning`** when limits are exceeded, and the block may be **truncated** (including a terminal bullet with `...`). **AGENTS.md** (managed block) lists the same rollup class of hints **without truncation**; oversize content still emits **`SpawnWarning`** with guidance to shorten hints or reduce installed extensions. **`hints.local`** is **not** included in the AGENTS rollup (skills only).
+**Hints in rendered skills:** normalized metadata adds a **Hints:** section **after** the skill **body** and **before** **Mandatory reads**. Hint strings are plain text, merged from **each** installed extension’s **`hints.global`** (installed-extension order), then **`hints.local`** only for the extension that owns the skill, then maintainer **`read-required` → `rules`** contributions: **`hint`** on file-backed rows **and** **hint-only** rows (YAML order within that stream; deduped across streams with first occurrence winning). **Rendered skills** apply a per-hint and combined-size budget: **`SpawnWarning`** when limits are exceeded, and the block may be **truncated** (including a terminal bullet with `...`). **AGENTS.md** (managed block) lists the same rollup class of hints **without truncation**; oversize content still emits **`SpawnWarning`** with guidance to shorten hints or reduce installed extensions. **`hints.local`** is **not** included in the AGENTS rollup (skills only).
 
 `spawn/navigation.yaml` remains the canonical index of which repository rules exist
 and whether each is mandatory or contextual for the merged navigation surface.
@@ -196,7 +197,7 @@ generation step always merges those categories and removes duplicates.
 
 **Hints** use the **same breadth for `hints.global`** as flattened global mandatory
 reads: every installed extension’s **`hints.global`** list contributes in
-extension-order before **`hints.local`** for the **`extension`** argument, then maintainer **`read-required` → `rules` → `hint`** strings (exact merge and dedupe in `low_level.generate_skills_metadata`).
+extension-order before **`hints.local`** for the **`extension`** argument, then maintainer **`read-required` → `rules`** hint strings (file-backed **`hint`** fields and **hint-only** rows; exact merge and dedupe in `low_level.generate_skills_metadata`).
 
 Illustrative output pseudostructure:
 

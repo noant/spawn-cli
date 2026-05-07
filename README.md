@@ -200,9 +200,11 @@ That rescans **`spawn/rules/`**, attaches missing rule files under a **`rules`**
 
 ### 2. Hints in `spawn/navigation.yaml`
 
-For **short, always-visible reminders** (tone, language, repo-specific habits), add an optional **`hint`** field on rows under **`read-required` → `rules`**—alongside **`path`** and **`description`**.
+For **short, always-visible reminders** (tone, language, repo-specific habits), add **hint-only** rows under **`read-required` → `rules`** (a **`hint`** entry **without** a **`path`**). Mandatory rule files use rows with **`path`** and **`description`** only—do **not** add **`hint`** on the same row as **`path`**; if refresh finds legacy pairs, it splits them into a file row and a following hint-only row.
 
-Spawn merges those strings into the **Hints** section of **rendered skills** and into the **Hints** rollup in managed IDE entry points (for example **`AGENTS.md`**), using the same ordering and deduping rules as extension **`hints.global`**.
+Hints from **`read-required` → `rules`** (hint-only rows) appear in skills’ **Hints** section and in the managed **`AGENTS.md`** rollup together with extension **`hints.global`**, using YAML row order within maintainer hints before dedupe (**`hint`** on **`read-contextual` → `rules`** is still **not** included there).
+
+If a **`path`** names a **`spawn/rules/…`** file that **does not** exist when navigation is refreshed, that row is **removed entirely** — fix or drop **`path`** first; **`hint`** on that same removed row is **not** downgraded to a hint-only row.
 
 Example:
 
@@ -211,7 +213,8 @@ read-required:
   - rules:
       - path: spawn/rules/team.md
         description: Team conventions.
-        hint: Prefer British spelling in user-facing copy.
+      - hint: Prefer British spelling in user-facing copy.
+      - hint: Short standalone reminder with no rule file.
 ```
 
 Then run **`spawn refresh`** so skills and entry points pick up the hint.

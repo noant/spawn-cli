@@ -115,7 +115,7 @@ Chain commands in order (e.g. `spawn init`, then `spawn build install "<path>"`)
 
 ## Editing `spawn/navigation.yaml`
 
-Maintainers may **hand-edit** **`rules`** groups: paths, **`description`**, and an optional **`hint`** on rows under **`read-required`** only (hints on **`read-contextual` → `rules`** are not consumed into skills or the AGENTS hint rollup). Do **not** manually maintain **`ext`** stanzas (YAML list entries with **`ext:`** and **`files`**, and mirrored **`hints`**): Spawn **overwrites** those blocks when navigation is refreshed. Prefer changing extension-owned text in **`extsrc/config.yaml`** (`hints.global` / `hints.local`) and re-running refresh.
+Maintainers may **hand-edit** **`read-required` → `rules`** rows: **`path`** and **`description`** for files under **`spawn/rules/`**, plus separate **hint-only** rows (a **`hint`** key without a mandatory file path—short reminders that **do not** add reads). Do **not** put **`hint`** on the same row as **`path`**; refresh will split legacy pairs into a file row and a following hint-only row. An optional **`hint`** may still sit on **`read-contextual` → `rules`** rows for human readers, but contextual **`hint`** strings are **not** consumed into skills or the AGENTS hint rollup. Do **not** manually maintain **`ext`** stanzas (YAML list entries with **`ext:`** and **`files`**, and mirrored **`hints`**): Spawn **overwrites** those blocks when navigation is refreshed. Prefer changing extension-owned text in **`extsrc/config.yaml`** (`hints.global` / `hints.local`) and re-running refresh.
 
 ## Commands and options
 
