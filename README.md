@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="logo/main.jpg" alt="Spawn CLI" width="480" />
+</p>
+
 ## What is Spawn?
 
 Spawn is a framework for building **AIDD** (AI-driven development) methodologies. It supports both **authoring** methodologies and **applying** them in a project. Within a single repository you can use **several** AIDD methodologies in a coherent way—shared navigation, skills, rules, and tooling stay aligned instead of competing ad hoc setups.
