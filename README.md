@@ -226,3 +226,11 @@ Then run **`spawn refresh`** so skills and entry points pick up the hint.
 ## License
 
 MIT — see [LICENSE](LICENSE).
+
+---
+
+P.S. Below is a diagram that might help you understand how Spawn works.
+
+<p align="center">
+  <img src="logo/Scheme.png" alt="How Spawn works" />
+</p>
