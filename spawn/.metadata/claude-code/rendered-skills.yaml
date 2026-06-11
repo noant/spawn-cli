@@ -1,0 +1,21 @@
+extensions:
+  mempalace-ext:
+  - skill: mempalace-configure-palace
+    path: .claude/skills/mempalace-configure-palace/SKILL.md
+  - skill: mempalace-diagnose-palace
+    path: .claude/skills/mempalace-diagnose-palace/SKILL.md
+  - skill: mempalace-search
+    path: .claude/skills/mempalace-search/SKILL.md
+  spectask:
+  - skill: spectask-code-review-passed
+    path: .claude/skills/spectask-code-review-passed/SKILL.md
+  - skill: spectask-create
+    path: .claude/skills/spectask-create/SKILL.md
+  - skill: spectask-design
+    path: .claude/skills/spectask-design/SKILL.md
+  - skill: spectask-execute
+    path: .claude/skills/spectask-execute/SKILL.md
+  - skill: spectask-seed-create
+    path: .claude/skills/spectask-seed-create/SKILL.md
+  - skill: spectask-spec-review-passed
+    path: .claude/skills/spectask-spec-review-passed/SKILL.md

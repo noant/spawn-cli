@@ -30,6 +30,7 @@ Supported names (canonical):
 - `windsurf`
 - `github-copilot`
 - `gemini-cli`
+- `opencode`
 
 Additional IDE layouts (Qoder, Qwen Code, Aider, Zed, Devin) are described later
 in this document for future adapters; they are **not** CLI-supported until added
@@ -176,6 +177,7 @@ includes a **Hints:** bullet list (full text; warnings only, no truncation).
 | Aider | `CONVENTIONS.md` plus `.aider.conf.yml` `read:` | — | `.aiderignore` (git root default) | `CONVENTIONS.md` | No IDE-style hierarchical skills; conventions are read-only context. |
 | Zed | `AGENTS.md`, `.rules`, `CLAUDE.md`, … per Zed rules doc | `.zed/settings.json` `context_servers` | `agent.tool_permissions` / workspace scan exclusions in settings (no `.cursorignore` equivalent) | `AGENTS.md` | MCP key name is `context_servers`. (Upstream may add repo skills under other paths—outside this column until documented.) |
 | Gemini CLI | `.gemini/skills/{skill}/SKILL.md` | `.gemini/settings.json` `mcpServers` | `.geminiignore` | `GEMINI.md` (unless overridden via `context.fileName`) | Project `.gemini/settings.json` at repo root. (CLI may also merge `.agents/skills/` discovery—outside this column.) |
+| OpenCode | `.opencode/skills/{skill}/SKILL.md` | `opencode.json` (repo root) `mcp` | unsupported | `AGENTS.md` | Stdio MCP uses `"type": "local"` + `"command"` array; HTTP/SSE uses `"type": "remote"` + `"url"`. Reads `.claude/skills/` and `.agents/skills/` via compatibility layer. `CLAUDE.md` is a fallback entry point. |
 | Devin | `.devin/skills/{skill}/SKILL.md` | `.devin/config.json` `mcpServers` | — | `AGENTS.md` | Imports from other tooling may merge MCP at runtime (`read-config-from`)—outside committed files unless copied. (Optional Spawn-only trees are not part of this matrix.) |
 
 ## Skill Rendering
@@ -536,6 +538,7 @@ Entry point targets:
 | Aider | `CONVENTIONS.md` |
 | Zed | `AGENTS.md` |
 | Gemini CLI | `GEMINI.md` |
+| OpenCode | `AGENTS.md` |
 | Devin | `AGENTS.md` |
 
 Gemini CLI additionally reads which context filenames to load via `context.fileName` under the `context` section in `.gemini/settings.json` (a string or array; default behavior still centers on `GEMINI.md` unless changed).

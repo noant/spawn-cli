@@ -23,6 +23,7 @@ from spawn_cli.ide import (
     GeminiCliAdapter,
     GitHubCopilotAdapter,
     IdeCapabilities,
+    OpencodeAdapter,
     StubAdapter,
     WindsurfAdapter,
     detect_supported_ides,
@@ -43,6 +44,8 @@ def test_get_known_adapter() -> None:
     assert get("codex").key == "codex"
     assert isinstance(get("github-copilot"), GitHubCopilotAdapter)
     assert isinstance(get("windsurf"), WindsurfAdapter)
+    assert isinstance(get("opencode"), OpencodeAdapter)
+    assert get("opencode").key == "opencode"
 
 
 def test_get_alias() -> None:
