@@ -1,16 +1,12 @@
 ---
-name: spectask-seed-create
-description: Capture a rough idea as spec/seeds/{X}-{slug}.md (not a full task); then offer to start spectask-create.
+name: spectask-spec-review-passed
+description: Step 3 — spec approved (spec/main.md).
 ---
 
 
 Operate within the **spectask** process defined in attached **spec/main.md**.
 
-Follow the short **Seed** paragraph and **[Seed file template (header)](#seed-file-template-header)** in **spec/main.md**.
-
-Pick a kebab-case **slug** and the next **`X`** under **`spec/seeds/`** (default: max numeric prefix among **`*.md`** there + **1**). Create **`spec/seeds/{X}-{slug}.md`**: **`linked task: none`** unless it already binds to an **`overview.md`** path — blank line — then informal notes (**not** a full spectask).
-
-Suggest **spectask-create** when the user promotes; **Step 1** and **Step 7** item **6** covering seed wiring live there.
+On the active `spec/tasks/{X}-{name}/overview.md`, finish Step 3: **Spec review passed** and the Step 3 prompt. Ask which task if unclear.
 
 
 Hints:

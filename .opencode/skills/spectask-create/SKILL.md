@@ -1,17 +1,15 @@
 ---
-name: spectask-seed-create
-description: Capture a rough idea as spec/seeds/{X}-{slug}.md (not a full task); then offer to start spectask-create.
+name: spectask-create
+description: Use when drafting a new spectask (specification only, per spec/main.md).
 ---
 
 
 Operate within the **spectask** process defined in attached **spec/main.md**.
+Complete **Steps 1–2** only — then stop and wait for the user’s **Step 3** (spec review).
 
-Follow the short **Seed** paragraph and **[Seed file template (header)](#seed-file-template-header)** in **spec/main.md**.
+Under this skill, writing implementation code without an approved specification is not allowed — stay within Steps 1–2 (overview.md and subtasks) until spec review passes.
 
-Pick a kebab-case **slug** and the next **`X`** under **`spec/seeds/`** (default: max numeric prefix among **`*.md`** there + **1**). Create **`spec/seeds/{X}-{slug}.md`**: **`linked task: none`** unless it already binds to an **`overview.md`** path — blank line — then informal notes (**not** a full spectask).
-
-Suggest **spectask-create** when the user promotes; **Step 1** and **Step 7** item **6** covering seed wiring live there.
-
+If work began from **`spec/seeds/`**, tie the seed to the new task in **Step 1** (**`linked task:`** + **Source seed** in **`overview.md`**) and close it in **Step 7** item **6**, per **`spec/main.md`**.
 
 Hints:
 - When finishing a task that involved editing this repo's code or docs: call mempalace_mine (mempalace-mine-mcp), then mempalace_reconnect on mempalace-mcp if already connected.
