@@ -48,7 +48,7 @@ def _build_opencode_mcp_entry(server: McpServer) -> dict[str, Any]:
         cmd = _build_local_mcp_cmd(server)
         entry = {"type": "local", "command": cmd, "enabled": True}
     if server.env:
-        entry["env"] = {
+        entry["environment"] = {
             k: f"${{{k}}}" if v.secret else v.value or f"${{{k}}}"
             for k, v in server.env.items()
         }

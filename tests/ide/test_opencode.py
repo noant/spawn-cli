@@ -62,6 +62,7 @@ def test_add_skills_warns_on_overwrite(adapter: OpencodeAdapter, tmp_path: Path)
     with warnings.catch_warnings(record=True) as w:
         warnings.simplefilter("always")
         adapter.add_skills(tmp_path, [SkillMetadata(name="s", description="d", content="2")])
+        assert w is not None
         assert len(w) == 1
         assert "Overwriting" in str(w[0].message)
 
@@ -222,7 +223,7 @@ def test_add_mcp_secret_placeholder(adapter: OpencodeAdapter, tmp_path: Path) ->
         ),
     )
     entry = json.loads((tmp_path / OPENCODE_CONFIG_JSON_FILENAME).read_text(encoding="utf-8"))["mcp"]["s"]
-    assert entry["env"]["TOKEN"] == "${TOKEN}"
+    assert entry["environment"]["TOKEN"] == "${TOKEN}"
 
 
 def test_add_mcp_plain_env_value(adapter: OpencodeAdapter, tmp_path: Path) -> None:
@@ -240,7 +241,7 @@ def test_add_mcp_plain_env_value(adapter: OpencodeAdapter, tmp_path: Path) -> No
         ),
     )
     entry = json.loads((tmp_path / OPENCODE_CONFIG_JSON_FILENAME).read_text(encoding="utf-8"))["mcp"]["s"]
-    assert entry["env"]["HOST"] == "localhost"
+    assert entry["environment"]["HOST"] == "localhost"
 
 
 def test_add_mcp_empty_env_uses_placeholder(adapter: OpencodeAdapter, tmp_path: Path) -> None:
@@ -258,7 +259,7 @@ def test_add_mcp_empty_env_uses_placeholder(adapter: OpencodeAdapter, tmp_path: 
         ),
     )
     entry = json.loads((tmp_path / OPENCODE_CONFIG_JSON_FILENAME).read_text(encoding="utf-8"))["mcp"]["s"]
-    assert entry["env"]["KEY"] == "${KEY}"
+    assert entry["environment"]["KEY"] == "${KEY}"
 
 
 def test_remove_mcp_removes_entry(adapter: OpencodeAdapter, tmp_path: Path) -> None:
@@ -305,6 +306,7 @@ def test_add_agent_ignore_warns(adapter: OpencodeAdapter, tmp_path: Path) -> Non
     with warnings.catch_warnings(record=True) as w:
         warnings.simplefilter("always")
         adapter.add_agent_ignore(tmp_path, ["*.log"])
+        assert w is not None
         assert len(w) == 1
         assert "unsupported" in str(w[0].message)
 
@@ -313,6 +315,7 @@ def test_remove_agent_ignore_warns(adapter: OpencodeAdapter, tmp_path: Path) -> 
     with warnings.catch_warnings(record=True) as w:
         warnings.simplefilter("always")
         adapter.remove_agent_ignore(tmp_path, [])
+        assert w is not None
         assert len(w) == 1
         assert "unsupported" in str(w[0].message)
 
@@ -387,4 +390,3 @@ def test_finalize_repo_keeps_opencode_json_with_servers(adapter: OpencodeAdapter
 
 def test_finalize_repo_noop_when_nothing(adapter: OpencodeAdapter, tmp_path: Path) -> None:
     adapter.finalize_repo_after_ide_removed(tmp_path)
-    assert True
