@@ -226,21 +226,25 @@ def opencode_config_json_mcp_is_empty(path: Path) -> bool:
     return True
 
 
+def _clean_skill_subdir(skill_subdir: Path) -> None:
+    for f in skill_subdir.iterdir():
+        if f.is_file():
+            f.unlink()
+    try:
+        if not any(skill_subdir.iterdir()):
+            skill_subdir.rmdir()
+    except OSError:
+        pass
+
+
 def finalize_opencode_repo(target_root: Path) -> None:
     if opencode_config_json_mcp_is_empty(target_root / "opencode.json"):
         (target_root / "opencode.json").unlink(missing_ok=True)
     skills_dir = target_root / ".opencode" / "skills"
     if skills_dir.is_dir():
-        for skill_subdir in list(skills_dir.iterdir()):
+        for skill_subdir in skills_dir.iterdir():
             if skill_subdir.is_dir():
-                for f in list(skill_subdir.iterdir()):
-                    if f.is_file():
-                        f.unlink()
-                try:
-                    if not any(skill_subdir.iterdir()):
-                        skill_subdir.rmdir()
-                except OSError:
-                    pass
+                _clean_skill_subdir(skill_subdir)
         try:
             if not any(skills_dir.iterdir()):
                 skills_dir.rmdir()

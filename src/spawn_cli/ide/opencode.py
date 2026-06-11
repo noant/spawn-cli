@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import warnings
 from pathlib import Path
+from typing import Any
 
 from spawn_cli.ide import _vacancy as _vac
 from spawn_cli.ide.mcp_stdio_argv import mcp_stdio_argv
@@ -25,20 +26,26 @@ OPENCODE_CONFIG_JSON_FILENAME = "opencode.json"
 OPENCODE_CONFIG_SCHEMA_URL = "https://opencode.ai/config.json"
 
 
-def _build_opencode_mcp_entry(server: McpServer) -> dict:
+def _build_local_mcp_cmd(server: McpServer) -> list[str]:
     transport = server.transport
+    cmd = [transport.command] if transport.command else []
+    cmd.extend(transport.args or [])
+    return cmd
+
+
+def _build_opencode_mcp_entry(server: McpServer) -> dict[str, Any]:
+    transport = server.transport
+    entry: dict[str, Any]
     if transport.type == "stdio":
         if server.spawn_stdio_proxy:
             cmd = ["spawn", *mcp_stdio_argv(server.extension, server.name)]
         else:
-            cmd = [transport.command] if transport.command else []
-            cmd.extend(transport.args or [])
-        entry: dict = {"type": "local", "command": cmd, "enabled": True}
+            cmd = _build_local_mcp_cmd(server)
+        entry = {"type": "local", "command": cmd, "enabled": True}
     elif transport.type in ("streamable-http", "sse"):
         entry = {"type": "remote", "url": transport.url or "", "enabled": True}
     else:
-        cmd = [transport.command] if transport.command else []
-        cmd.extend(transport.args or [])
+        cmd = _build_local_mcp_cmd(server)
         entry = {"type": "local", "command": cmd, "enabled": True}
     if server.env:
         entry["env"] = {
