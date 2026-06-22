@@ -1362,6 +1362,7 @@ __all__ = [
     "list_ides",
     "list_mcp",
     "list_skills",
+    "merged_os_environ_with_mcp_env",
     "mcp_host_platform_stem",
     "sync_core_config_from_defaults",
     "merge_core_and_extension_agent_ignore",

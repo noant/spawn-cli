@@ -49,7 +49,12 @@ def run_mcp_stdio_proxy(target_root: Path, extension_id: str, server_name: str) 
 
     argv = [cmd, *srv.transport.args]
     cwd_path = (target_root / srv.transport.cwd).resolve()
-    child_env = merged_os_environ_with_mcp_env(os.environ, srv.env)
+    child_env = merged_os_environ_with_mcp_env(dict(os.environ), srv.env)
+
+    # Prepend spawn-cli venv bin to PATH so extension commands (e.g., python3)
+    # resolve to packages installed into the spawn-cli venv.
+    venv_bin = str(Path(sys.executable).parent)
+    child_env["PATH"] = venv_bin + os.pathsep + child_env.get("PATH", "")
 
     try:
         with subprocess.Popen(
