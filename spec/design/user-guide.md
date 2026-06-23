@@ -13,10 +13,10 @@ How to install and run the **`spawn`** command against a target repository. Comm
 
 The PyPI distribution name is **`spawn-cli`**; the console script is **`spawn`** → `spawn_cli.cli:main` in `pyproject.toml`.
 
-### From PyPI (`pip`, `pipx`)
+### From PyPI (`uv`, `pipx`)
 
 ```bash
-pip install spawn-cli
+uv tool install spawn-cli
 spawn --help
 ```
 
@@ -60,32 +60,22 @@ Anywhere you would type `spawn`, you can use `uvx --from spawn-cli spawn` instea
 
 Clone the repo and install from the project root (where `pyproject.toml` lives):
 
-**With `uv`:**
-
 ```bash
 cd /path/to/spawn-cli
 uv sync
 uv run spawn --help
 ```
 
-**With `pip`:**
+After `uv tool install` from a local path (e.g. `uv tool install --editable .`), **`spawn`** is on `PATH` like a PyPI install.
 
-```bash
-cd /path/to/spawn-cli
-pip install -e .
-spawn --help
-```
-
-After `pip install -e .` or `uv tool install` from a local path (e.g. `uv tool install --editable .`), **`spawn`** is on `PATH` like a PyPI install.
-
-### Upgrade (`pip` / `pipx` / local checkout)
+### Upgrade (`uv` / `pipx` / local checkout)
 
 Use the same installer you used initially. If you use **uv** only, see **With `uv`** above.
 
-**pip** (current environment):
+**uv** (persistent tool):
 
 ```bash
-pip install --upgrade spawn-cli
+uv tool upgrade spawn-cli
 spawn --help
 ```
 
@@ -102,7 +92,6 @@ spawn --help
 cd /path/to/spawn-cli
 git pull
 uv sync
-# or: pip install -e .
 ```
 
 ## Typical workflow
