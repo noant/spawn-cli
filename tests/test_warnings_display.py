@@ -37,7 +37,7 @@ def test_non_spawn_delegates_to_chain(capsys):
     def prior(message, category, filename, lineno, file=None, line=None):
         delegated.append(str(message))
 
-    warnings.showwarning = prior  # type: ignore[assignment]
+    warnings.showwarning = prior
     try:
         install_spawn_warning_format()
         warnings.warn("legacy", UserWarning)
