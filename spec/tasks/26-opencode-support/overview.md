@@ -34,7 +34,7 @@ Add a fully correct OpenCode IDE adapter to Spawn, covering skills, MCP, entry p
 - Skills rendered to `.opencode/skills/{name}/SKILL.md` (subdirectory per skill, matching the opencode skills spec).
 - MCP merged into `opencode.json` at project root under `"mcp"` key; `"type": "local"` for stdio, `"type": "remote"` for HTTP/SSE; env vars under `"env"` key.
 - Entry point: `AGENTS.md` (managed block).
-- Agent ignore: unsupported (warns).
+- Agent ignore: supported via `watcher.ignore` array in `opencode.json` (project-style). Spawn merges owned globs into the watcher ignore list; agent may still reach ignored paths via direct tool calls.
 - `finalize_opencode_repo`: cleans `opencode.json` when `mcp` section is empty and no other user content present, prunes empty `.opencode/skills/` subdirs, removes `.opencode/` dir when entirely empty.
 - `ide-adapters.md` updated: opencode added to key list, matrix row, and entry-point table.
 
@@ -44,7 +44,7 @@ Add a fully correct OpenCode IDE adapter to Spawn, covering skills, MCP, entry p
 - Project config: `opencode.json` at project root (highest precedence).
 - Skills: `.opencode/skills/{name}/SKILL.md` (project-level) and `~/.config/opencode/skills/{name}/SKILL.md` (global).
 - Entry point: `AGENTS.md` at project root; `CLAUDE.md` is a fallback (opencode also reads it).
-- Agent ignore: not supported as a dedicated file; Spawn warns.
+- Agent ignore: supported via `watcher.ignore` in `opencode.json`; Spawn warns only if the config file is unreadable.
 
 ### MCP Shape in opencode.json
 ```json

@@ -24,6 +24,7 @@ from spawn_cli.models.skill import SkillMetadata
 
 OPENCODE_CONFIG_JSON_FILENAME = "opencode.json"
 OPENCODE_CONFIG_SCHEMA_URL = "https://opencode.ai/config.json"
+OPENCODE_CONFIG_SCHEMA_KEY = "$schema"
 
 
 def _build_local_mcp_cmd(server: McpServer) -> list[str]:
@@ -65,7 +66,7 @@ class OpencodeAdapter(IdeAdapter):
             capabilities=IdeCapabilities(
                 skills="native",
                 mcp="project",
-                agent_ignore="unsupported",
+                agent_ignore="project",
                 entry_point="agents-md",
             ),
         )
@@ -97,10 +98,10 @@ class OpencodeAdapter(IdeAdapter):
         existing_schema = OPENCODE_CONFIG_SCHEMA_URL
         if config_path.exists():
             data = json.loads(config_path.read_text(encoding="utf-8"))
-            existing_schema = data.get("$schema", OPENCODE_CONFIG_SCHEMA_URL)
+            existing_schema = data.get(OPENCODE_CONFIG_SCHEMA_KEY, OPENCODE_CONFIG_SCHEMA_URL)
         else:
             data = {}
-        data.setdefault("$schema", existing_schema)
+        data.setdefault(OPENCODE_CONFIG_SCHEMA_KEY, existing_schema)
         mcp_servers = data.setdefault("mcp", {})
         if not isinstance(mcp_servers, dict):
             mcp_servers = {}
@@ -124,12 +125,62 @@ class OpencodeAdapter(IdeAdapter):
         config_path.write_text(json.dumps(data, indent=2), encoding="utf-8")
 
     def add_agent_ignore(self, target_root: Path, globs: list[str]) -> None:
-        del target_root, globs
-        warnings.warn("opencode: agent ignore is unsupported; steer via AGENTS.md policy instead")
+        config_path = target_root / OPENCODE_CONFIG_JSON_FILENAME
+        if config_path.exists():
+            data = json.loads(config_path.read_text(encoding="utf-8"))
+        else:
+            data = {}
+        data.setdefault(OPENCODE_CONFIG_SCHEMA_KEY, OPENCODE_CONFIG_SCHEMA_URL)
+        watcher = data.setdefault("watcher", {})
+        if not isinstance(watcher, dict):
+            watcher = {}
+            data["watcher"] = watcher
+        ignore_list = watcher.setdefault("ignore", [])
+        if not isinstance(ignore_list, list):
+            ignore_list = []
+            watcher["ignore"] = ignore_list
+        existing = set(ignore_list)
+        for g in globs:
+            if g not in existing:
+                ignore_list.append(g)
+                existing.add(g)
+        config_path.write_text(json.dumps(data, indent=2), encoding="utf-8")
 
     def remove_agent_ignore(self, target_root: Path, globs: list[str]) -> None:
-        del target_root, globs
-        warnings.warn("opencode: agent ignore is unsupported")
+        config_path = target_root / OPENCODE_CONFIG_JSON_FILENAME
+        if not config_path.exists():
+            return
+        data = json.loads(config_path.read_text(encoding="utf-8"))
+        watcher = data.get("watcher")
+        if not isinstance(watcher, dict):
+            return
+        ignore_list = watcher.get("ignore")
+        if not isinstance(ignore_list, list):
+            return
+        drop = {g.strip() for g in globs if g.strip()}
+        watcher["ignore"] = [g for g in ignore_list if g not in drop]
+        if not watcher["ignore"]:
+            del watcher["ignore"]
+        if not watcher:
+            del data["watcher"]
+        config_path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+
+    def clear_spawn_agent_ignore(self, target_root: Path) -> None:
+        self.remove_agent_ignore(target_root, list(self._current_agent_ignore(target_root)))
+
+    def _current_agent_ignore(self, target_root: Path) -> list[str]:
+        config_path = target_root / OPENCODE_CONFIG_JSON_FILENAME
+        if not config_path.exists():
+            return []
+        try:
+            data = json.loads(config_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            return []
+        watcher = data.get("watcher")
+        if not isinstance(watcher, dict):
+            return []
+        ignore_list = watcher.get("ignore")
+        return list(ignore_list) if isinstance(ignore_list, list) else []
 
     def rewrite_entry_point(self, target_root: Path, prompt: str) -> str:
         ep = target_root / "AGENTS.md"

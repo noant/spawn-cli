@@ -8,7 +8,7 @@ from spawn_cli.io.paths import ensure_dir
 if sys.version_info >= (3, 11):
     import tomllib
 else:
-    import tomli as tomllib
+    import tomli as tomllib  # type: ignore[import-not-found]
 
 import tomli_w
 

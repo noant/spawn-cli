@@ -48,7 +48,7 @@ Three targeted edits to `spec/design/ide-adapters.md`:
 **After**
 ```
 | Gemini CLI | `.gemini/skills/{skill}/SKILL.md` | `.gemini/settings.json` `mcpServers` | `.geminiignore` | `GEMINI.md` (unless overridden via `context.fileName`) | Project `.gemini/settings.json` at repo root. (CLI may also merge `.agents/skills/` discovery—outside this column.) |
-| OpenCode | `.opencode/skills/{skill}/SKILL.md` | `opencode.json` (repo root) `mcp` | unsupported | `AGENTS.md` | Stdio MCP uses `"type": "local"` + `"command"` array; HTTP/SSE uses `"type": "remote"` + `"url"`. Reads `.claude/skills/` and `.agents/skills/` via compatibility layer. `CLAUDE.md` is a fallback entry point. |
+| OpenCode | `.opencode/skills/{skill}/SKILL.md` | `opencode.json` (repo root) `mcp` | `opencode.json` `watcher.ignore` | `AGENTS.md` | Stdio MCP uses `"type": "local"` + `"command"` array; HTTP/SSE uses `"type": "remote"` + `"url"`. Reads `.claude/skills/` and `.agents/skills/` via compatibility layer. `CLAUDE.md` is a fallback entry point. |
 | Devin | ...
 ```
 

@@ -35,7 +35,7 @@ def test_detect_capabilities(adapter: OpencodeAdapter, tmp_path: Path) -> None:
     caps = adapter.detect(tmp_path).capabilities
     assert caps.skills == "native"
     assert caps.mcp == "project"
-    assert caps.agent_ignore == "unsupported"
+    assert caps.agent_ignore == "project"
     assert caps.entry_point == "agents-md"
 
 
@@ -302,22 +302,47 @@ def test_remove_mcp_preserves_custom_fields(adapter: OpencodeAdapter, tmp_path: 
     assert "a" not in data["mcp"]
 
 
-def test_add_agent_ignore_warns(adapter: OpencodeAdapter, tmp_path: Path) -> None:
-    with warnings.catch_warnings(record=True) as w:
-        warnings.simplefilter("always")
-        adapter.add_agent_ignore(tmp_path, ["*.log"])
-        assert w is not None
-        assert len(w) == 1
-        assert "unsupported" in str(w[0].message)
+def test_add_agent_ignore_merges_into_watcher(adapter: OpencodeAdapter, tmp_path: Path) -> None:
+    adapter.add_agent_ignore(tmp_path, ["spawn/**", "*.log"])
+    data = json.loads((tmp_path / OPENCODE_CONFIG_JSON_FILENAME).read_text(encoding="utf-8"))
+    assert data["watcher"]["ignore"] == ["spawn/**", "*.log"]
 
 
-def test_remove_agent_ignore_warns(adapter: OpencodeAdapter, tmp_path: Path) -> None:
-    with warnings.catch_warnings(record=True) as w:
-        warnings.simplefilter("always")
-        adapter.remove_agent_ignore(tmp_path, [])
-        assert w is not None
-        assert len(w) == 1
-        assert "unsupported" in str(w[0].message)
+def test_add_agent_ignore_deduplicates(adapter: OpencodeAdapter, tmp_path: Path) -> None:
+    adapter.add_agent_ignore(tmp_path, ["spawn/**"])
+    adapter.add_agent_ignore(tmp_path, ["spawn/**", "*.log"])
+    data = json.loads((tmp_path / OPENCODE_CONFIG_JSON_FILENAME).read_text(encoding="utf-8"))
+    assert data["watcher"]["ignore"] == ["spawn/**", "*.log"]
+
+
+def test_add_agent_ignore_preserves_existing_config(adapter: OpencodeAdapter, tmp_path: Path) -> None:
+    (tmp_path / OPENCODE_CONFIG_JSON_FILENAME).write_text(
+        json.dumps({"$schema": OPENCODE_CONFIG_SCHEMA_URL, "custom": 1}),
+        encoding="utf-8",
+    )
+    adapter.add_agent_ignore(tmp_path, ["spawn/**"])
+    data = json.loads((tmp_path / OPENCODE_CONFIG_JSON_FILENAME).read_text(encoding="utf-8"))
+    assert data["custom"] == 1
+    assert data["watcher"]["ignore"] == ["spawn/**"]
+
+
+def test_remove_agent_ignore_removes_from_watcher(adapter: OpencodeAdapter, tmp_path: Path) -> None:
+    adapter.add_agent_ignore(tmp_path, ["spawn/**", "*.log", "dist/**"])
+    adapter.remove_agent_ignore(tmp_path, ["*.log"])
+    data = json.loads((tmp_path / OPENCODE_CONFIG_JSON_FILENAME).read_text(encoding="utf-8"))
+    assert data["watcher"]["ignore"] == ["spawn/**", "dist/**"]
+
+
+def test_remove_agent_ignore_cleans_empty_watcher(adapter: OpencodeAdapter, tmp_path: Path) -> None:
+    adapter.add_agent_ignore(tmp_path, ["spawn/**"])
+    adapter.remove_agent_ignore(tmp_path, ["spawn/**"])
+    data = json.loads((tmp_path / OPENCODE_CONFIG_JSON_FILENAME).read_text(encoding="utf-8"))
+    assert "watcher" not in data
+
+
+def test_remove_agent_ignore_noop_when_no_config(adapter: OpencodeAdapter, tmp_path: Path) -> None:
+    adapter.remove_agent_ignore(tmp_path, ["spawn/**"])
+    assert not (tmp_path / OPENCODE_CONFIG_JSON_FILENAME).exists()
 
 
 def test_rewrite_entry_point_creates_agents_md(adapter: OpencodeAdapter, tmp_path: Path) -> None:

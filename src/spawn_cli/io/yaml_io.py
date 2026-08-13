@@ -10,7 +10,7 @@ def configure_yaml_dump(yaml: YAML) -> None:
 
     yaml.default_flow_style = False
     yaml.width = 4096
-    yaml.sort_base_mapping_type_on_output = False
+    yaml.sort_base_mapping_type_on_output = False  # type: ignore[assignment]
 
 
 def load_yaml(path: Path) -> dict:

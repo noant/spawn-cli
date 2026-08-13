@@ -177,7 +177,7 @@ includes a **Hints:** bullet list (full text; warnings only, no truncation).
 | Aider | `CONVENTIONS.md` plus `.aider.conf.yml` `read:` | — | `.aiderignore` (git root default) | `CONVENTIONS.md` | No IDE-style hierarchical skills; conventions are read-only context. |
 | Zed | `AGENTS.md`, `.rules`, `CLAUDE.md`, … per Zed rules doc | `.zed/settings.json` `context_servers` | `agent.tool_permissions` / workspace scan exclusions in settings (no `.cursorignore` equivalent) | `AGENTS.md` | MCP key name is `context_servers`. (Upstream may add repo skills under other paths—outside this column until documented.) |
 | Gemini CLI | `.gemini/skills/{skill}/SKILL.md` | `.gemini/settings.json` `mcpServers` | `.geminiignore` | `GEMINI.md` (unless overridden via `context.fileName`) | Project `.gemini/settings.json` at repo root. (CLI may also merge `.agents/skills/` discovery—outside this column.) |
-| OpenCode | `.opencode/skills/{skill}/SKILL.md` | `opencode.json` (repo root) `mcp` | unsupported | `AGENTS.md` | Stdio MCP uses `"type": "local"` + `"command"` array; HTTP/SSE uses `"type": "remote"` + `"url"`. Reads `.claude/skills/` and `.agents/skills/` via compatibility layer. `CLAUDE.md` is a fallback entry point. |
+| OpenCode | `.opencode/skills/{skill}/SKILL.md` | `opencode.json` (repo root) `mcp` | `opencode.json` `watcher.ignore` | `AGENTS.md` | Stdio MCP uses `"type": "local"` + `"command"` array; HTTP/SSE uses `"type": "remote"` + `"url"`. Reads `.claude/skills/` and `.agents/skills/` via compatibility layer. `CLAUDE.md` is a fallback entry point. |
 | Devin | `.devin/skills/{skill}/SKILL.md` | `.devin/config.json` `mcpServers` | — | `AGENTS.md` | Imports from other tooling may merge MCP at runtime (`read-config-from`)—outside committed files unless copied. (Optional Spawn-only trees are not part of this matrix.) |
 
 ## Skill Rendering
@@ -562,6 +562,7 @@ specific and must not pretend to work when there is no supported target.
 | Zed | No Cursor-style `.cursorignore`; approximate exclusions via scan settings and `agent.tool_permissions`. |
 | Gemini CLI | Merge Spawn-owned globs into `.geminiignore`. |
 | Devin | Spawn does not assume a writable ignore-file contract; Terminal may expose `respect_gitignore` for tools only. |
+| OpenCode | Merge Spawn-owned globs into `watcher.ignore` array in `opencode.json`. Excludes paths from file watching; agent may still reach ignored paths via direct tool calls. |
 
 When an adapter renders ignore globs into a file that also contains user globs,
 it must use a managed block or an ownership metadata comparison so uninstall
