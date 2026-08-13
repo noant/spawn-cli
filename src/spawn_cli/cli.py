@@ -12,6 +12,7 @@ from spawn_cli.core import mcp_stdio
 from spawn_cli.core.errors import SpawnError
 from spawn_cli.ide.registry import DetectResult, detect_supported_ides
 from spawn_cli.io.lock import spawn_lock
+from spawn_cli.log import get_logger, setup_logging
 from spawn_cli.warnings_display import install_spawn_warning_format
 
 
@@ -29,6 +30,13 @@ def build_parser() -> argparse.ArgumentParser:
         "--version",
         action="version",
         version=f"spawn {__version__}",
+    )
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        action="store_true",
+        default=False,
+        help="enable debug-level logging output on stderr",
     )
     sub = parser.add_subparsers(dest="command", required=True)
 
@@ -338,15 +346,17 @@ def main(argv: list[str] | None = None) -> int:
     install_spawn_warning_format()
     parser = build_parser()
     args = parser.parse_args(argv)
+    setup_logging(verbose=getattr(args, "verbose", False))
+    log = get_logger()
     target_root = Path.cwd().resolve()
 
     try:
         return _dispatch(args, target_root)
     except SpawnError as e:
-        print(f"Error: {e}", file=sys.stderr)
+        log.exception("Error: %s", e)
         return 1
     except Exception as e:
-        print(f"Unexpected error: {e}", file=sys.stderr)
+        log.exception("Unexpected error: %s", e)
         return 2
 
 
@@ -450,8 +460,9 @@ def _dispatch_extension(args: argparse.Namespace, target_root: Path) -> int:
 
     if sub == "check":
         warn_list = hl.extension_check(Path(args.path).resolve(), strict=args.strict)
+        log = get_logger()
         for w in warn_list:
-            print(f"Warning: {w}")
+            log.warning("Warning: %s", w)
         return 0
 
     if sub == "from-rules":

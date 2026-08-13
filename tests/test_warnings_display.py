@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import warnings
 
 import pytest
@@ -20,17 +21,17 @@ def _reset_warning_hook():
     warnings.showwarning = _builtin_showwarning
 
 
-def test_spawn_warning_prints_friendly_line(capsys):
+def test_spawn_warning_prints_friendly_line(caplog):
     reset_spawn_warning_format()
     install_spawn_warning_format()
-    warnings.warn("Replacing existing file from extension (static): spec/x.md", SpawnWarning)
-    err = capsys.readouterr().err.strip()
-    assert err == "spawn: warning: Replacing existing file from extension (static): spec/x.md"
-    assert "SpawnWarning" not in err
-    assert ".py" not in err
+    with caplog.at_level(logging.WARNING, logger="spawn"):
+        warnings.warn("Replacing existing file from extension (static): spec/x.md", SpawnWarning)
+    assert "spawn: warning: Replacing existing file from extension (static): spec/x.md" in caplog.text
+    assert "SpawnWarning" not in caplog.text
+    assert ".py" not in caplog.text.split("spawn: warning:")[-1]
 
 
-def test_non_spawn_delegates_to_chain(capsys):
+def test_non_spawn_delegates_to_chain(caplog):
     reset_spawn_warning_format()
     delegated: list[str] = []
 
@@ -42,7 +43,8 @@ def test_non_spawn_delegates_to_chain(capsys):
         install_spawn_warning_format()
         warnings.warn("legacy", UserWarning)
         assert delegated == ["legacy"]
-        warnings.warn("sw", SpawnWarning)
-        assert capsys.readouterr().err.strip() == "spawn: warning: sw"
+        with caplog.at_level(logging.WARNING, logger="spawn"):
+            warnings.warn("sw", SpawnWarning)
+        assert "spawn: warning: sw" in caplog.text
     finally:
         reset_spawn_warning_format()

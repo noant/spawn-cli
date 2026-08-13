@@ -1,8 +1,25 @@
 from __future__ import annotations
 
+import logging
+import sys
 from pathlib import Path
 
 import pytest
+
+from spawn_cli.log import LOGGER_NAME
+
+
+@pytest.fixture(autouse=True)
+def _configure_spawn_logger():
+    """Ensure the spawn logger emits to stderr during tests."""
+    logger = logging.getLogger(LOGGER_NAME)
+    logger.setLevel(logging.DEBUG)
+    handler = logging.StreamHandler(sys.stderr)
+    handler.setFormatter(logging.Formatter("%(message)s"))
+    if not any(isinstance(h, logging.StreamHandler) and h.stream is sys.stderr for h in logger.handlers):
+        logger.addHandler(handler)
+    yield
+    logger.removeHandler(handler)
 
 
 @pytest.fixture
