@@ -1,7 +1,0 @@
-extension: extension-creator
-source:
-  type: git
-  path: https://github.com/noant/spawn-ext-creator.git
-installed:
-  version: 0.2.1
-  installedAt: '2026-08-26T19:29:05+00:00'
