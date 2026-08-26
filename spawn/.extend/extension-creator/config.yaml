@@ -1,0 +1,117 @@
+schema: 1
+version: 0.2.1
+name: extension-creator
+
+files:
+  spawn-ext-guide/user-guide.md:
+    description: Human-readable standalone guide — narrative for all authoring topics.
+    mode: static
+    globalRead: no
+    localRead: no
+  spawn-ext-guide/ai/core.md:
+    description: Machine baseline — terms, extsrc tree rules, static vs artifact, name and uniqueness, install outputs.
+    mode: static
+    globalRead: no
+    localRead: required
+  spawn-ext-guide/ai/config-yaml.md:
+    description: Machine schema for config.yaml — keys, files/folders/skills modes, reads, ignores, setup, annotated example.
+    mode: static
+    globalRead: no
+    localRead: auto
+  spawn-ext-guide/ai/skill-sources.md:
+    description: Machine rules for extsrc/skills/*.md — frontmatter, name/description resolution, rendered skill shape, example.
+    mode: static
+    globalRead: no
+    localRead: auto
+  spawn-ext-guide/ai/mcp-json.md:
+    description: >-
+      Machine schema for extsrc/mcp/windows.json, linux.json, macos.json — servers,
+      OS selection, aligned name sets, transport, spawn_stdio_proxy (stdio IDE proxy),
+      env, capabilities, validation against check, JSON examples.
+    mode: static
+    globalRead: no
+    localRead: auto
+  spawn-ext-guide/ai/cli.md:
+    description: Machine CLI reference — spawn init/extension/build commands, extensions.yaml bundle shape, authoring checklist.
+    mode: static
+    globalRead: no
+    localRead: auto
+
+folders: {}
+
+skills:
+  spawn-ext-bootstrap.md:
+    name: spawn-ext-bootstrap
+    description: Bootstrap a new Spawn extension repo with extsrc skeleton and stable id.
+    required-read:
+      - spawn-ext-guide/ai/core.md
+      - spawn-ext-guide/ai/cli.md
+  spawn-ext-config.md:
+    name: spawn-ext-config
+    description: Declare config.yaml files/folders/ignores/setup and mirror every path under extsrc/files.
+    required-read:
+      - spawn-ext-guide/ai/core.md
+      - spawn-ext-guide/ai/config-yaml.md
+  spawn-ext-hints.md:
+    name: spawn-ext-hints
+    description: Add optional hints.global / hints.local in config.yaml — plain-text agent reminders merged like global reads vs pack-local skills.
+    required-read:
+      - spawn-ext-guide/ai/core.md
+      - spawn-ext-guide/ai/config-yaml.md
+      - spawn-ext-guide/user-guide.md
+  spawn-ext-skill-sources.md:
+    name: spawn-ext-skill-sources
+    description: Author extsrc/skills and register them in config with required-read merges.
+    required-read:
+      - spawn-ext-guide/ai/core.md
+      - spawn-ext-guide/ai/config-yaml.md
+      - spawn-ext-guide/ai/skill-sources.md
+  spawn-ext-mcp.md:
+    name: spawn-ext-mcp
+    description: >-
+      Add or edit extsrc/mcp/*.json — three platform files, Spawn servers shape,
+      matching server names, optional spawn_stdio_proxy for stdio, safe env placeholders.
+    required-read:
+      - spawn-ext-guide/ai/core.md
+      - spawn-ext-guide/ai/mcp-json.md
+  spawn-ext-verify.md:
+    name: spawn-ext-verify
+    description: Strict check extension layout and smoke-test install in a disposable target.
+    required-read:
+      - spawn-ext-guide/ai/core.md
+      - spawn-ext-guide/ai/cli.md
+  spawn-ext-increment-version.md:
+    name: spawn-ext-increment-version
+    description: Bump extension version in extsrc/config.yaml for releases (semver-oriented guidance).
+    required-read:
+      - spawn-ext-guide/ai/core.md
+      - spawn-ext-guide/ai/config-yaml.md
+      - spawn-ext-guide/ai/cli.md
+  spawn-methodology-shape.md:
+    name: spawn-methodology-shape
+    description: Design methodology namespaces, static vs artifact layout, and read surfaces before packing.
+    required-read:
+      - spawn-ext-guide/ai/core.md
+      - spawn-ext-guide/ai/config-yaml.md
+      - spawn-ext-guide/user-guide.md
+  spawn-methodology-update.md:
+    name: spawn-methodology-update
+    description: >-
+      Update methodology from a user instruction — clarify scope, apply changes,
+      validate, bump version, and offer a git commit with a suggested message.
+    required-read:
+      - spawn-ext-guide/ai/core.md
+      - spawn-ext-guide/ai/config-yaml.md
+      - spawn-ext-guide/ai/skill-sources.md
+      - spawn-ext-guide/ai/cli.md
+  spawn-ext-extract-stack-patterns.md:
+    name: spawn-ext-extract-stack-patterns
+    description: Analyze a reference codebase and distill universal stack patterns into extension spec files and procedural skills.
+    required-read:
+      - spawn-ext-guide/ai/core.md
+      - spawn-ext-guide/ai/config-yaml.md
+      - spawn-ext-guide/ai/skill-sources.md
+
+agent-ignore: []
+git-ignore: []
+setup: {}

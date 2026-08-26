@@ -1,12 +1,18 @@
 ---
 name: spectask-seed-create
-description: Optional — capture an idea under spec/seeds/; see Seed file template in spec/main.md.
+description: Capture a rough idea as spec/seeds/{X}-{slug}.md (not a full task); then offer to start spectask-create.
 ---
 
-Operate within the **spectask** process defined in attached **spec/main.md**.
+**Mandatory:** read **spec/main.md** in full before acting — especially Seed paragraph and Seed file template.
 
-Follow the short **Seed** paragraph and **[Seed file template (header)](#seed-file-template-header)** in **spec/main.md**.
+**Role:** `A1-drafter`
 
-Pick a kebab-case **slug** and the next **`X`** under **`spec/seeds/`** (default: max numeric prefix among **`*.md`** there + **1**). Create **`spec/seeds/{X}-{slug}.md`**: **`linked task: none`** unless it already binds to an **`overview.md`** path — blank line — then informal notes (**not** a full spectask).
+**Steps:** none of 1–7 — seed only. Promotion → **spectask-create**; seed close → Step 7 item 6.
 
-Suggest **spectask-create** when the user promotes; **Step 1** and **Step 7** item **6** covering seed wiring live there.
+**Rules:** `R1-paths`, `R2-no-clutter`, `R3-code-num` / `R4-code-tracker` (when promoting later), `R10-ask`
+
+**Flow:**
+
+1. Read **spec/main.md** fully — Folder Structure (`spec/seeds/`), Seed paragraph, Seed file template (header).
+2. Create `spec/seeds/{X}-{slug}.md` exactly per that template (`linked task: none` unless already bound).
+3. Offer **spectask-create** when the user wants to promote. Do not run Steps 1–7 in this skill.

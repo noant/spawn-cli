@@ -1,2 +1,3 @@
 **/.mempalace/chroma/
 **/.mempalace/palace/
+spec/.config/**

@@ -6,5 +6,6 @@ Inspect `read-contextual` descriptions and read only files relevant to the curre
 Hints:
 - When finishing a task that involved editing this repo's code or docs: call mempalace_mine (mempalace-mine-mcp), then mempalace_reconnect on mempalace-mcp if already connected.
 - Prefer codebase search via mempalace-mcp first; use workspace full-text / ripgrep only if MemPalace is unavailable or insufficient.
+- Use the platform ask tool when available (R10-ask in spec/main.md); otherwise, stop and request input from the user.
 
 <!-- spawn:end -->

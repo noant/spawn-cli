@@ -25,6 +25,13 @@
       "env": {
         "MEMPALACE_PALACE_PATH": ".mempalace/palace"
       }
+    },
+    "spectask-mcp-jira": {
+      "command": "uvx",
+      "args": [
+        "spectask-mcp",
+        "serve"
+      ]
     }
   }
 }

@@ -4,8 +4,10 @@ uv.lock
 *.egg-info/
 # spawn:start
 spawn/.metadata/temp/**
+spawn/.metadata/.spawn.lock
 **/.mempalace/chroma/
 **/.mempalace/palace/
+spec/.config/**
 # spawn:end
 
 # MemPalace per-project files (issue #185)

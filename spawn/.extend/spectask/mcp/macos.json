@@ -1,0 +1,12 @@
+{
+  "servers": [
+    {
+      "name": "spectask-mcp-jira",
+      "transport": {
+        "type": "stdio",
+        "command": "uvx",
+        "args": ["spectask-mcp", "serve"]
+      }
+    }
+  ]
+}

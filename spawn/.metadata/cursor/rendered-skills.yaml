@@ -6,8 +6,14 @@ extensions:
     path: .cursor/skills/spectask-create/SKILL.md
   - skill: spectask-design
     path: .cursor/skills/spectask-design/SKILL.md
+  - skill: spectask-execute-step-by-step
+    path: .cursor/skills/spectask-execute-step-by-step/SKILL.md
   - skill: spectask-execute
     path: .cursor/skills/spectask-execute/SKILL.md
+  - skill: spectask-extract-patterns
+    path: .cursor/skills/spectask-extract-patterns/SKILL.md
+  - skill: spectask-from-jira
+    path: .cursor/skills/spectask-from-jira/SKILL.md
   - skill: spectask-seed-create
     path: .cursor/skills/spectask-seed-create/SKILL.md
   - skill: spectask-spec-review-passed
@@ -19,3 +25,24 @@ extensions:
     path: .cursor/skills/mempalace-diagnose-palace/SKILL.md
   - skill: mempalace-search
     path: .cursor/skills/mempalace-search/SKILL.md
+  extension-creator:
+  - skill: spawn-ext-bootstrap
+    path: .cursor/skills/spawn-ext-bootstrap/SKILL.md
+  - skill: spawn-ext-config
+    path: .cursor/skills/spawn-ext-config/SKILL.md
+  - skill: spawn-ext-extract-stack-patterns
+    path: .cursor/skills/spawn-ext-extract-stack-patterns/SKILL.md
+  - skill: spawn-ext-hints
+    path: .cursor/skills/spawn-ext-hints/SKILL.md
+  - skill: spawn-ext-increment-version
+    path: .cursor/skills/spawn-ext-increment-version/SKILL.md
+  - skill: spawn-ext-mcp
+    path: .cursor/skills/spawn-ext-mcp/SKILL.md
+  - skill: spawn-ext-skill-sources
+    path: .cursor/skills/spawn-ext-skill-sources/SKILL.md
+  - skill: spawn-ext-verify
+    path: .cursor/skills/spawn-ext-verify/SKILL.md
+  - skill: spawn-methodology-shape
+    path: .cursor/skills/spawn-methodology-shape/SKILL.md
+  - skill: spawn-methodology-update
+    path: .cursor/skills/spawn-methodology-update/SKILL.md

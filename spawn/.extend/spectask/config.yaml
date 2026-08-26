@@ -1,16 +1,29 @@
 schema: 1
 name: spectask
-version: "1.2.6"
+version: "1.16.5"
+
+hints:
+  global:
+    - Use the platform ask tool when available (R10-ask in spec/main.md); otherwise, stop and request input from the user.
 
 folders:
   spec/tasks:
     mode: artifact
   spec/seeds:
     mode: artifact
+  "spec/.config":
+    mode: artifact
 
 agent-ignore:
   - spec/seeds/_DONE_*.md
   - spec/tasks/**/_DONE_*/_DONE_*.md
+  - spec/.config/**
+
+git-ignore:
+  - spec/.config/**
+
+setup:
+  after-install: install_spectask_mcp.py
 
 files:
   spec/main.md:
@@ -30,21 +43,48 @@ files:
     localRead: required
 
 skills:
+  spectask-from-jira.md:
+    name: spectask-from-jira
+    description: "Import Jira tickets into spec/tasks/{task-code}-{slug}/; codebase analysis for Step 1-2; offline fallback."
+    required-read:
+      - spec/main.md
   spectask-create.md:
     name: spectask-create
     description: "Use when drafting a new spectask (specification only, per spec/main.md)."
+    required-read:
+      - spec/main.md
   spectask-spec-review-passed.md:
     name: spectask-spec-review-passed
     description: "Step 3 — spec approved (spec/main.md)."
+    required-read:
+      - spec/main.md
   spectask-execute.md:
     name: spectask-execute
     description: "Steps 4–5 in spec/main.md; then wait for user Step 6."
+    required-read:
+      - spec/main.md
+  spectask-execute-step-by-step.md:
+    name: spectask-execute-step-by-step
+    description: "Step 4 — one Execution Scheme subtask per run with per-step self-review; auto Step 5 when all done (spec/main.md)."
+    required-read:
+      - spec/main.md
   spectask-code-review-passed.md:
     name: spectask-code-review-passed
-    description: "After user confirms code review — Steps 6–7 in one run (spec/main.md)."
+    description: "After user confirms code review / debugging — Steps 6–7 then optional pattern extract (spec/main.md)."
+    required-read:
+      - spec/main.md
+  spectask-extract-patterns.md:
+    name: spectask-extract-patterns
+    description: "After Step 7 — optional extract of reusable patterns into spawn/rules/ and navigation (spec/main.md)."
+    required-read:
+      - spec/main.md
   spectask-design.md:
     name: spectask-design
     description: "Use when registering architecture files in spec/design.yaml or drafting spec/design/*.md."
+    required-read:
+      - spec/main.md
   spectask-seed-create.md:
     name: spectask-seed-create
     description: "Capture a rough idea as spec/seeds/{X}-{slug}.md (not a full task); then offer to start spectask-create."
+    required-read:
+      - spec/main.md
