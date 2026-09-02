@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import shutil
 
 from pathlib import Path
@@ -287,64 +288,72 @@ def test_remove_extension_rebuilds_survivor_skills_without_removed_global_read(
     assert BETA_GLOBAL_READ_FILE not in {r.file for r in m_survivor.required_read}
 
 
-@patch("spawn_cli.core.high_level.warnings.warn")
-@patch("spawn_cli.core.high_level.ide_get", lambda *_a, **_k: _stub_with_caps("native", "unsupported"))
 def test_refresh_extension_core_warns_limited_mcp_when_servers_present(
-    mock_warn: MagicMock, target: Path
+    target: Path,
 ) -> None:
-    ll.add_ide_to_list(target, "cursor")
-    _install_ext(
-        target,
-        "e1",
-        mcp_servers=[
-            {"name": "srv-one", "transport": {"type": "stdio", "command": "true"}},
-        ],
-    )
-    hl._refresh_extension_core(target, "e1")
-    mock_warn.assert_called_once()
-    assert "limited MCP support" in str(mock_warn.call_args[0][0])
-    assert mock_warn.call_args[0][1] is SpawnWarning
+    with (
+        patch("spawn_cli.core.high_level.warnings.warn") as mock_warn,
+        patch("spawn_cli.core.high_level.ide_get", lambda *_a, **_k: _stub_with_caps("native", "unsupported")),
+    ):
+        ll.add_ide_to_list(target, "cursor")
+        _install_ext(
+            target,
+            "e1",
+            mcp_servers=[
+                {"name": "srv-one", "transport": {"type": "stdio", "command": "true"}},
+            ],
+        )
+        hl._refresh_extension_core(target, "e1")
+        mock_warn.assert_called_once()
+        assert "limited MCP support" in str(mock_warn.call_args[0][0])
+        assert mock_warn.call_args[0][1] is SpawnWarning
 
 
-@patch("spawn_cli.core.high_level.warnings.warn")
-@patch("spawn_cli.core.high_level.ide_get", lambda *_a, **_k: _stub_with_caps("unsupported", "project"))
 def test_refresh_extension_core_warns_skills_unsupported_when_skill_files_present(
-    mock_warn: MagicMock, target: Path
+    target: Path,
 ) -> None:
-    ll.add_ide_to_list(target, "cursor")
-    _install_ext(target, "e1", skills={"a.md": {"name": "s", "description": "d"}})
-    hl._refresh_extension_core(target, "e1")
-    mock_warn.assert_called_once()
-    assert "does not support skills" in str(mock_warn.call_args[0][0])
-    assert mock_warn.call_args[0][1] is SpawnWarning
+    with (
+        patch("spawn_cli.core.high_level.warnings.warn") as mock_warn,
+        patch("spawn_cli.core.high_level.ide_get", lambda *_a, **_k: _stub_with_caps("unsupported", "project")),
+    ):
+        ll.add_ide_to_list(target, "cursor")
+        _install_ext(target, "e1", skills={"a.md": {"name": "s", "description": "d"}})
+        hl._refresh_extension_core(target, "e1")
+        mock_warn.assert_called_once()
+        assert "does not support skills" in str(mock_warn.call_args[0][0])
+        assert mock_warn.call_args[0][1] is SpawnWarning
 
 
-@patch("spawn_cli.core.high_level.warnings.warn")
-@patch("spawn_cli.core.high_level.ide_get", lambda *_a, **_k: _stub_with_caps("unsupported", "unsupported"))
-def test_add_ide_no_capability_warnings_when_no_extensions(mock_warn: MagicMock, target: Path) -> None:
-    hl.add_ide(target, "cursor")
-    mock_warn.assert_not_called()
+def test_add_ide_no_capability_warnings_when_no_extensions(target: Path) -> None:
+    with (
+        patch("spawn_cli.core.high_level.warnings.warn") as mock_warn,
+        patch("spawn_cli.core.high_level.ide_get", lambda *_a, **_k: _stub_with_caps("unsupported", "unsupported")),
+    ):
+        hl.add_ide(target, "cursor")
+        mock_warn.assert_not_called()
 
 
-@patch("spawn_cli.core.high_level.warnings.warn")
-@patch("spawn_cli.core.high_level.ide_get", lambda *_a, **_k: _stub_with_caps("native", "unsupported"))
 def test_refresh_extension_for_ide_mcp_warn_only_when_named_ext_has_servers(
-    mock_warn: MagicMock, target: Path
+    target: Path,
 ) -> None:
-    ll.add_ide_to_list(target, "cursor")
-    _install_ext(
-        target,
-        "srv",
-        mcp_servers=[
-            {"name": "one", "transport": {"type": "stdio", "command": "true"}},
-        ],
-    )
-    _install_ext(target, "skills_only", skills={"k.md": {"name": "k", "description": "d"}})
-    hl.refresh_extension_for_ide(target, "cursor", "skills_only")
-    mock_warn.assert_not_called()
-    hl.refresh_extension_for_ide(target, "cursor", "srv")
-    mock_warn.assert_called_once()
-    assert "limited MCP support" in str(mock_warn.call_args[0][0])
+    with (
+        patch("spawn_cli.core.high_level.warnings.warn") as mock_warn,
+        patch("spawn_cli.core.high_level.ide_get", lambda *_a, **_k: _stub_with_caps("native", "unsupported")),
+    ):
+        ll.add_ide_to_list(target, "cursor")
+        _install_ext(
+            target,
+            "srv",
+            mcp_servers=[
+                {"name": "one", "transport": {"type": "stdio", "command": "true"}},
+            ],
+        )
+        _install_ext(target, "skills_only", skills={"k.md": {"name": "k", "description": "d"}})
+        hl.refresh_extension_for_ide(target, "cursor", "skills_only")
+        mock_warn.assert_not_called()
+        hl.refresh_extension_for_ide(target, "cursor", "srv")
+        mock_warn.assert_called_once()
+        assert "limited MCP support" in str(mock_warn.call_args[0][0])
 
 
 @patch("spawn_cli.core.high_level.ide_get", lambda *_a, **_k: _stub_ide())
@@ -374,7 +383,7 @@ def test_refresh_mcp(target: Path) -> None:
 
 
 @patch("spawn_cli.core.high_level.ide_get", lambda *_a, **_k: _stub_ide())
-def test_refresh_mcp_stdout_exact_merged_notice(capsys: pytest.CaptureFixture[str], target: Path) -> None:
+def test_refresh_mcp_stdout_exact_merged_notice(caplog: pytest.LogCaptureFixture, target: Path) -> None:
     ll.add_ide_to_list(target, "cursor")
     _install_ext(
         target,
@@ -383,13 +392,14 @@ def test_refresh_mcp_stdout_exact_merged_notice(capsys: pytest.CaptureFixture[st
             {"name": "srv-one", "transport": {"type": "stdio", "command": "true"}},
         ],
     )
-    hl.refresh_mcp(target, "cursor", "e1")
-    assert capsys.readouterr().out == hl.MCP_MERGED_NOTICE + "\n"
+    with caplog.at_level(logging.INFO, logger="spawn"):
+        hl.refresh_mcp(target, "cursor", "e1")
+    assert hl.MCP_MERGED_NOTICE in caplog.text
 
 
-@patch("spawn_cli.core.high_level.ide_get", return_value=WindsurfAdapter())
+@patch("spawn_cli.core.high_level.ide_get", new=lambda *_a, **_k: WindsurfAdapter())
 def test_refresh_mcp_no_stdout_notice_windsurf_noop_mcp(
-    capsys: pytest.CaptureFixture[str],
+    caplog: pytest.LogCaptureFixture,
     target: Path,
 ) -> None:
     ll.add_ide_to_list(target, "windsurf")
@@ -400,15 +410,16 @@ def test_refresh_mcp_no_stdout_notice_windsurf_noop_mcp(
             {"name": "srv-one", "transport": {"type": "stdio", "command": "true"}},
         ],
     )
-    hl.refresh_mcp(target, "windsurf", "e1")
-    assert hl.MCP_MERGED_NOTICE not in capsys.readouterr().out
+    with caplog.at_level(logging.INFO, logger="spawn"):
+        hl.refresh_mcp(target, "windsurf", "e1")
+    assert hl.MCP_MERGED_NOTICE not in caplog.text
     assert ll.get_rendered_mcp(target, "windsurf", "e1") == []
 
 
 @patch("spawn_cli.core.high_level.ide_get", lambda *_a, **_k: _stub_ide())
 @pytest.mark.parametrize("empty_mcp_kind", ["missing_file", "empty_servers_key"])
 def test_refresh_mcp_no_stdout_notice_without_mcp_servers(
-    capsys: pytest.CaptureFixture[str],
+    caplog: pytest.LogCaptureFixture,
     target: Path,
     empty_mcp_kind: str,
 ) -> None:
@@ -417,13 +428,14 @@ def test_refresh_mcp_no_stdout_notice_without_mcp_servers(
     ext_root = target / "spawn" / ".extend" / "e1"
     if empty_mcp_kind == "empty_servers_key":
         _write_mcp_trio(ext_root, [])
-    hl.refresh_mcp(target, "cursor", "e1")
-    assert hl.MCP_MERGED_NOTICE not in capsys.readouterr().out
+    with caplog.at_level(logging.INFO, logger="spawn"):
+        hl.refresh_mcp(target, "cursor", "e1")
+    assert hl.MCP_MERGED_NOTICE not in caplog.text
 
 
 @patch("spawn_cli.core.high_level.ide_get", lambda *_a, **_k: _stub_ide())
 def test_add_ide_prints_merged_notice_once_with_two_mcp_extensions(
-    capsys: pytest.CaptureFixture[str],
+    caplog: pytest.LogCaptureFixture,
     target: Path,
 ) -> None:
     _install_ext(
@@ -442,14 +454,14 @@ def test_add_ide_prints_merged_notice_once_with_two_mcp_extensions(
     )
     mock = MagicMock(wraps=_stub_ide())
     with patch("spawn_cli.core.high_level.ide_get", return_value=mock):
-        hl.add_ide(target, "cursor")
-    out = capsys.readouterr().out
-    assert out.count(hl.MCP_MERGED_NOTICE) == 1
+        with caplog.at_level(logging.INFO, logger="spawn"):
+            hl.add_ide(target, "cursor")
+    assert caplog.text.count(hl.MCP_MERGED_NOTICE) == 1
 
 
 @patch("spawn_cli.core.high_level.ide_get", lambda *_a, **_k: _stub_ide())
 def test_refresh_mcp_skip_notice_still_persists_rendered_mcp(
-    capsys: pytest.CaptureFixture[str],
+    caplog: pytest.LogCaptureFixture,
     target: Path,
 ) -> None:
     ll.add_ide_to_list(target, "cursor")
@@ -460,8 +472,9 @@ def test_refresh_mcp_skip_notice_still_persists_rendered_mcp(
             {"name": "srv-one", "transport": {"type": "stdio", "command": "true"}},
         ],
     )
-    hl.refresh_mcp(target, "cursor", "e1", emit_mcp_merged_notice=False)
-    assert hl.MCP_MERGED_NOTICE not in capsys.readouterr().out
+    with caplog.at_level(logging.INFO, logger="spawn"):
+        hl.refresh_mcp(target, "cursor", "e1", emit_mcp_merged_notice=False)
+    assert hl.MCP_MERGED_NOTICE not in caplog.text
     assert ll.get_rendered_mcp(target, "cursor", "e1") == ["srv-one"]
 
 
@@ -545,6 +558,7 @@ def test_refresh_entry_point_agents_warnings_for_oversize_hint(tmp_path: Path) -
         assert mock.rewrite_entry_point.called
         prompt = mock.rewrite_entry_point.call_args[0][1]
         assert "x" * 600 in prompt
+        assert wrec is not None
         assert any(issubclass(w.category, SpawnWarning) for w in wrec)
 
 
@@ -731,6 +745,7 @@ def test_extension_init_idempotent(tmp_path: Path) -> None:
     with warnings.catch_warnings(record=True) as w:
         warnings.simplefilter("always")
         hl.extension_init(tmp_path, "other")
+        assert w is not None
         assert any("already exists" in str(x.message) for x in w)
     raw = _load_cfg_dict(tmp_path / "extsrc" / "config.yaml")
     assert raw.get("name") == "my-pack"

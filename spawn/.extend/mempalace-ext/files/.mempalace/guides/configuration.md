@@ -187,7 +187,7 @@ File `~/.mempalace/identity.txt` — assistant identity text loaded on wake-up. 
 ## Overriding palace path
 
 - CLI: `--palace <path>` on commands (`search`, `mine`, etc.).
-- MCP: `python -m mempalace.mcp_server --palace <path>` when invoking the module directly.
+- MCP: `uv run python -m mempalace.mcp_server --palace <path>` when invoking the module directly.
 - Environment: **`MEMPALACE_PALACE_PATH`** (same meaning as `--palace`).
 - **`MEMPAL_DIR`** — directory for auto-mining in hooks (see the official env table).
 

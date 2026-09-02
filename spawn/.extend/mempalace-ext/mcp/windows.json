@@ -5,8 +5,8 @@
       "spawn_stdio_proxy": true,
       "transport": {
         "type": "stdio",
-        "command": "py",
-        "args": ["-3", "-X", "utf8", "-m", "mempalace.mcp_server"],
+        "command": "uv",
+        "args": ["run", "python", "-X", "utf8", "-m", "mempalace.mcp_server"],
         "cwd": "."
       },
       "env": {
@@ -28,8 +28,8 @@
       "spawn_stdio_proxy": true,
       "transport": {
         "type": "stdio",
-        "command": "py",
-        "args": ["-3", "-X", "utf8", ".mempalace/ext/mine_mcp_server.py"],
+        "command": "uv",
+        "args": ["run", "python", "-X", "utf8", ".mempalace/ext/mine_mcp_server.py"],
         "cwd": "."
       },
       "env": {

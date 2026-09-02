@@ -13,7 +13,8 @@ from spawn_cli.ide.registry import IdeCapabilities, get as ide_get
 from spawn_cli.io.json_io import save_json
 from spawn_cli.io.paths import ensure_dir, safe_path
 from spawn_cli.io.yaml_io import load_yaml, save_yaml
-from spawn_cli.models.config import ExtensionConfig, ReadFlag
+from spawn_cli.log import get_logger
+from spawn_cli.models.config import ExtensionConfig, ReadFlag, SetupConfig
 
 SPAWN_ENTRY_POINT_PROMPT = """\
 Before working, read `spawn/navigation.yaml`.
@@ -24,6 +25,8 @@ Inspect `read-contextual` descriptions and read only files relevant to the curre
 MCP_MERGED_NOTICE = (
     "MCP was merged for this workspace; you may need to press Enable in your IDE MCP UI."
 )
+
+CONFIG_FILENAME = "config.yaml"
 
 
 def _any_extension_has_skill_files(target_root: Path) -> bool:
@@ -185,7 +188,7 @@ def refresh_mcp(
     new_names = adapter.add_mcp(target_root, nm)
     ll.save_mcp_rendered(target_root, ide, extension, new_names)
     if new_names and emit_mcp_merged_notice:
-        print(MCP_MERGED_NOTICE)
+        get_logger().info(MCP_MERGED_NOTICE)
     return new_names
 
 
@@ -297,7 +300,7 @@ def refresh_repository(target_root: Path) -> None:
     for ide in ll.list_ides(target_root):
         refresh_agent_ignore(target_root, ide)
     if merged_any:
-        print(MCP_MERGED_NOTICE)
+        get_logger().info(MCP_MERGED_NOTICE)
     refresh_gitignore(target_root)
     refresh_navigation(target_root)
     for ide in ll.list_ides(target_root):
@@ -427,12 +430,106 @@ def _ensure_empty_mcp_platform_files(extsrc: Path) -> None:
             save_json(p, empty)
 
 
+def _resolve_extsrc(path: Path) -> Path:
+    if (path / "extsrc" / CONFIG_FILENAME).is_file():
+        return path / "extsrc"
+    if (path / CONFIG_FILENAME).is_file():
+        return path
+    raise SpawnError(f"extsrc/{CONFIG_FILENAME} is missing")
+
+
+def _validate_all_mcp_platform_files(
+    paths: list[Path] | tuple[Path, ...],
+    cfg: ExtensionConfig,
+    strict: bool,
+    warnings_out: list[str],
+) -> list[frozenset[str]] | None:
+    name_sets: list[frozenset[str]] = []
+    for p in paths:
+        result = _validate_mcp_platform_file(p, cfg, strict, warnings_out, name_sets)
+        if result is None:
+            return None
+        name_sets = result
+    return name_sets
+
+
+def _collect_mcp_warnings(
+    extsrc: Path,
+    cfg: ExtensionConfig,
+    strict: bool,
+    warnings_out: list[str],
+) -> list[str]:
+    root_mcp = extsrc / "mcp.json"
+    if root_mcp.is_file():
+        msg = (
+            "obsolete extsrc/mcp.json is not used; remove it and use "
+            "extsrc/mcp/windows.json, linux.json, and macos.json only"
+        )
+        if strict:
+            raise SpawnError(msg)
+        warnings_out.append(msg)
+    mcp_dir = extsrc / "mcp"
+    if not mcp_dir.is_dir():
+        msg = "missing extsrc/mcp/ directory (expected windows.json, linux.json, macos.json)"
+        if strict:
+            raise SpawnError(msg)
+        warnings_out.append(msg)
+        return warnings_out
+    paths = ll.extension_mcp_platform_json_paths(extsrc)
+    if not all(p.is_file() for p in paths):
+        missing = [p.name for p in paths if not p.is_file()]
+        msg = f"incomplete extsrc/mcp layout (missing {', '.join(missing)})"
+        if strict:
+            raise SpawnError(msg)
+        warnings_out.append(msg)
+        return warnings_out
+    name_sets = _validate_all_mcp_platform_files(paths, cfg, strict, warnings_out)
+    if name_sets is None:
+        return warnings_out
+    if len(set(name_sets)) != 1:
+        msg = (
+            "MCP server names must match across mcp/windows.json, "
+            "linux.json, and macos.json"
+        )
+        if strict:
+            raise SpawnError(msg)
+        warnings_out.append(msg)
+    return warnings_out
+
+
+def _validate_mcp_platform_file(
+    p: Path,
+    cfg: ExtensionConfig,
+    strict: bool,
+    warnings_out: list[str],
+    name_sets: list[frozenset[str]],
+) -> list[frozenset[str]] | None:
+    try:
+        nm = ll.normalized_mcp_from_mcp_json_path(p, cfg.name or "extension")
+    except Exception as e:
+        if strict:
+            raise SpawnError(f"MCP file invalid ({p}): {e}") from e
+        warnings_out.append(f"MCP file invalid ({p}): {e}")
+        return None
+    for srv in nm.servers:
+        if srv.spawn_stdio_proxy and srv.transport.type != "stdio":
+            msg = (
+                f"MCP server {srv.name!r} in {p}: spawn_stdio_proxy requires "
+                f"transport.type 'stdio' (got {srv.transport.type!r})"
+            )
+            if strict:
+                raise SpawnError(msg)
+            warnings_out.append(msg)
+    name_sets.append(frozenset(s.name for s in nm.servers))
+    return name_sets
+
+
 def extension_init(path: Path, name: str) -> None:
     extsrc = path / "extsrc"
-    cfg_path = extsrc / "config.yaml"
+    cfg_path = extsrc / CONFIG_FILENAME
     if cfg_path.is_file():
         warnings.warn(
-            "extsrc/config.yaml already exists; left unchanged during extension init",
+            f"extsrc/{CONFIG_FILENAME} already exists; left unchanged during extension init",
             SpawnWarning,
         )
         return
@@ -454,113 +551,65 @@ def extension_init(path: Path, name: str) -> None:
     save_yaml(cfg_path, template)
 
 
+def _check_condition(condition: bool, msg: str, strict: bool, warnings_out: list[str]) -> None:
+    if condition:
+        if strict:
+            raise SpawnError(msg)
+        warnings_out.append(msg)
+
+
+def _validate_skills(extsrc: Path, skills: dict, strict: bool, warnings_out: list[str]) -> None:
+    skills_dir = extsrc / "skills"
+    for key in skills:
+        if not (skills_dir / key).is_file():
+            _check_condition(True, f"skill file missing: skills/{key}", strict, warnings_out)
+
+
+def _validate_file_descriptions(files: dict, strict: bool, warnings_out: list[str]) -> None:
+    for name, ent in files.items():
+        if ent.globalRead != ReadFlag.no or ent.localRead != ReadFlag.no:
+            if not ent.description or not ent.description.strip():
+                _check_condition(True, f"file {name!r} has read visibility but no description", strict, warnings_out)
+
+
+def _validate_setup_scripts(setup: SetupConfig | None, setup_dir: Path, strict: bool, warnings_out: list[str]) -> None:
+    if not setup:
+        return
+    for phase, rel in (
+        ("before-install", setup.before_install),
+        ("after-install", setup.after_install),
+        ("before-uninstall", setup.before_uninstall),
+        ("after-uninstall", setup.after_uninstall),
+        ("healthcheck", setup.healthcheck),
+    ):
+        if rel and not (setup_dir / rel).is_file():
+            _check_condition(True, f"setup script missing: setup/{rel}", strict, warnings_out)
+
+
+def _validate_declared_files(files_dir: Path, declared: set[str], strict: bool, warnings_out: list[str]) -> None:
+    if not files_dir.is_dir():
+        return
+    for f in files_dir.rglob("*"):
+        if f.is_file():
+            rel = f.relative_to(files_dir).as_posix()
+            if rel not in declared:
+                _check_condition(True, f"undeclared file under extsrc/files: {rel}", strict, warnings_out)
+
+
 def extension_check(path: Path, strict: bool = False) -> list[str]:
     warnings_out: list[str] = []
-    if (path / "extsrc" / "config.yaml").is_file():
-        extsrc = path / "extsrc"
-    elif (path / "config.yaml").is_file():
-        extsrc = path
-    else:
-        raise SpawnError("extsrc/config.yaml is missing")
-    cfg_path = extsrc / "config.yaml"
+    extsrc = _resolve_extsrc(path)
+    cfg_path = extsrc / CONFIG_FILENAME
     raw = load_yaml(cfg_path)
     try:
         cfg = ExtensionConfig.model_validate(raw)
     except Exception as e:
         raise SpawnError(f"invalid extension config: {e}") from e
-    skills_dir = extsrc / "skills"
-    setup_dir = extsrc / "setup"
-    files_dir = extsrc / "files"
-    for key, sk in cfg.skills.items():
-        skill_file = skills_dir / key
-        if not skill_file.is_file():
-            msg = f"skill file missing: skills/{key}"
-            if strict:
-                raise SpawnError(msg)
-            warnings_out.append(msg)
-    for _ent_key, ent in cfg.files.items():
-        gr, lr = ent.globalRead, ent.localRead
-        if gr != ReadFlag.no or lr != ReadFlag.no:
-            if not ent.description or not ent.description.strip():
-                msg = f"file {_ent_key!r} has read visibility but no description"
-                if strict:
-                    raise SpawnError(msg)
-                warnings_out.append(msg)
-    root_mcp = extsrc / "mcp.json"
-    if root_mcp.is_file():
-        msg = (
-            "obsolete extsrc/mcp.json is not used; remove it and use "
-            "extsrc/mcp/windows.json, linux.json, and macos.json only"
-        )
-        if strict:
-            raise SpawnError(msg)
-        warnings_out.append(msg)
-    mcp_dir = extsrc / "mcp"
-    if not mcp_dir.is_dir():
-        msg = "missing extsrc/mcp/ directory (expected windows.json, linux.json, macos.json)"
-        if strict:
-            raise SpawnError(msg)
-        warnings_out.append(msg)
-    else:
-        paths = ll.extension_mcp_platform_json_paths(extsrc)
-        if not all(p.is_file() for p in paths):
-            missing = [p.name for p in paths if not p.is_file()]
-            msg = f"incomplete extsrc/mcp layout (missing {', '.join(missing)})"
-            if strict:
-                raise SpawnError(msg)
-            warnings_out.append(msg)
-        else:
-            name_sets: list[frozenset[str]] = []
-            for p in paths:
-                try:
-                    nm = ll.normalized_mcp_from_mcp_json_path(p, cfg.name or "extension")
-                except Exception as e:
-                    if strict:
-                        raise SpawnError(f"MCP file invalid ({p}): {e}") from e
-                    warnings_out.append(f"MCP file invalid ({p}): {e}")
-                    name_sets = []
-                    break
-                for srv in nm.servers:
-                    if srv.spawn_stdio_proxy and srv.transport.type != "stdio":
-                        msg = (
-                            f"MCP server {srv.name!r} in {p}: spawn_stdio_proxy requires "
-                            f"transport.type 'stdio' (got {srv.transport.type!r})"
-                        )
-                        if strict:
-                            raise SpawnError(msg)
-                        warnings_out.append(msg)
-                name_sets.append(frozenset(s.name for s in nm.servers))
-            if name_sets and len(set(name_sets)) != 1:
-                msg = (
-                    "MCP server names must match across mcp/windows.json, "
-                    "linux.json, and macos.json"
-                )
-                if strict:
-                    raise SpawnError(msg)
-                warnings_out.append(msg)
-    if cfg.setup:
-        for _phase, rel in (
-            ("before-install", cfg.setup.before_install),
-            ("after-install", cfg.setup.after_install),
-            ("before-uninstall", cfg.setup.before_uninstall),
-            ("after-uninstall", cfg.setup.after_uninstall),
-            ("healthcheck", cfg.setup.healthcheck),
-        ):
-            if rel and not (setup_dir / rel).is_file():
-                msg = f"setup script missing: setup/{rel}"
-                if strict:
-                    raise SpawnError(msg)
-                warnings_out.append(msg)
-    declared = set(cfg.files.keys())
-    if files_dir.is_dir():
-        for f in files_dir.rglob("*"):
-            if f.is_file():
-                rel = f.relative_to(files_dir).as_posix()
-                if rel not in declared:
-                    msg = f"undeclared file under extsrc/files: {rel}"
-                    if strict:
-                        raise SpawnError(msg)
-                    warnings_out.append(msg)
+    _validate_skills(extsrc, cfg.skills, strict, warnings_out)
+    _validate_file_descriptions(cfg.files, strict, warnings_out)
+    _collect_mcp_warnings(extsrc, cfg, strict, warnings_out)
+    _validate_setup_scripts(cfg.setup, extsrc / "setup", strict, warnings_out)
+    _validate_declared_files(extsrc / "files", set(cfg.files.keys()), strict, warnings_out)
     return warnings_out
 
 
@@ -594,7 +643,7 @@ def extension_from_rules(source: str, output_path: Path, name: str, branch: str 
                         "localRead": "no",
                     }
         save_yaml(
-            extsrc / "config.yaml",
+            extsrc / CONFIG_FILENAME,
             {
                 "name": name,
                 "schema": 1,
@@ -633,7 +682,7 @@ def add_ide(target_root: Path, ide: str) -> None:
             merged_any = True
     _refresh_skills_all_extensions_for_ide(target_root, ide)
     if merged_any:
-        print(MCP_MERGED_NOTICE)
+        get_logger().info(MCP_MERGED_NOTICE)
     refresh_agent_ignore(target_root, ide)
 
 

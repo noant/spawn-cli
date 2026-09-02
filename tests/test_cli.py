@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import contextlib
+import logging
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -45,14 +46,14 @@ def test_spawn_init(tmp_path, monkeypatch):
     mock_init.assert_called_once_with(root)
 
 
-def test_spawn_need_init(tmp_path, monkeypatch, capsys):
+def test_spawn_need_init(tmp_path, monkeypatch, caplog):
     monkeypatch.chdir(tmp_path)
-    assert main(["rules", "refresh"]) == 1
-    err = capsys.readouterr().err
-    assert "need init before" in err
+    with caplog.at_level(logging.ERROR, logger="spawn"):
+        assert main(["rules", "refresh"]) == 1
+    assert "need init before" in caplog.text
 
 
-def test_spawn_lock_busy(tmp_path, monkeypatch, capsys):
+def test_spawn_lock_busy(tmp_path, monkeypatch, caplog):
     monkeypatch.chdir(tmp_path)
     (tmp_path / "spawn").mkdir()
 
@@ -70,10 +71,11 @@ def test_spawn_lock_busy(tmp_path, monkeypatch, capsys):
     with patch("spawn_cli.cli.spawn_lock", counting_lock), patch(
         "spawn_cli.cli.hl.refresh_rules_navigation", MagicMock()
     ):
-        assert main(["rules", "refresh"]) == 0
-        assert main(["rules", "refresh"]) == 1
+        with caplog.at_level(logging.ERROR, logger="spawn"):
+            assert main(["rules", "refresh"]) == 0
+            assert main(["rules", "refresh"]) == 1
 
-    assert "Another Spawn operation is in progress" in capsys.readouterr().err
+    assert "Another Spawn operation is in progress" in caplog.text
 
 
 def test_spawn_rules_refresh(tmp_path, monkeypatch):
@@ -106,10 +108,11 @@ def test_spawn_refresh(tmp_path, monkeypatch):
     mock_repo.assert_called_once_with(root)
 
 
-def test_spawn_refresh_need_init(tmp_path, monkeypatch, capsys):
+def test_spawn_refresh_need_init(tmp_path, monkeypatch, caplog):
     monkeypatch.chdir(tmp_path)
-    assert main(["refresh"]) == 1
-    assert "need init before" in capsys.readouterr().err
+    with caplog.at_level(logging.ERROR, logger="spawn"):
+        assert main(["refresh"]) == 1
+    assert "need init before" in caplog.text
 
 
 def test_spawn_ide_list_supported_ides(tmp_path, monkeypatch, capsys):
@@ -272,7 +275,7 @@ def test_spawn_extension_init(tmp_path, monkeypatch):
     mock_init.assert_called_once_with(sub.resolve(), "x")
 
 
-def test_spawn_extension_check(tmp_path, monkeypatch, capsys):
+def test_spawn_extension_check(tmp_path, monkeypatch, caplog):
     monkeypatch.chdir(tmp_path)
     (tmp_path / "spawn").mkdir()
     chk = tmp_path / "chk"
@@ -282,10 +285,11 @@ def test_spawn_extension_check(tmp_path, monkeypatch, capsys):
     with patch("spawn_cli.cli.spawn_lock", _noop_lock), patch(
         "spawn_cli.cli.hl.extension_check", mock_check
     ):
-        assert main(["extension", "check", str(chk)]) == 0
+        with caplog.at_level(logging.WARNING, logger="spawn"):
+            assert main(["extension", "check", str(chk)]) == 0
 
     mock_check.assert_called_once_with(chk.resolve(), strict=False)
-    assert "Warning: missing skill" in capsys.readouterr().out
+    assert "Warning: missing skill" in caplog.text
 
 
 def test_spawn_extension_healthcheck_ok(tmp_path, monkeypatch):
@@ -336,7 +340,7 @@ def test_spawn_build_list(tmp_path, monkeypatch, capsys):
     assert "url" in capsys.readouterr().out
 
 
-def test_spawn_error_exit_code(tmp_path, monkeypatch, capsys):
+def test_spawn_error_exit_code(tmp_path, monkeypatch, caplog):
     monkeypatch.chdir(tmp_path)
     (tmp_path / "spawn").mkdir()
 
@@ -346,9 +350,10 @@ def test_spawn_error_exit_code(tmp_path, monkeypatch, capsys):
     with patch("spawn_cli.cli.spawn_lock", _noop_lock), patch(
         "spawn_cli.cli.hl.refresh_rules_navigation", boom
     ):
-        assert main(["rules", "refresh"]) == 1
+        with caplog.at_level(logging.ERROR, logger="spawn"):
+            assert main(["rules", "refresh"]) == 1
 
-    assert "planned failure" in capsys.readouterr().err
+    assert "planned failure" in caplog.text
 
 
 @contextlib.contextmanager

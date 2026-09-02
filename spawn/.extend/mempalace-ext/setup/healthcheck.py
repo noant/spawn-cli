@@ -18,7 +18,7 @@ def main() -> int:
         _emit(
             "mempalace healthcheck: cannot import mempalace in this interpreter. "
             "Install pinned deps from .mempalace/ext/requirements-mempalace.txt "
-            "(or pip install mempalace). "
+            "(or uv pip install mempalace). "
             f"Interpreter:\n  {sys.executable}",
         )
         return 1

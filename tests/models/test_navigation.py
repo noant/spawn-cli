@@ -56,4 +56,4 @@ def test_navigation_file_aliases() -> None:
 
 def test_navigation_file_invalid_shape() -> None:
     with pytest.raises(ValidationError):
-        NavigationFile.model_validate({"read-required": "nope"})  # type: ignore[arg-type]
+        NavigationFile.model_validate({"read-required": "nope"})
