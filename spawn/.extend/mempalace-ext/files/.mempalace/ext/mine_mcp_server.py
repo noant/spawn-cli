@@ -5,7 +5,7 @@ Spawn / Cursor run this with workspace cwd set to the repo root, e.g.:
 
     python .mempalace/ext/mine_mcp_server.py
 
-    Requires the ``mempalace`` CLI from the same environment (``uv pip install mempalace``).
+Requires the ``mempalace`` CLI from the same environment (``uv pip install mempalace``).
 Protocol shape aligned with MemPalace's ``mcp_server.py`` (initialize, tools/list, tools/call).
 """
 
@@ -17,7 +17,7 @@ import os
 import subprocess
 import sys
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
 logger = logging.getLogger("mempalace_mine_mcp")
 logging.basicConfig(stream=sys.stderr, level=logging.INFO)
@@ -34,7 +34,7 @@ def _truthy_env_opt(name: str) -> bool:
     return (os.environ.get(name, "") or "").strip().lower() in ("1", "true", "yes")
 
 
-def _resolved_cli_palace(root: str, palace_tool_arg: str | None) -> str | None:
+def _resolved_cli_palace(root: str, palace_tool_arg: Optional[str]) -> Optional[str]:
     """Absolute palace for ``--palace``, or ``None`` to let MemPalace use its defaults.
 
     Matches after_install: repo-local ``<cwd>/.mempalace/palace`` unless
@@ -77,7 +77,7 @@ def _subprocess_env_for_mempalace_child() -> dict[str, str]:
 
 
 def _wake_up_write_wakeup_md(
-    root: str, palace_path: str | None, wing: str | None
+    root: str, palace_path: Optional[str], wing: Optional[str]
 ) -> dict[str, Any]:
     """Run ``mempalace wake-up`` and write ``<root>/.mempalace/wakeup.md``."""
 
@@ -134,8 +134,8 @@ def _wake_up_write_wakeup_md(
 def _tool_mempalace_mine(
     directory: str = ".",
     mode: str = "projects",
-    wing: str | None = None,
-    palace: str | None = None,
+    wing: Optional[str] = None,
+    palace: Optional[str] = None,
 ) -> dict[str, Any]:
     """Run ``mempalace [--palace P] mine <dir> ...`` and return process output.
 
@@ -272,7 +272,7 @@ def _handle_tools_call(params: dict, req_id: Any) -> dict:
             "id": req_id,
             "error": {"code": -32602, "message": str(e)},
         }
-    except (RuntimeError, ValueError, OSError):
+    except Exception:
         logger.exception("tool error")
         return {
             "jsonrpc": "2.0",
@@ -281,7 +281,7 @@ def _handle_tools_call(params: dict, req_id: Any) -> dict:
         }
 
 
-def _handle_request(request: dict) -> dict | None:
+def _handle_request(request: dict) -> Optional[dict]:
     method = request.get("method") or ""
     params = request.get("params") or {}
     req_id = request.get("id")
@@ -337,7 +337,7 @@ def main() -> None:
             break
         except json.JSONDecodeError:
             logger.exception("bad json")
-        except (RuntimeError, ValueError, OSError):
+        except Exception:
             logger.exception("server error")
 
 
