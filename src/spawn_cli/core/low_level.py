@@ -32,10 +32,18 @@ CANONICAL_IDE_KEYS: tuple[str, ...] = (
     "windsurf",
     "github-copilot",
     "gemini-cli",
+    "opencode",
 )
 
 SPAWN_GITIGNORE_START = "# spawn:start"
 SPAWN_GITIGNORE_END = "# spawn:end"
+
+METADATA_DIR = ".metadata"
+CONFIG_YAML = "config.yaml"
+NAVIGATION_YAML = "navigation.yaml"
+LOCAL_RULE_FILE_DESC = "Local rule file."
+GITIGNORE_FILENAME = ".gitignore"
+IDE_YAML = "ide.yaml"
 
 
 def _spawn(root: Path) -> Path:
@@ -66,14 +74,14 @@ def list_extensions(target_root: Path) -> list[str]:
 
 
 def list_ides(target_root: Path) -> list[str]:
-    path = _spawn(target_root) / ".metadata" / "ide.yaml"
+    path = _spawn(target_root) / METADATA_DIR / IDE_YAML
     data = load_yaml(path)
     model = IdeList.model_validate(data) if data else IdeList()
     return list(model.ides)
 
 
 def add_ide_to_list(target_root: Path, ide: str) -> None:
-    path = _spawn(target_root) / ".metadata" / "ide.yaml"
+    path = _spawn(target_root) / METADATA_DIR / IDE_YAML
     data = load_yaml(path)
     model = IdeList.model_validate(data) if data else IdeList()
     if ide not in model.ides:
@@ -82,7 +90,7 @@ def add_ide_to_list(target_root: Path, ide: str) -> None:
 
 
 def remove_ide_from_list(target_root: Path, ide: str) -> None:
-    path = _spawn(target_root) / ".metadata" / "ide.yaml"
+    path = _spawn(target_root) / METADATA_DIR / IDE_YAML
     data = load_yaml(path)
     model = IdeList.model_validate(data) if data else IdeList()
     model.ides = [x for x in model.ides if x != ide]
@@ -93,7 +101,7 @@ METADATA_TEMP_MAX_AGE_SECONDS = 86400
 
 
 def remove_ide_metadata_dir(target_root: Path, ide: str) -> None:
-    md = _spawn(target_root) / ".metadata" / ide
+    md = _spawn(target_root) / METADATA_DIR / ide
     if md.is_dir():
         shutil.rmtree(md, ignore_errors=True)
 
@@ -122,7 +130,7 @@ def prune_metadata_temp(parent: Path, *, max_age_seconds: int, reserved: str | N
 
 
 def _config_path(target_root: Path, extension: str) -> Path:
-    return _extend_root(target_root) / extension / "config.yaml"
+    return _extend_root(target_root) / extension / CONFIG_YAML
 
 
 def _load_ext_config(target_root: Path, extension: str) -> ExtensionConfig:
@@ -193,6 +201,20 @@ def _merge_hint_streams_ordered(streams: list[list[str]]) -> list[str]:
     return out
 
 
+def _extract_hint_only_from_rule_entry(entry: Any) -> str | None:
+    if not isinstance(entry, dict):
+        return None
+    path_val = entry.get("path")
+    if isinstance(path_val, str) and path_val.strip():
+        return None
+    hint_val = entry.get("hint")
+    if isinstance(hint_val, str):
+        stripped = hint_val.strip()
+        if stripped:
+            return stripped
+    return None
+
+
 def _navigation_read_required_rule_hints_ordered(target_root: Path) -> list[str]:
     """Plain-text hints from maintainer-authored ``read-required`` ``rules`` rows (YAML order).
 
@@ -201,7 +223,7 @@ def _navigation_read_required_rule_hints_ordered(target_root: Path) -> list[str]
     Hint fields on ``read-contextual`` rules are ignored here.
     Strips each hint; whitespace-only hints are omitted.
     """
-    path = _spawn(target_root) / "navigation.yaml"
+    path = _spawn(target_root) / NAVIGATION_YAML
     raw = load_yaml(path)
     if not isinstance(raw, dict):
         return []
@@ -216,16 +238,9 @@ def _navigation_read_required_rule_hints_ordered(target_root: Path) -> list[str]
         if not isinstance(rules_raw, list):
             continue
         for entry in rules_raw:
-            if not isinstance(entry, dict):
-                continue
-            path_val = entry.get("path")
-            if isinstance(path_val, str) and path_val.strip():
-                continue
-            hint_val = entry.get("hint")
-            if isinstance(hint_val, str):
-                stripped = hint_val.strip()
-                if stripped:
-                    out.append(stripped)
+            hint = _extract_hint_only_from_rule_entry(entry)
+            if hint:
+                out.append(hint)
     return out
 
 
@@ -249,7 +264,7 @@ def _finalize_hints_for_skill_metadata(merged_hints: list[str]) -> list[str]:
     )
 
     def build_block(strings: list[str], with_ellipsis: bool) -> str:
-        lines = [f"- {s}" for s in strings]
+        lines = [f"- {item}" for item in strings]
         if with_ellipsis:
             lines.append("- ...")
         if not lines:
@@ -453,12 +468,12 @@ def get_skill_raw_info(target_root: Path, extension: str, skill_path: Path) -> S
     req_read: list[str] = []
     if sk_entry and sk_entry.required_read:
         req_read = list(sk_entry.required_read)
-    return SkillRawInfo(
-        name=name,
-        description=description,
-        content=content,
-        required_read=req_read,
-    )
+    return SkillRawInfo.model_validate({
+        "name": name,
+        "description": description,
+        "content": content,
+        "required-read": req_read,
+    })
 
 
 def _flatten_global_refs_ordered(
@@ -481,6 +496,17 @@ def _norm_read_path(path_str: str) -> str:
     return Path(path_str).as_posix().replace("\\", "/")
 
 
+def _extract_maybe_rule_ref(entry: Any) -> SkillFileRef | None:
+    if not isinstance(entry, dict):
+        return None
+    path_raw = entry.get("path")
+    if not isinstance(path_raw, str) or not path_raw.strip():
+        return None
+    desc_raw = entry.get("description")
+    desc = "" if desc_raw is None else str(desc_raw)
+    return SkillFileRef(file=path_raw.strip(), description=desc)
+
+
 def _navigation_rules_refs_from_section(section: Any) -> list[SkillFileRef]:
     out: list[SkillFileRef] = []
     if not isinstance(section, list):
@@ -492,20 +518,15 @@ def _navigation_rules_refs_from_section(section: Any) -> list[SkillFileRef]:
         if not isinstance(rules_raw, list):
             continue
         for entry in rules_raw:
-            if not isinstance(entry, dict):
-                continue
-            path_raw = entry.get("path")
-            if not isinstance(path_raw, str) or not path_raw.strip():
-                continue
-            desc_raw = entry.get("description")
-            desc = "" if desc_raw is None else str(desc_raw)
-            out.append(SkillFileRef(file=path_raw.strip(), description=desc))
+            ref = _extract_maybe_rule_ref(entry)
+            if ref is not None:
+                out.append(ref)
     return out
 
 
 def _navigation_yaml_rules_refs(target_root: Path) -> tuple[list[SkillFileRef], list[SkillFileRef]]:
     """Return (read-required rules, read-contextual rules) from merged navigation.yaml."""
-    path = _spawn(target_root) / "navigation.yaml"
+    path = _spawn(target_root) / NAVIGATION_YAML
     raw = load_yaml(path)
     if not isinstance(raw, dict):
         return [], []
@@ -538,17 +559,65 @@ def _required_read_description_for_path(
     return _describe_path(cfg_ext, p)
 
 
-def generate_skills_metadata(target_root: Path, extension: str) -> list[SkillMetadata]:
-    cfg_ext = _load_ext_config(target_root, extension)
+def _build_skill_hints_array(target_root: Path, cfg_ext: ExtensionConfig) -> list[str]:
     maintainer_hints = _navigation_read_required_rule_hints_ordered(target_root)
     global_streams = _extension_global_hint_streams_ordered(target_root)
     local_raw = list(cfg_ext.hints.local) if cfg_ext.hints else []
-    merged_for_skill = _merge_hint_streams_ordered(
-        [*global_streams, local_raw, maintainer_hints]
-    )
-    skill_hints = (
-        _finalize_hints_for_skill_metadata(merged_for_skill) if merged_for_skill else []
-    )
+    merged = _merge_hint_streams_ordered([*global_streams, local_raw, maintainer_hints])
+    if not merged:
+        return []
+    return _finalize_hints_for_skill_metadata(merged)
+
+
+def _collect_required_read_paths(
+    raw_required_read: list[str],
+    local_required: list[SkillFileRef],
+    merged_global_required: list[SkillFileRef],
+    nav_rules_required: list[SkillFileRef],
+) -> tuple[list[str], set[str]]:
+    required_paths: list[str] = []
+    seen_norm: set[str] = set()
+    for blob in (
+        raw_required_read,
+        [r.file for r in local_required],
+        [r.file for r in merged_global_required],
+    ):
+        for fp in blob:
+            nk = _norm_read_path(fp)
+            if nk in seen_norm:
+                continue
+            seen_norm.add(nk)
+            required_paths.append(fp)
+    for ref in nav_rules_required:
+        nk = _norm_read_path(ref.file)
+        if nk in seen_norm:
+            continue
+        seen_norm.add(nk)
+        required_paths.append(ref.file)
+    return required_paths, seen_norm
+
+
+def _collect_auto_read_for_skill(
+    local_auto: list[SkillFileRef],
+    merged_global_auto: list[SkillFileRef],
+    nav_rules_contextual: list[SkillFileRef],
+    required_key_set: set[str],
+) -> list[SkillFileRef]:
+    auto_out: list[SkillFileRef] = []
+    seen_auto: set[str] = set()
+    for stream in (local_auto, merged_global_auto, nav_rules_contextual):
+        for ar in stream:
+            key = _norm_read_path(ar.file)
+            if key in required_key_set or key in seen_auto:
+                continue
+            seen_auto.add(key)
+            auto_out.append(ar)
+    return auto_out
+
+
+def generate_skills_metadata(target_root: Path, extension: str) -> list[SkillMetadata]:
+    cfg_ext = _load_ext_config(target_root, extension)
+    skill_hints = _build_skill_hints_array(target_root, cfg_ext)
 
     merged_global_required = _flatten_global_refs_ordered(
         target_root, get_required_read_global_all(target_root)
@@ -561,26 +630,9 @@ def generate_skills_metadata(target_root: Path, extension: str) -> list[SkillMet
     metas: list[SkillMetadata] = []
     for skill_path in list_skills(target_root, extension):
         raw = get_skill_raw_info(target_root, extension, skill_path)
-        required_paths: list[str] = []
-        seen_norm: set[str] = set()
-        for blob in (
-            list(raw.required_read),
-            [r.file for r in local_required],
-            [r.file for r in merged_global_required],
-        ):
-            for fp in blob:
-                nk = _norm_read_path(fp)
-                if nk in seen_norm:
-                    continue
-                seen_norm.add(nk)
-                required_paths.append(fp)
-        for ref in nav_rules_required:
-            nk = _norm_read_path(ref.file)
-            if nk in seen_norm:
-                continue
-            seen_norm.add(nk)
-            required_paths.append(ref.file)
-
+        required_paths, _ = _collect_required_read_paths(
+            list(raw.required_read), local_required, merged_global_required, nav_rules_required,
+        )
         required_out = [
             SkillFileRef(
                 file=p,
@@ -590,30 +642,10 @@ def generate_skills_metadata(target_root: Path, extension: str) -> list[SkillMet
             )
             for p in required_paths
         ]
-
         required_key_set = {_norm_read_path(p) for p in required_paths}
-
-        auto_out: list[SkillFileRef] = []
-        seen_auto: set[str] = set()
-        for ar in local_auto:
-            key = _norm_read_path(ar.file)
-            if key in required_key_set or key in seen_auto:
-                continue
-            seen_auto.add(key)
-            auto_out.append(ar)
-        for ar in merged_global_auto:
-            key = _norm_read_path(ar.file)
-            if key in required_key_set or key in seen_auto:
-                continue
-            seen_auto.add(key)
-            auto_out.append(ar)
-        for ar in nav_rules_contextual:
-            key = _norm_read_path(ar.file)
-            if key in required_key_set or key in seen_auto:
-                continue
-            seen_auto.add(key)
-            auto_out.append(ar)
-
+        auto_out = _collect_auto_read_for_skill(
+            local_auto, merged_global_auto, nav_rules_contextual, required_key_set
+        )
         metas.append(
             SkillMetadata(
                 name=raw.name,
@@ -692,7 +724,7 @@ def mcp_host_platform_stem() -> str:
     )
 
 
-def extension_mcp_platform_json_paths(extension_root: Path) -> tuple[Path, Path, Path]:
+def extension_mcp_platform_json_paths(extension_root: Path) -> tuple[Path, ...]:
     d = extension_root / "mcp"
     return tuple(d / f"{s}.json" for s in MCP_PLATFORM_STEMS)
 
@@ -792,7 +824,7 @@ def get_navigation_metadata(target_root: Path, extension: str) -> dict:
 
 
 def get_core_agent_ignore(target_root: Path) -> list[str]:
-    path = _spawn(target_root) / ".core" / "config.yaml"
+    path = _spawn(target_root) / ".core" / CONFIG_YAML
     data = load_yaml(path)
     if not data:
         return []
@@ -806,7 +838,7 @@ def sync_core_config_from_defaults(target_root: Path) -> None:
     Validates that an existing repo file parses as ``CoreConfig`` before
     replacing it so corrupted files are not silently clobbered.
     """
-    path = _spawn(target_root) / ".core" / "config.yaml"
+    path = _spawn(target_root) / ".core" / CONFIG_YAML
     if not path.is_file():
         raise SpawnError("spawn/.core/config.yaml is missing; run spawn init.")
     bundled_txt = (
@@ -878,11 +910,11 @@ def get_ext_git_ignore(target_root: Path, extension: str) -> list[str]:
 
 
 def _rendered_skills_path(target_root: Path, ide: str) -> Path:
-    return _spawn(target_root) / ".metadata" / ide / "rendered-skills.yaml"
+    return _spawn(target_root) / METADATA_DIR / ide / "rendered-skills.yaml"
 
 
 def _rendered_mcp_path(target_root: Path, ide: str) -> Path:
-    return _spawn(target_root) / ".metadata" / ide / "rendered-mcp.yaml"
+    return _spawn(target_root) / METADATA_DIR / ide / "rendered-mcp.yaml"
 
 
 def save_skills_rendered(
@@ -946,7 +978,7 @@ def get_rendered_mcp(target_root: Path, ide: str, extension: str) -> list[str]:
 
 
 def _git_ignore_list_path(target_root: Path) -> Path:
-    return _spawn(target_root) / ".metadata" / "git-ignore.txt"
+    return _spawn(target_root) / METADATA_DIR / "git-ignore.txt"
 
 
 def get_git_ignore_list(target_root: Path) -> list[str]:
@@ -959,7 +991,7 @@ def save_git_ignore_list(target_root: Path, items: list[str]) -> None:
 
 
 def _agent_ignore_list_path(target_root: Path, ide: str) -> Path:
-    return _spawn(target_root) / ".metadata" / ide / "agent-ignore.txt"
+    return _spawn(target_root) / METADATA_DIR / ide / "agent-ignore.txt"
 
 
 def get_agent_ignore_list(target_root: Path, ide: str) -> list[str]:
@@ -981,7 +1013,7 @@ def save_agent_ignore_list(target_root: Path, ide: str, items: list[str]) -> Non
 
 
 def get_global_gitignore(target_root: Path) -> list[str]:
-    git_path = target_root / ".gitignore"
+    git_path = target_root / GITIGNORE_FILENAME
     if not git_path.is_file():
         return []
     return read_lines(git_path)
@@ -1006,7 +1038,7 @@ def _partition_gitignore(lines: list[str]) -> tuple[list[str], list[str], list[s
 
 
 def push_to_global_gitignore(target_root: Path, items: list[str]) -> None:
-    path = target_root / ".gitignore"
+    path = target_root / GITIGNORE_FILENAME
     raw = read_lines(path)
     before, interior, after = _partition_gitignore(raw)
     ordered: list[str] = []
@@ -1038,7 +1070,7 @@ def push_to_global_gitignore(target_root: Path, items: list[str]) -> None:
 
 
 def remove_from_global_gitignore(target_root: Path, items: list[str]) -> None:
-    path = target_root / ".gitignore"
+    path = target_root / GITIGNORE_FILENAME
     raw = read_lines(path)
     before, interior, after = _partition_gitignore(raw)
     remove_me = {x.strip() for x in items if x.strip()}
@@ -1115,7 +1147,7 @@ def save_extension_navigation(
     read_required_files: list[SkillFileRef],
     read_contextual_files: list[SkillFileRef],
 ) -> None:
-    nav_path = _spawn(target_root) / "navigation.yaml"
+    nav_path = _spawn(target_root) / NAVIGATION_YAML
     yaml_rt = YAML(typ="rt")
     configure_yaml_dump(yaml_rt)
     if nav_path.is_file():
@@ -1159,140 +1191,140 @@ def save_extension_navigation(
 
 
 
-def save_rules_navigation(target_root: Path) -> None:
-    nav_path = _spawn(target_root) / 'navigation.yaml'
-    raw = load_yaml(nav_path) or {}
-    rr: list[Any] = list(raw['read-required']) if isinstance(raw.get('read-required'), list) else []
-    rc: list[Any] = list(raw.get('read-contextual')) if isinstance(raw.get('read-contextual'), list) else []
+def _locate_or_create_rules_list(section: list[Any]) -> list[Any]:
+    for grp in section:
+        if isinstance(grp, dict) and isinstance(grp.get('rules'), list):
+            return grp['rules']
+    section.append({'rules': []})
+    tail = section[-1]
+    if not isinstance(tail, dict):
+        raise SpawnError('internal navigation shape error')
+    return tail['rules']
 
+
+def _rule_paths_union(*maybe_lists: list[Any] | None) -> set[str]:
+    out: set[str] = set()
+    for lst in maybe_lists:
+        if not lst:
+            continue
+        for item in lst:
+            if isinstance(item, dict) and 'path' in item:
+                out.add(_norm_read_path(str(item['path'])))
+    return out
+
+
+def _handle_path_backed_rule_entry(
+    entry: dict, paths_on_disk: set[str], target_root: Path
+) -> list[dict] | None:
+    path_raw = entry.get('path')
+    if not isinstance(path_raw, str) or not path_raw.strip():
+        warnings.warn('Removed invalid rule row from navigation (empty path field).', SpawnWarning)
+        return None
+    rk = _norm_read_path(path_raw.strip())
+    exists = rk in paths_on_disk and (Path(target_root) / Path(rk)).is_file()
+    if not exists:
+        warnings.warn(f"Removed missing rule path from navigation: {rk}", SpawnWarning)
+        return None
+    rows = [{'path': rk, 'description': str(entry.get('description') or LOCAL_RULE_FILE_DESC)}]
+    hint_raw = entry.get('hint')
+    if isinstance(hint_raw, str) and hint_raw.strip():
+        warnings.warn(
+            f'Moved maintainer hint from file-backed rule row to standalone hint row: {rk}',
+            SpawnWarning,
+        )
+        rows.append({'hint': hint_raw.strip()})
+    return rows
+
+
+def _handle_hint_only_rule_entry(entry: dict) -> dict | None:
+    hint_raw = entry.get('hint')
+    if not isinstance(hint_raw, str) or not hint_raw.strip():
+        return None
+    row: dict[str, Any] = {'hint': hint_raw.strip()}
+    desc_raw = entry.get('description')
+    if isinstance(desc_raw, str) and desc_raw.strip():
+        row['description'] = desc_raw.strip()
+    return row
+
+
+def _prune_read_required_rules(lst: list[Any], paths_on_disk: set[str], target_root: Path) -> None:
+    out: list[Any] = []
+    for entry in lst:
+        if not isinstance(entry, dict):
+            continue
+        if 'path' in entry:
+            rows = _handle_path_backed_rule_entry(entry, paths_on_disk, target_root)
+            if rows is not None:
+                out.extend(rows)
+            continue
+        row = _handle_hint_only_rule_entry(entry)
+        if row is not None:
+            out.append(row)
+            continue
+        warnings.warn('Removed invalid rule row from navigation (no path and no hint).', SpawnWarning)
+    lst[:] = out
+
+
+def _prune_contextual_rules(lst: list[Any], paths_on_disk: set[str], target_root: Path) -> None:
+    out: list[Any] = []
+    for entry in lst:
+        if not isinstance(entry, dict) or 'path' not in entry:
+            continue
+        rk = _norm_read_path(str(entry['path']))
+        exists = rk in paths_on_disk and (Path(target_root) / Path(rk)).is_file()
+        if not exists:
+            warnings.warn(f"Removed missing rule path from navigation: {rk}", SpawnWarning)
+            continue
+        row: dict[str, Any] = {
+            'path': rk,
+            'description': str(entry.get('description') or LOCAL_RULE_FILE_DESC),
+        }
+        hint_val = entry.get('hint')
+        if isinstance(hint_val, str):
+            row['hint'] = hint_val
+        out.append(row)
+    lst[:] = out
+
+
+def _collect_rule_paths_on_disk(target_root: Path) -> set[str]:
     rule_dir = _spawn(target_root) / 'rules'
-    paths_on_disk: set[str] = set()
-    if rule_dir.is_dir():
-        for f in sorted(rule_dir.rglob('*')):
-            if f.is_file():
-                rel_posix = (Path('spawn/rules') / f.relative_to(rule_dir).as_posix()).as_posix()
-                paths_on_disk.add(rel_posix.replace('\\', '/'))
+    if not rule_dir.is_dir():
+        return set()
+    out: set[str] = set()
+    for f in sorted(rule_dir.rglob('*')):
+        if f.is_file():
+            rel_posix = (Path('spawn/rules') / f.relative_to(rule_dir).as_posix()).as_posix()
+            out.add(rel_posix.replace('\\', '/'))
+    return out
 
-    def locate_or_create_rules_list(section: list[Any]) -> list[Any]:
-        for grp in section:
-            if isinstance(grp, dict) and isinstance(grp.get('rules'), list):
-                return grp['rules']
-        section.append({'rules': []})
-        tail = section[-1]
-        if not isinstance(tail, dict):
-            raise SpawnError('internal navigation shape error')
-        return tail['rules']
 
-    def rule_paths_union(*maybe_lists: list[Any] | None) -> set[str]:
-        out: set[str] = set()
-        for lst in maybe_lists:
-            if not lst:
-                continue
-            for item in lst:
-                if isinstance(item, dict) and 'path' in item:
-                    out.add(Path(str(item['path'])).as_posix().replace('\\', '/'))
-        return out
-
-    rq_rules_list = locate_or_create_rules_list(rr)
-
-    cq_rules_list: list[Any] | None = None
+def _find_contextual_rules_list(rc: list[Any]) -> list[Any] | None:
     for grp in rc:
         if isinstance(grp, dict) and isinstance(grp.get('rules'), list):
-            cq_rules_list = grp['rules']
-            break
+            return grp['rules']
+    return None
 
-    known_paths = rule_paths_union(rq_rules_list, cq_rules_list)
+
+def save_rules_navigation(target_root: Path) -> None:
+    nav_path = _spawn(target_root) / NAVIGATION_YAML
+    raw = load_yaml(nav_path) or {}
+    raw_rr = raw.get('read-required')
+    raw_rc = raw.get('read-contextual')
+    rr: list[Any] = list(raw_rr) if isinstance(raw_rr, list) else []
+    rc: list[Any] = list(raw_rc) if isinstance(raw_rc, list) else []
+
+    paths_on_disk = _collect_rule_paths_on_disk(target_root)
+    rq_rules_list = _locate_or_create_rules_list(rr)
+    cq_rules_list = _find_contextual_rules_list(rc)
+    known_paths = _rule_paths_union(rq_rules_list, cq_rules_list)
 
     for dk in sorted(paths_on_disk):
         if dk not in known_paths:
-            rq_rules_list.append({'path': dk, 'description': 'Local rule file.'})
+            rq_rules_list.append({'path': dk, 'description': LOCAL_RULE_FILE_DESC})
 
-    def posix_norm(p: str) -> str:
-        return Path(p).as_posix().replace('\\', '/')
-
-    def prune_read_required_rules(lst: list[Any]) -> None:
-        """Keep file-backed rows with existing paths (no ``hint`` on those rows); keep hint-only rows."""
-
-        out: list[Any] = []
-        for entry in lst:
-            if not isinstance(entry, dict):
-                continue
-            hint_raw = entry.get('hint')
-            hint_is_str = isinstance(hint_raw, str)
-            hint_stripped = hint_raw.strip() if hint_is_str else ''
-            path_in_entry = 'path' in entry
-            path_raw = entry.get('path')
-
-            if path_in_entry:
-                if isinstance(path_raw, str) and path_raw.strip():
-                    rk = posix_norm(path_raw.strip())
-                    exists = rk in paths_on_disk and (Path(target_root) / Path(rk)).is_file()
-                    if exists:
-                        row: dict[str, Any] = {
-                            'path': rk,
-                            'description': str(entry.get('description') or 'Local rule file.'),
-                        }
-                        out.append(row)
-                        if hint_stripped:
-                            warnings.warn(
-                                f'Moved maintainer hint from file-backed rule row to standalone '
-                                f'hint row: {rk}',
-                                SpawnWarning,
-                            )
-                            out.append({'hint': hint_stripped})
-                    else:
-                        warnings.warn(
-                            f"Removed missing rule path from navigation: {rk}",
-                            SpawnWarning,
-                        )
-                else:
-                    warnings.warn(
-                        'Removed invalid rule row from navigation (empty path field).',
-                        SpawnWarning,
-                    )
-                continue
-
-            if hint_stripped:
-                row_h: dict[str, Any] = {'hint': hint_stripped}
-                desc_raw = entry.get('description')
-                if isinstance(desc_raw, str) and desc_raw.strip():
-                    row_h['description'] = desc_raw.strip()
-                out.append(row_h)
-                continue
-
-            warnings.warn(
-                'Removed invalid rule row from navigation (no path and no hint).',
-                SpawnWarning,
-            )
-
-        lst[:] = out
-
-    def prune_contextual_rules(lst: list[Any]) -> None:
-        out: list[Any] = []
-        for entry in lst:
-            if not isinstance(entry, dict) or 'path' not in entry:
-                continue
-            rk = posix_norm(str(entry['path']))
-            exists = rk in paths_on_disk and (Path(target_root) / Path(rk)).is_file()
-            if exists:
-                row: dict[str, Any] = {
-                    'path': rk,
-                    'description': str(entry.get('description') or 'Local rule file.'),
-                }
-                hint_val = entry.get('hint')
-                if isinstance(hint_val, str):
-                    row['hint'] = hint_val
-                out.append(row)
-            else:
-                warnings.warn(
-                    f"Removed missing rule path from navigation: {rk}",
-                    SpawnWarning,
-                )
-        lst[:] = out
-
-    prune_read_required_rules(rq_rules_list)
+    _prune_read_required_rules(rq_rules_list, paths_on_disk, target_root)
     if cq_rules_list is not None:
-        prune_contextual_rules(cq_rules_list)
+        _prune_contextual_rules(cq_rules_list, paths_on_disk, target_root)
 
     raw["read-required"] = rr
     raw["read-contextual"] = rc
@@ -1305,15 +1337,15 @@ def init(target_root: Path) -> None:
     ensure_dir(s)
     ensure_dir(s / '.core')
 
-    cfg = s / '.core' / 'config.yaml'
+    cfg = s / '.core' / CONFIG_YAML
     if not cfg.is_file():
         template = resources.files('spawn_cli.resources').joinpath('default_core_config.yaml').read_text(encoding='utf-8')
         cfg.write_text(template, encoding='utf-8')
 
-    md = s / '.metadata'
+    md = s / METADATA_DIR
     ensure_dir(md)
 
-    ide_yaml = md / 'ide.yaml'
+    ide_yaml = md / IDE_YAML
     if not ide_yaml.is_file():
         save_yaml(ide_yaml, IdeList().model_dump(by_alias=True, exclude_none=True))
 
@@ -1323,7 +1355,7 @@ def init(target_root: Path) -> None:
 
     ensure_dir(s / 'rules')
 
-    nav = s / 'navigation.yaml'
+    nav = s / NAVIGATION_YAML
     if not nav.is_file():
         save_yaml(nav, {'read-required': [], 'read-contextual': []})
 
@@ -1362,7 +1394,6 @@ __all__ = [
     "list_ides",
     "list_mcp",
     "list_skills",
-    "merged_os_environ_with_mcp_env",
     "mcp_host_platform_stem",
     "sync_core_config_from_defaults",
     "merge_core_and_extension_agent_ignore",
