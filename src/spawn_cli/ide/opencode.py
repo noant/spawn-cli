@@ -45,6 +45,8 @@ def _build_opencode_mcp_entry(server: McpServer) -> dict[str, Any]:
         entry = {"type": "local", "command": cmd, "enabled": True}
     elif transport.type in ("streamable-http", "sse"):
         entry = {"type": "remote", "url": transport.url or "", "enabled": True}
+        if transport.headers:
+            entry["headers"] = {k: f"${{{v}}}" for k, v in transport.headers.items()}
     else:
         cmd = _build_local_mcp_cmd(server)
         entry = {"type": "local", "command": cmd, "enabled": True}
