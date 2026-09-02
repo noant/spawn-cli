@@ -32,7 +32,6 @@ CANONICAL_IDE_KEYS: tuple[str, ...] = (
     "windsurf",
     "github-copilot",
     "gemini-cli",
-    "opencode",
 )
 
 SPAWN_GITIGNORE_START = "# spawn:start"
