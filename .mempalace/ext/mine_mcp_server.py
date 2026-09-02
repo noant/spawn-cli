@@ -272,7 +272,7 @@ def _handle_tools_call(params: dict, req_id: Any) -> dict:
             "id": req_id,
             "error": {"code": -32602, "message": str(e)},
         }
-    except (RuntimeError, ValueError, OSError):
+    except Exception:
         logger.exception("tool error")
         return {
             "jsonrpc": "2.0",
@@ -337,7 +337,7 @@ def main() -> None:
             break
         except json.JSONDecodeError:
             logger.exception("bad json")
-        except (RuntimeError, ValueError, OSError):
+        except Exception:
             logger.exception("server error")
 
 
