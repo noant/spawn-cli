@@ -1,3 +1,5 @@
-# Pinned to match extsrc/setup/after_install.py (update both when bumping MemPalace).
-#   pip install -r .mempalace/ext/requirements-mempalace.txt
-mempalace==3.3.4
+# Pinned to match extsrc/setup/after_install.py (update both when bumping MemPalace).
+# attrs: chromadb → jsonschema 4.x requires attrs>=22.2.0 (mine / Chroma backend).
+#   uv pip install -r .mempalace/ext/requirements-mempalace.txt
+mempalace==3.3.5
+attrs>=22.2.0

@@ -207,15 +207,65 @@ def finalize_github_copilot_repo(target_root: Path) -> None:
         pass
 
 
+def opencode_config_json_mcp_is_empty(path: Path) -> bool:
+    """True when opencode.json has no MCP servers and only schema metadata besides."""
+    if not path.is_file():
+        return False
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return False
+    if not isinstance(data, dict):
+        return False
+    mcp = data.get("mcp")
+    if not (mcp in (None, {}) or (isinstance(mcp, dict) and len(mcp) == 0)):
+        return False
+    for k, v in data.items():
+        if k not in ("$schema", "mcp") and json_value_nonempty(v):
+            return False
+    return True
+
+
+def _clean_skill_subdir(skill_subdir: Path) -> None:
+    for f in skill_subdir.iterdir():
+        if f.is_file():
+            f.unlink()
+    try:
+        if not any(skill_subdir.iterdir()):
+            skill_subdir.rmdir()
+    except OSError:
+        pass
+
+
+def finalize_opencode_repo(target_root: Path) -> None:
+    if opencode_config_json_mcp_is_empty(target_root / "opencode.json"):
+        (target_root / "opencode.json").unlink(missing_ok=True)
+    skills_dir = target_root / ".opencode" / "skills"
+    if skills_dir.is_dir():
+        for skill_subdir in skills_dir.iterdir():
+            if skill_subdir.is_dir():
+                _clean_skill_subdir(skill_subdir)
+        try:
+            if not any(skills_dir.iterdir()):
+                skills_dir.rmdir()
+        except OSError:
+            pass
+    opencode_dir = target_root / ".opencode"
+    if ide_dotdir_is_entirely_removable(opencode_dir, allow_delete_entire=True):
+        shutil.rmtree(opencode_dir, ignore_errors=True)
+
+
 __all__ = [
     "dir_has_any_file",
     "finalize_claude_repo",
     "finalize_codex_repo",
     "finalize_github_copilot_repo",
+    "finalize_opencode_repo",
     "finalize_standard_dotdir_skills_and_mcp",
     "ide_dotdir_is_entirely_removable",
     "json_value_nonempty",
     "mcp_json_mcp_servers_format_is_empty",
+    "opencode_config_json_mcp_is_empty",
     "prune_empty_directories_under",
     "vscode_servers_mcp_json_is_empty",
 ]

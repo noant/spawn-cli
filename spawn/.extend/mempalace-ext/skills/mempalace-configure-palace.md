@@ -6,10 +6,7 @@ description: Configure MemPalace for a repo-local palace; propose wing/room layo
 
 ---
 
-
-
 When the user wants **palace configuration** (wings, rooms, paths, entities, identity):
-
 
 
 1. **Treat the palace as repo-local.** This workflow assumes **`mempalace.yaml`** plus data under **`<repo>/.mempalace/palace`**, aligned with this pack’s MCP **`env`** (**`MEMPALACE_PALACE_PATH=.mempalace/palace`**) when clients use merged config from **`spawn extension add`**. For **`mempalace search`** (plain terminal), set **`MEMPALACE_PALACE_PATH`** or **`--palace`** to the **same directory** MCP uses. Technical notes on **`~/.mempalace/config.json`**, **`MEMPALACE_EXTENSION_GLOBAL_PALACE`**, and other overrides live in **`.mempalace/guides/configuration.md`** — **do not** open a competing “prefer global palace” UX here.

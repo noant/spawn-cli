@@ -7,6 +7,7 @@ from . import claude_code  # noqa: F401
 from . import codex  # noqa: F401
 from . import gemini_cli  # noqa: F401
 from . import github_copilot  # noqa: F401
+from . import opencode  # noqa: F401
 from . import windsurf  # noqa: F401
 from ._stub import StubAdapter
 from .claude_code import ClaudeCodeAdapter
@@ -14,6 +15,7 @@ from .codex import CodexAdapter
 from .cursor import CursorAdapter
 from .gemini_cli import GeminiCliAdapter
 from .github_copilot import GitHubCopilotAdapter
+from .opencode import OpencodeAdapter
 from .mcp_stdio_argv import mcp_stdio_argv
 from .windsurf import WindsurfAdapter
 from .registry import (
@@ -47,6 +49,7 @@ __all__ = [
     "CursorAdapter",
     "GeminiCliAdapter",
     "GitHubCopilotAdapter",
+    "OpencodeAdapter",
     "DetectResult",
     "CORE_IGNORE_BLOCK_END",
     "CORE_IGNORE_BLOCK_START",

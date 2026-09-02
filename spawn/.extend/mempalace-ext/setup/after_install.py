@@ -1,8 +1,8 @@
-"""Spawn after-install: pinned pip install + interactive ``mempalace init`` in the target repo.
+"""Spawn after-install: uv pip install + interactive ``mempalace init`` in the target repo.
 
 Runs in the consumer repository (Spawn should use the target root as cwd):
 
-1. ``pip install`` or, if ``pip`` is missing, ``uv pip install --python=...`` unless skipped.
+1. ``uv pip install`` unless skipped.
 2. ``mempalace init .`` unless skipped — scaffold project palace files. Stdin/stdout/stderr
    are inherited so prompts (entities, mine, etc.) work when Spawn forwards hook I/O.
 
@@ -13,18 +13,12 @@ Update ``MEMPALACE_PYPI_VERSION`` when this extension adopts a newer supported r
 
 Environment:
 
-- ``MEMPALACE_EXTENSION_SKIP_PIP`` = ``1`` / ``true`` / ``yes`` — skip pip (init still runs if not skipped).
+- ``MEMPALACE_EXTENSION_SKIP_PIP`` = ``1`` / ``true`` / ``yes`` — skip uv pip install (init still runs if not skipped).
 - ``MEMPALACE_EXTENSION_SKIP_INIT`` = ``1`` / ``true`` / ``yes`` — skip ``mempalace init``.
 - ``MEMPALACE_EXTENSION_AUTO_MINE`` = ``1`` / ``true`` / ``yes`` — pass ``--auto-mine`` to ``init`` so mining runs immediately (no prompt; long-running).
 - ``MEMPALACE_EXTENSION_GLOBAL_PALACE`` = ``1`` / ``true`` / ``yes`` — do **not** force a repo-local palace; keep MemPalace defaults (``~/.mempalace/palace`` unless you already exported ``MEMPALACE_PALACE_PATH``).
 
-If the Spawn CLI Python has no ``pip`` module (typical of some uv-managed installs),
-installation falls back to ``uv pip install --python=<that interpreter>`` when ``uv`` is on ``PATH``.
-
-Child processes inherit ``PYTHONUTF8=1`` and ``PYTHONIOENCODING=utf-8`` when unset so
-``mempalace init`` (git log via ``text=True`` pipes) does not fail on Windows cp1252.
-
-``pip``/``uv`` subprocess output is captured as UTF-8 and re-printed using ASCII-safe
+``uv`` subprocess output is captured as UTF-8 and re-printed using ASCII-safe
 bytes so a parent process (e.g. Spawn) that decodes hooked stderr as cp1252 does not hit
 ``UnicodeDecodeError``. The ``mempalace init`` subprocess inherits stdio (no capture).
 """
@@ -39,7 +33,8 @@ import sys
 from pathlib import Path
 
 # Pin must match a version published on https://pypi.org/project/mempalace/
-MEMPALACE_PYPI_VERSION = "3.3.4"
+MEMPALACE_PYPI_VERSION = "3.3.5"
+_LOG_PREFIX = "mempalace extension: "
 
 
 def _ascii_safe(s: str) -> str:
@@ -134,7 +129,7 @@ def _env_for_mempalace_child(root: Path) -> dict[str, str]:
     env = _subprocess_env()
     if _force_global_default_palace():
         _err(
-            "mempalace extension: repo-local palace override disabled "
+            _LOG_PREFIX + "repo-local palace override disabled "
             "(MEMPALACE_EXTENSION_GLOBAL_PALACE)",
         )
         return env
@@ -145,14 +140,14 @@ def _env_for_mempalace_child(root: Path) -> dict[str, str]:
     )
     if inherits:
         _err(
-            "mempalace extension: keeping inherited "
+            _LOG_PREFIX + "keeping inherited "
             "MEMPALACE_PALACE_PATH / MEMPAL_PALACE_PATH for init",
         )
         return env
 
     palace = str((root / ".mempalace" / "palace").resolve())
     env["MEMPALACE_PALACE_PATH"] = palace
-    _err(f"mempalace extension: MEMPALACE_PALACE_PATH={_ascii_safe(palace)} (repo-local default)")
+    _err(f"{_LOG_PREFIX}MEMPALACE_PALACE_PATH={_ascii_safe(palace)} (repo-local default)")
     return env
 
 
@@ -166,65 +161,89 @@ def _mempalace_cli() -> list[str]:
     return [sys.executable, "-m", "mempalace"]
 
 
-def _install_mempalace_pip(spec: str) -> int:
-    """Install mempalace into the same environment as ``sys.executable``.
+def _requirements_file(root: Path) -> Path:
+    return root / ".mempalace" / "ext" / "requirements-mempalace.txt"
 
-    Prefer ``python -m pip`` when the ``pip`` module exists; otherwise use
-    ``uv pip install --python=...`` if ``uv`` is available (covers uv-managed
-    interpreters without pip).
+
+def _install_pip_packages(*specs: str) -> int:
+    """Install packages into the same environment as ``sys.executable`` using ``uv pip install``.
+
+    Falls back to ``python -m pip`` if ``uv`` is not available.
     """
-    if importlib.util.find_spec("pip") is not None:
-        cmd = [sys.executable, "-m", "pip", "install", spec]
-        _err("mempalace extension: " + " ".join(cmd))
-        try:
-            _run_child(cmd, env=_subprocess_env())
-        except subprocess.CalledProcessError as e:
-            _err(
-                f"mempalace extension: pip install failed; install manually, e.g. pip install {spec}",
-            )
-            return int(e.returncode) if e.returncode is not None else 1
+    if not specs:
         return 0
 
     uv = shutil.which("uv")
     if uv:
-        cmd = [uv, "pip", "install", f"--python={sys.executable}", spec]
-        _err("mempalace extension: " + " ".join(cmd))
+        cmd = [uv, "pip", "install", f"--python={sys.executable}", *specs]
+        _err(_LOG_PREFIX + " ".join(cmd))
         try:
             _run_child(cmd, env=_subprocess_env())
         except subprocess.CalledProcessError as e:
             _err(
-                "mempalace extension: uv pip install failed; install manually, e.g. "
-                f"uv pip install --python={sys.executable} {spec}",
+                _LOG_PREFIX + "uv pip install failed; install manually, e.g. "
+                f"uv pip install --python={sys.executable} "
+                + " ".join(specs),
+            )
+            return int(e.returncode) if e.returncode is not None else 1
+        return 0
+
+    if importlib.util.find_spec("pip") is not None:
+        cmd = [sys.executable, "-m", "pip", "install", *specs]
+        _err(_LOG_PREFIX + " ".join(cmd))
+        try:
+            _run_child(cmd, env=_subprocess_env())
+        except subprocess.CalledProcessError as e:
+            _err(
+                _LOG_PREFIX + "pip install failed; install manually, e.g. pip install "
+                + " ".join(specs),
             )
             return int(e.returncode) if e.returncode is not None else 1
         return 0
 
     _err(
-        "mempalace extension: no pip module on this Python and `uv` not found on PATH; "
-        f"install manually, e.g. uv pip install --python={sys.executable} {spec}",
+        _LOG_PREFIX + "`uv` not found on PATH and no `pip` module on this Python; "
+        f"install manually, e.g. uv pip install --python={sys.executable} "
+        + " ".join(specs),
     )
     return 1
 
 
+def _install_from_requirements(root: Path) -> int:
+    """Install pinned deps from the shipped requirements file, with a defensive fallback."""
+    req = _requirements_file(root)
+    if req.is_file():
+        return _install_pip_packages("-r", str(req))
+
+    _err(
+        _LOG_PREFIX + "requirements file missing; falling back to inline pins "
+        f"({req})",
+    )
+    return _install_pip_packages(
+        f"mempalace=={MEMPALACE_PYPI_VERSION}",
+        "attrs>=22.2.0",
+    )
+
+
 def main() -> int:
     _err(
-        "mempalace extension: after_install starting "
-        "(pip/uv logs are buffered; mempalace init is interactive via inherited stdio).",
+        _LOG_PREFIX + "after_install starting "
+        "(uv logs are buffered; mempalace init is interactive via inherited stdio).",
     )
     if _skip_pip():
         _err(
-            "mempalace extension: skipping pip install (MEMPALACE_EXTENSION_SKIP_PIP set)",
+            _LOG_PREFIX + "skipping pip install (MEMPALACE_EXTENSION_SKIP_PIP set)",
         )
     else:
-        spec = f"mempalace=={MEMPALACE_PYPI_VERSION}"
-        rc = _install_mempalace_pip(spec)
+        root = Path.cwd().resolve()
+        rc = _install_from_requirements(root)
         if rc != 0:
             return rc
-        _err("mempalace extension: package install step finished.")
+        _err(_LOG_PREFIX + "package install step finished.")
 
     if _skip_init():
         _err(
-            "mempalace extension: skipping mempalace init (MEMPALACE_EXTENSION_SKIP_INIT set)",
+            _LOG_PREFIX + "skipping mempalace init (MEMPALACE_EXTENSION_SKIP_INIT set)",
         )
         return 0
 
@@ -234,11 +253,11 @@ def main() -> int:
     if auto_mine:
         init_cmd.append("--auto-mine")
     _err(
-        "mempalace extension: " + " ".join(init_cmd) + f" (cwd={root})",
+        _LOG_PREFIX + " ".join(init_cmd) + f" (cwd={root})",
     )
     if auto_mine:
         _err(
-            "mempalace extension: --auto-mine enabled; first mine may take a long time.",
+            _LOG_PREFIX + "--auto-mine enabled; first mine may take a long time.",
         )
     try:
         _run_child(
@@ -249,12 +268,12 @@ def main() -> int:
         )
     except subprocess.CalledProcessError as e:
         _err(
-            "mempalace extension: mempalace init failed; run manually from repo root: "
+            _LOG_PREFIX + "mempalace init failed; run manually from repo root: "
             "mempalace init .",
         )
         return int(e.returncode) if e.returncode is not None else 1
 
-    _err("mempalace extension: after_install finished successfully.")
+    _err(_LOG_PREFIX + "after_install finished successfully.")
     return 0
 
 

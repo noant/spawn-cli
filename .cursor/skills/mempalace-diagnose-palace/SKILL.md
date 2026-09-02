@@ -7,9 +7,9 @@ description: Diagnose MemPalace install, palace path alignment, CLI/MCP, and wak
 When the user reports **MemPalace not working**, **empty search**, **MCP errors**, or **stale context**:
 
 1. **Pack / Python**
-   - Run **`spawn extension healthcheck mempalace`** (or `healthcheck.py` with the same Python Spawn uses). Failure → install **`mempalace`** in **that exact interpreter** (the healthcheck prints it). If **`python -c "import mempalace"`** in your shell works but healthcheck exits 1, Spawn is using a different Python — align them or install into the interpreter Spawn uses.
+   - Run **`spawn extension healthcheck mempalace`** (or `healthcheck.py` with the same Python Spawn uses). Failure → install **`mempalace`** in **that exact interpreter** (the healthcheck prints it). If **`uv run python -c "import mempalace"`** in your shell works but healthcheck exits 1, Spawn is using a different Python — align them or install into the interpreter Spawn uses.
    - Use **`.mempalace/ext/requirements-mempalace.txt`** and `after_install.py` skip flags **`MEMPALACE_EXTENSION_SKIP_PIP`** / **`MEMPALACE_EXTENSION_SKIP_INIT`** as needed.
-   - From the **repo root**, run **`python -c "import mempalace"`** and **`python -m mempalace --version`** (or **`py -m mempalace`** on Windows if that is the configured interpreter).
+   - From the **repo root**, run **`uv run python -c "import mempalace"`** and **`uv run python -m mempalace --version`**.
 
 2. **Palace initialized and healthy**
    - If there is no project scaffold, run **`mempalace init .`** from the repo root (or rely on the after-install hook). Confirm **`.mempalace/`** and project **`mempalace.yaml`** (and **`entities.json`** if used) exist.
@@ -24,7 +24,7 @@ When the user reports **MemPalace not working**, **empty search**, **MCP errors*
    - **`mempalace search "<known phrase>"`** using the same **`--palace`** / env the IDE will use. If this fails, fix paths or init before debugging MCP.
 
 5. **MCP**
-   - Both **`mempalace-mcp`** and **`mempalace-mine-mcp`** must use a **`python` / `mempalace`** that has the package installed (often venv / **`py`** on Windows). **`mempalace-mcp`** must launch **`mempalace.mcp_server`** (**`python -m mempalace.mcp_server`**, or **`mempalace-mcp`**); if the merged config mistakenly uses **`python -m mempalace mcp`**, tools never appear (**connection closed** / **-32000**) — that subcommand is setup text only.
+   - Both **`mempalace-mcp`** and **`mempalace-mine-mcp`** must use a **`uv run python` / `mempalace`** that has the package installed (often venv). **`mempalace-mcp`** must launch **`mempalace.mcp_server`** (**`uv run python -m mempalace.mcp_server`**, or **`mempalace-mcp`**); if the merged config mistakenly uses **`python -m mempalace mcp`**, tools never appear (**connection closed** / **-32000**) — that subcommand is setup text only.
    - After **`mempalace_mine`** succeeds, **`.mempalace/wakeup.md`** should update; if the main server was already up, call **`mempalace_reconnect`** on **`mempalace-mcp`**. Full checklist: **`.mempalace/guides/guide.md`** (MCP + IDE wiring).
 
 6. **Narrow the symptom**

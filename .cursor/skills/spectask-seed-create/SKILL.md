@@ -19,6 +19,7 @@ description: Capture a rough idea as spec/seeds/{X}-{slug}.md (not a full task);
 3. Offer **spectask-create** when the user wants to promote. Do not run Steps 1–7 in this skill.
 
 
+
 Hints:
 - When finishing a task that involved editing this repo's code or docs: call mempalace_mine (mempalace-mine-mcp), then mempalace_reconnect on mempalace-mcp if already connected.
 - Prefer codebase search via mempalace-mcp first; use workspace full-text / ripgrep only if MemPalace is unavailable or insufficient.
