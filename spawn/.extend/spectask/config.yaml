@@ -1,6 +1,6 @@
 schema: 1
 name: spectask
-version: "1.16.5"
+version: "1.20.0"
 
 hints:
   global:
@@ -27,12 +27,12 @@ setup:
 
 files:
   spec/main.md:
-    description: "Spec-Tasks methodology — folder structure, seven-step process, overview template."
+    description: "Spec-Tasks methodology — folder structure, eight-step process, overview template."
     mode: static
     globalRead: auto
     localRead: required
   spec/design/hla.md:
-    description: "Project high-level architecture; updated in Step 7."
+    description: "Project high-level architecture; updated in Step 8."
     mode: artifact
     globalRead: auto
     localRead: auto
@@ -45,7 +45,7 @@ files:
 skills:
   spectask-from-jira.md:
     name: spectask-from-jira
-    description: "Import Jira tickets into spec/tasks/{task-code}-{slug}/; codebase analysis for Step 1-2; offline fallback."
+    description: "Import Jira tickets into spec/tasks/{task-code}-{slug}/; codebase analysis for Step 2-3; offline fallback."
     required-read:
       - spec/main.md
   spectask-create.md:
@@ -55,27 +55,27 @@ skills:
       - spec/main.md
   spectask-spec-review-passed.md:
     name: spectask-spec-review-passed
-    description: "Step 3 — spec approved (spec/main.md)."
+    description: "Step 4 — spec approved (spec/main.md)."
     required-read:
       - spec/main.md
   spectask-execute.md:
     name: spectask-execute
-    description: "Steps 4–5 in spec/main.md; then wait for user Step 6."
+    description: "Steps 5–6 in spec/main.md; then wait for user Step 7."
     required-read:
       - spec/main.md
   spectask-execute-step-by-step.md:
     name: spectask-execute-step-by-step
-    description: "Step 4 — one Execution Scheme subtask per run with per-step self-review; auto Step 5 when all done (spec/main.md)."
+    description: "Step 5 — one Execution Scheme subtask per run with per-step self-review; auto Step 6 when all done (spec/main.md)."
     required-read:
       - spec/main.md
   spectask-code-review-passed.md:
     name: spectask-code-review-passed
-    description: "After user confirms code review / debugging — Steps 6–7 then optional pattern extract (spec/main.md)."
+    description: "After user confirms code review / debugging — Steps 7–8 then pattern extract (spec/main.md)."
     required-read:
       - spec/main.md
   spectask-extract-patterns.md:
     name: spectask-extract-patterns
-    description: "After Step 7 — optional extract of reusable patterns into spawn/rules/ and navigation (spec/main.md)."
+    description: "After Step 8 — extract reusable patterns into spawn/rules/ and navigation (spec/main.md)."
     required-read:
       - spec/main.md
   spectask-design.md:
