@@ -4,9 +4,7 @@
 
 ## What is Spawn?
 
-Spawn is a framework for building **AIDD** (AI-driven development) methodologies. It supports both **authoring** methodologies and **applying** them in a project. Within a single repository you can use **several** AIDD methodologies in a coherent way—shared navigation, skills, rules, and tooling stay aligned instead of competing ad hoc setups.
-
-In today's terms, Spawn is an **agent harness**: an orchestration layer wrapped around your coding agent. The harness supplies the agent with curated context (navigation, rules, skills), wires in MCP tools, and enforces a process, so the agent stops improvising repo conventions and works the way the team defined. If you are evaluating agent harnesses, Spawn is the harness you can version in Git and tailor to your own methodology.
+Spawn is a framework for building **AIDD** (AI-driven development) methodologies — an **agent harness** that wraps your coding agent in an orchestration layer. It supports both **authoring** methodologies and **applying** them in a project. Within a single repository you can use **several** AIDD methodologies in a coherent way—shared navigation, skills, rules, and tooling stay aligned instead of competing ad hoc setups.
 
 ## What is spawn-cli?
 
