@@ -177,6 +177,7 @@ includes a **Hints:** bullet list (full text; warnings only, no truncation).
 | Zed | `AGENTS.md`, `.rules`, `CLAUDE.md`, … per Zed rules doc | `.zed/settings.json` `context_servers` | `agent.tool_permissions` / workspace scan exclusions in settings (no `.cursorignore` equivalent) | `AGENTS.md` | MCP key name is `context_servers`. (Upstream may add repo skills under other paths—outside this column until documented.) |
 | Gemini CLI | `.gemini/skills/{skill}/SKILL.md` | `.gemini/settings.json` `mcpServers` | `.geminiignore` | `GEMINI.md` (unless overridden via `context.fileName`) | Project `.gemini/settings.json` at repo root. (CLI may also merge `.agents/skills/` discovery—outside this column.) |
 | Devin | `.devin/skills/{skill}/SKILL.md` | `.devin/config.json` `mcpServers` | — | `AGENTS.md` | Imports from other tooling may merge MCP at runtime (`read-config-from`)—outside committed files unless copied. (Optional Spawn-only trees are not part of this matrix.) |
+| Cline | `.cline/skills/{skill}/SKILL.md` (frontmatter `name` must equal directory name) | — (no project-scope MCP; global `cline_mcp_settings.json` only) | `.clineignore` (repo root, gitignore-style) | `AGENTS.md` | MCP unsupported: Spawn warns and writes nothing. Detection markers: `.cline/`, `.clinerules/` or `.clinerules`, `.clineignore`. Legacy `.clinerules` is untouched by cleanup. |
 
 ## Skill Rendering
 
@@ -537,6 +538,7 @@ Entry point targets:
 | Zed | `AGENTS.md` |
 | Gemini CLI | `GEMINI.md` |
 | Devin | `AGENTS.md` |
+| Cline | `AGENTS.md` |
 
 Gemini CLI additionally reads which context filenames to load via `context.fileName` under the `context` section in `.gemini/settings.json` (a string or array; default behavior still centers on `GEMINI.md` unless changed).
 

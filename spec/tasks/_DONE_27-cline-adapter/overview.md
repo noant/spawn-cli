@@ -1,7 +1,7 @@
 # 27: Cline IDE adapter
 
 ## Source seed
-- Path: spec/seeds/9-cline-adapter.md
+- Path: spec/seeds/_DONE_9-cline-adapter.md
 
 ## Status
 - [V] Research [glm-5.3 + kimi-k3.1-pro]
@@ -11,8 +11,8 @@
 - [V] Spec review
 - [V] Code implementation [GLM-5.3-flash]
 - [V] Code self-review [GLM-5.3 + Kimi-k3.1-pro]
-- [ ] Code review / debugging
-- [ ] Design document update [model]
+- [V] Code review / debugging
+- [V] Design document update [GLM-5.3-flash]
 
 ## Goal
 Implement a full Cline IDE adapter (`src/spawn_cli/ide/cline.py`) and register it under canonical IDE key `cline`, replacing the conceptual `StubAdapter` usage.
