@@ -17,7 +17,7 @@ description: After user confirms code review / debugging — Steps 7–8 then pa
 1. Read **spec/main.md** fully — **Step 7**, **Step 8**, **Pattern extract (after Step 8)**.
 2. `[interactive]`: execute **Step 7** exactly as written (mark `[V]` and prompt).
 3. Execute **Step 8** exactly as written.
-4. Execute **Pattern extract** exactly as written (or via **spectask-extract-patterns**): filter candidates, then `[interactive]` present the entire filtered list to the user in one message in this run and ask per-candidate Required/Optional/Decline via the ask tool; `[auto]` run mode: skip Present/Ask and write all survivors as Optional (read-contextual). Do not write under **`spawn/rules/`** or edit **`spawn/navigation.yaml`** until the user answers (`[interactive]`) / until candidates are filtered (`[auto]`).
+4. Execute **Pattern extract** exactly as written (or via **spectask-extract-patterns**): filter candidates; `[interactive]` present the filtered list in one message and ask per-candidate Required/Optional/Decline; `[auto]` skip Present/Ask and write all survivors with auto-detected scope (Scope rule in spec/main.md).
 
 
 Hints:

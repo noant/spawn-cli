@@ -17,7 +17,7 @@ description: After Step 8 — extract reusable patterns into spawn/rules/ and na
 1. Read **spec/main.md** fully — Pattern extract (Discover, Selection criteria, Present, Ask, Apply, Write).
 2. **Discover** exactly as written.
 3. Zero candidates → say so briefly and stop (no ask, no present, no fillers).
-4. `[auto]` run mode: skip Present/Ask — write ALL survivors as Optional (read-contextual), add them to `spawn/navigation.yaml`, run `spawn refresh`, list changed files (`R14`), and stop.
+4. `[auto]`: skip Present/Ask — write all survivors, scope auto-detected (Required = repo-wide rule, Optional = context-specific), update `spawn/navigation.yaml`, `spawn refresh`, list changed files (`R14`).
 5. `[interactive]`: **Present** the entire filtered list in **one message** right after Step 8; per survivor: short title + one-line rationale + scope (Required = `read-required`, Optional = `read-contextual`).
 6. `[interactive]`: **Ask** per-candidate Required/Optional/Decline plus "decline all" via the ask tool (`R10-ask`); wait. Do not write rules, run `spawn refresh`, or start the next task yet.
 7. **Apply**: write only Required/Optional candidates; unanswered candidates default to Decline; all Declined → write nothing.

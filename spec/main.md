@@ -498,14 +498,14 @@ After Step 8, extract reusable approaches into **`spawn/rules/`** as project-sta
 
 The agent filters candidates and presents the final list to the user in this run.
 It then asks per-candidate acceptance via the ask tool (`R10-ask`).
-**[auto] run mode (Step 1.1): no user interaction — skip Present and Ask; after Discover, write ALL survivors as Optional (read-contextual) and continue.**
+**[auto] run mode (Step 1.1): skip Present and Ask — after Discover, write all survivors; scope auto-detected (Scope rule below).**
 
 **Order (mandatory):**
 
 1. **Discover** — find and filter reusable candidates (agent only).
-2. **Present** — show the filtered list to the user in one message right after Step 8 (title + one-line rationale + suggested scope per survivor). Skipped in [auto] run mode.
-3. **Ask** — ask per-candidate acceptance via the ask tool (`R10-ask`); wait for the user's answer. Skipped in [auto] run mode.
-4. **Write** — only candidates the user accepted as Required or Optional; in [auto] run mode, all survivors (as Optional).
+2. **Present** — show the filtered list to the user in one message right after Step 8 (title + one-line rationale + suggested scope per survivor). Skipped in [auto].
+3. **Ask** — ask per-candidate acceptance via the ask tool (`R10-ask`); wait. Skipped in [auto].
+4. **Write** — accepted candidates; in [auto], all survivors (scope auto-detected).
 
 This step always runs after Step 8. If Discover leaves zero candidates, say so briefly and stop.
 
@@ -542,18 +542,15 @@ Reject immediately (do not offer):
 - then ask via the ask tool (`R10-ask`): per-candidate Required/Optional/Decline, plus a "decline all" option
 - then wait — do not write rules, do not run `spawn refresh`, do not start the next task
 
-### Ask (after Present)
+### Apply (after the ask; in [auto] applied right after Discover)
 
-- skipped in [auto] run mode (Step 1.1)
-- per-candidate Required/Optional/Decline via the ask tool (`R10-ask`), plus a "decline all" option
-- then wait — do not write rules, do not run `spawn refresh`, do not start the next task
+- [auto]: write all survivors; scope auto-detected (Scope rule)
+- otherwise: only Required/Optional accepted; unanswered default to Decline; all Declined -> write nothing
 
-### Apply (after the ask; in [auto] run mode applied right after Discover)
+### Scope rule (auto detection)
 
-- [auto] run mode: write ALL survivors as Optional (read-contextual)
-- otherwise write only Required/Optional candidates
-- if all Declined (or "decline all"): write nothing
-- candidates not addressed default to **Decline** (do not invent consent)
+- Required (`read-required`) — the rule affects every agent run in the repo
+- Optional (`read-contextual`) — the rule matters only in specific contexts
 
 ### Write
 
@@ -561,7 +558,7 @@ Reject immediately (do not offer):
 2. Prefer an existing **`spawn/rules/`** file on the same topic — merge or revise.
    If none fits, create a new kebab-case Markdown file.
 3. Prefer short code examples in each rule when applicable (criterion 6).
-4. Add each file to **`spawn/navigation.yaml`** under **`read-required` → `rules`** or **`read-contextual` → `rules`** as the user chose.
+4. Add each file to **`spawn/navigation.yaml`** under **`read-required` → `rules`** or **`read-contextual` → `rules`** — as the user chose, or auto-detected per Scope rule in [auto].
    Row: **`path`** + short **`description`**.
    Never list the same path in both.
 5. Run exactly **`spawn refresh`** in the terminal.
