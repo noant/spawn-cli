@@ -1,7 +1,8 @@
 ---
 name: spectask-execute-step-by-step
-description: Interactive mode - Step 5 one Execution Scheme subtask per run with per-step self-review; full Step 6 when all done (spec/main.md).
+description: Step 5 — one Execution Scheme subtask per run with per-step self-review; auto Step 6 when all done (spec/main.md).
 ---
+
 
 Interactive-mode variant of **spectask-execute**: user drives subtask-by-subtask. In `[auto]` run mode use **spectask-execute** instead — subtasks run continuously without per-step stops.
 

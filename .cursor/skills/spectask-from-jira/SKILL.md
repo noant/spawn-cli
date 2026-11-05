@@ -1,7 +1,8 @@
 ---
 name: spectask-from-jira
-description: Import Jira tickets into spec/tasks/{task-code}-{slug}/; codebase analysis for Steps 2-3; offline fallback.
+description: Import Jira tickets into spec/tasks/{task-code}-{slug}/; codebase analysis for Step 2-3; offline fallback.
 ---
+
 
 **Mandatory:** read **spec/main.md** in full. Do not invent procedure beyond that file.
 

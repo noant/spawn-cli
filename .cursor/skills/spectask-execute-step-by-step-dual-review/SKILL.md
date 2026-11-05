@@ -1,7 +1,8 @@
 ---
 name: spectask-execute-step-by-step-dual-review
-description: Interactive mode - Step 5 subtask-per-run like spectask-execute-step-by-step, with per-subtask cross review per the Code review scheme (R23); spec deviations auto-fix, conceptual problems stop for a user decision.
+description: Step 5 — one subtask per run, each reviewed by two reviewer subagents of different models; deviations auto-fix, conceptual problems/spec bugs stop for a user decision (fix spec / spec+code / spec+revert).
 ---
+
 
 Interactive cross-review variant of **spectask-execute-step-by-step**. Reviewer pairs come from the **Code review scheme** in `## Review models` (`R23-review-scheme`, chosen in Step 1.1) — do not re-ask them. In `[auto]` run mode use **spectask-execute** instead.
 

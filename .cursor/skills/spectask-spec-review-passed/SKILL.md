@@ -1,7 +1,8 @@
 ---
 name: spectask-spec-review-passed
-description: Interactive Step 4 bookkeeping - spec approved; mark and prompt for the implementation command. Skipped in auto run mode.
+description: Step 4 — spec approved (spec/main.md).
 ---
+
 
 Interactive-mode bookkeeping only. In `[auto]` run mode Step 4 is skipped (checkbox unchecked) and implementation starts automatically after Step 3 — do not use this skill.
 

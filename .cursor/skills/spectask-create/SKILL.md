@@ -3,6 +3,7 @@ name: spectask-create
 description: Use when drafting a new spectask (specification only, per spec/main.md).
 ---
 
+
 **Mandatory:** read **spec/main.md** in full.
 
 **Role:** `A1-drafter`

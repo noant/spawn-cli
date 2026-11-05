@@ -498,13 +498,14 @@ After Step 8, extract reusable approaches into **`spawn/rules/`** as project-sta
 
 The agent filters candidates and presents the final list to the user in this run.
 It then asks per-candidate acceptance via the ask tool (`R10-ask`).
+**[auto] run mode (Step 1.1): no user interaction — skip Present and Ask; after Discover, write ALL survivors as Optional (read-contextual) and continue.**
 
 **Order (mandatory):**
 
 1. **Discover** — find and filter reusable candidates (agent only).
-2. **Present** — show the filtered list to the user in one message right after Step 8 (title + one-line rationale + suggested scope per survivor).
-3. **Ask** — ask per-candidate acceptance via the ask tool (`R10-ask`); wait for the user's answer.
-4. **Write** — only candidates the user accepted as Required or Optional.
+2. **Present** — show the filtered list to the user in one message right after Step 8 (title + one-line rationale + suggested scope per survivor). Skipped in [auto] run mode.
+3. **Ask** — ask per-candidate acceptance via the ask tool (`R10-ask`); wait for the user's answer. Skipped in [auto] run mode.
+4. **Write** — only candidates the user accepted as Required or Optional; in [auto] run mode, all survivors (as Optional).
 
 This step always runs after Step 8. If Discover leaves zero candidates, say so briefly and stop.
 
@@ -534,15 +535,23 @@ Reject immediately (do not offer):
 
 ### Present (after Discover)
 
+- skipped in [auto] run mode (Step 1.1)
 - run only when Discover left one or more candidates
 - present the entire list in **one message**, right after Step 8
 - for each survivor: short title, one-line rationale, suggested scope (Required = `read-required`, Optional = `read-contextual`)
 - then ask via the ask tool (`R10-ask`): per-candidate Required/Optional/Decline, plus a "decline all" option
 - then wait — do not write rules, do not run `spawn refresh`, do not start the next task
 
-### Apply the user's answer (after the ask)
+### Ask (after Present)
 
-- write only Required/Optional candidates
+- skipped in [auto] run mode (Step 1.1)
+- per-candidate Required/Optional/Decline via the ask tool (`R10-ask`), plus a "decline all" option
+- then wait — do not write rules, do not run `spawn refresh`, do not start the next task
+
+### Apply (after the ask; in [auto] run mode applied right after Discover)
+
+- [auto] run mode: write ALL survivors as Optional (read-contextual)
+- otherwise write only Required/Optional candidates
 - if all Declined (or "decline all"): write nothing
 - candidates not addressed default to **Decline** (do not invent consent)
 

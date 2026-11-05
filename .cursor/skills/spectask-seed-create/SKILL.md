@@ -3,6 +3,7 @@ name: spectask-seed-create
 description: Capture a rough idea as spec/seeds/{X}-{slug}.md (not a full task); then offer to start spectask-create.
 ---
 
+
 **Mandatory:** read **spec/main.md** in full — Seed paragraph and Seed file template.
 
 **Role:** `A1-drafter`

@@ -1,7 +1,8 @@
 ---
 name: spectask-execute
-description: Steps 5-6 in spec/main.md; in interactive mode wait for user Step 7, in auto mode continue to Step 8.
+description: Steps 5–6 in spec/main.md; then wait for user Step 7.
 ---
+
 
 **Mandatory:** read **spec/main.md** in full — Steps 5-6, Coder protocol, Subagent run protocol.
 
