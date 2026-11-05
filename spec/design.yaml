@@ -19,4 +19,4 @@ documents:
   - path: spec/design/ide-adapters.md
     description: IDE adapter matrix and Spawn metadata rendering contracts.
   - path: spec/design/user-guide.md
-    description: Brief end-user install and invocation (pip, uvx, local sources).
+    description: Brief end-user install and invocation (uv, uvx, local sources).

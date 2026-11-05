@@ -22,7 +22,7 @@ files:
     globalRead: required
     localRead: no
   .mempalace/ext/requirements-mempalace.txt:
-    description: "Minimal pip dependency line for installing mempalace in the project."
+    description: "Minimal uv/pip dependency line for installing mempalace in the project."
     mode: static
     globalRead: no
     localRead: no

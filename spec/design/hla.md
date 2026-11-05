@@ -13,7 +13,7 @@ This note is the **map of the codebase**: packaging, layers under `spawn_cli/`, 
 | [`extensions.md`](extensions.md) | Extension packaging and AIDD methodology. |
 | [`extension-author-guide.md`](extension-author-guide.md) | Author-facing extension layout, config, workflows. |
 | [`ide-adapters.md`](ide-adapters.md) | IDE adapter matrix and rendering contracts. |
-| [`user-guide.md`](user-guide.md) | End-user install and invocation (pip, uvx, local). |
+| [`user-guide.md`](user-guide.md) | End-user install and invocation (uv, uvx, local). |
 
 ## Packaging and entry point
 
