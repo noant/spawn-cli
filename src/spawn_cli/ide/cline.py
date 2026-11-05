@@ -5,6 +5,7 @@ from __future__ import annotations
 import warnings
 from pathlib import Path
 
+from spawn_cli.errors import SpawnWarning
 from spawn_cli.ide import _vacancy as _vac
 from spawn_cli.ide._helpers import (
     clear_split_agent_ignore_file,
@@ -73,14 +74,15 @@ class ClineAdapter(IdeAdapter):
         del normalized_mcp
         del target_root
         warnings.warn(
-            "cline: Cline has no project-scope MCP settings; "
-            "MCP is configured globally (cline_mcp_settings.json)"
+            "Cline has no project-scope MCP settings; "
+            "MCP servers stay configured globally in the Cline app",
+            SpawnWarning,
         )
         return []
 
     def remove_mcp(self, target_root: Path, rendered_mcp_names: list[str]) -> None:
         del target_root, rendered_mcp_names
-        warnings.warn("cline: MCP is unsupported; nothing to remove")
+        warnings.warn("MCP is not managed by spawn for cline; nothing to remove", SpawnWarning)
 
     def add_agent_ignore(self, target_root: Path, globs: list[str]) -> None:
         rewrite_ignore_block(target_root / ".clineignore", globs)
