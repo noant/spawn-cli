@@ -44,6 +44,8 @@ Mandatory reads:
 - `.mempalace/wakeup.md` - Bounded MemPalace wake-up context from the palace.
 - `spawn/rules/00-general.md` - General language-agnostic conventions (ASCII, documentation, chat language).
 - `spawn/rules/01-vacancy-cleanup-subtrees.md` - finalize_*_repo cleanup must know every adapter-written config subtree; avoid dead configs.
+- `spawn/rules/02-agent-config-namespacing.md` - Local rule file.
+- `spawn/rules/03-adapter-spawn-warning.md` - IDE adapters emit warnings via SpawnWarning category for friendly CLI output.
 - `spawn/navigation.yaml` - Merged Spawn navigation (read-required, read-contextual).
 
 Contextual reads:
