@@ -261,6 +261,31 @@ def finalize_opencode_repo(target_root: Path) -> None:
         (target_root / ".opencode").rmdir()
 
 
+def finalize_hermes_repo(target_root: Path) -> None:
+    """Hermes adapter: `.hermes/skills` dotdir; drop when vacant."""
+    finalize_standard_dotdir_skills_and_mcp(
+        target_root,
+        ".hermes",
+        allow_delete_entire=True,
+    )
+
+
+def finalize_junie_repo(target_root: Path) -> None:
+    """Junie adapter: `.junie/{skills,mcp/mcp.json}`; drop parts when vacant, keep user content."""
+    junie_root = target_root / ".junie"
+    if not junie_root.is_dir():
+        return
+    try_unlink_empty_mcp_mcp_servers(junie_root / "mcp" / "mcp.json")
+    prune_empty_directories_under(junie_root)
+    if ide_dotdir_is_entirely_removable(junie_root, allow_delete_entire=True):
+        shutil.rmtree(junie_root, ignore_errors=True)
+    ignore = target_root / ".aiignore"
+    if ignore.is_file():
+        clear_split_agent_ignore_file(ignore)
+        if not ignore.read_text(encoding="utf-8").strip():
+            ignore.unlink(missing_ok=True)
+
+
 def finalize_cline_repo(target_root: Path) -> None:
     """Cline adapter: `.cline/skills` dotdir and root `.clineignore`; drop both when vacant."""
     finalize_standard_dotdir_skills_and_mcp(
@@ -275,10 +300,45 @@ def finalize_cline_repo(target_root: Path) -> None:
             ignore.unlink(missing_ok=True)
 
 
+def _mimo_config_vacant(path: Path) -> bool:
+    data = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(data, dict):
+        return False  # user config in an unexpected shape: keep untouched
+    if data == {}:
+        return True
+    for key, value in data.items():
+        if key in ("mcp", "permission"):
+            if value:  # non-empty -> user content or live servers
+                return False
+        elif json_value_nonempty(value):  # unknown user key with substance
+            return False
+    return True
+
+
+def finalize_mimo_code_repo(target_root: Path) -> None:
+    """Mimo Code adapter: `.mimocode/mimocode.json` (keys mcp, permission) and `.mimocode/skills`; drop when vacant."""
+    config = target_root / ".mimocode" / "mimocode.json"
+    if config.is_file():
+        try:
+            vacant = _mimo_config_vacant(config)
+        except json.JSONDecodeError:
+            vacant = False  # keep unparseable user config untouched
+        if vacant:
+            config.unlink()
+    skills_dir = target_root / ".mimocode" / "skills"
+    if skills_dir.is_dir() and not dir_has_any_file(skills_dir):
+        prune_empty_directories_under(target_root / ".mimocode")
+    if (target_root / ".mimocode").is_dir() and not dir_has_any_file(target_root / ".mimocode"):
+        (target_root / ".mimocode").rmdir()
+
+
 __all__ = [
     "dir_has_any_file",
     "finalize_claude_repo",
     "finalize_cline_repo",
+    "finalize_hermes_repo",
+    "finalize_junie_repo",
+    "finalize_mimo_code_repo",
     "finalize_opencode_repo",
     "finalize_codex_repo",
     "finalize_github_copilot_repo",

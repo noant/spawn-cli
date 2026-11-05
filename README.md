@@ -223,14 +223,40 @@ read-required:
 
 Then run **`spawn refresh`** so skills and entry points pick up the hint.
 
-## License
+### Supported IDEs
 
-MIT — see [LICENSE](LICENSE).
+| IDE (key) | Skills | MCP | Agent ignore | Entry point | Detection markers |
+| --- | --- | --- | --- | --- | --- |
+| Cursor (`cursor`) | `.cursor/skills/` | `.cursor/mcp.json` | `.cursorignore` | `AGENTS.md` | `.cursor/` |
+| Codex (`codex`) | `.agents/skills/` | `.codex/config.toml` | `config.toml` permissions | `AGENTS.md` | `.codex/`, `.agents/` |
+| Claude Code (`claude-code`) | `.claude/skills/` | `.mcp.json` | `.claude/settings.json` | `CLAUDE.md` | `.claude/`, `CLAUDE.md` |
+| Windsurf (`windsurf`) | `.windsurf/skills/` | — | `.codeiumignore` | `AGENTS.md` | `.windsurf/`, `.codeiumignore` |
+| GitHub Copilot (`github-copilot`) | `.github/skills/` | `.vscode/mcp.json` | — | `.github/copilot-instructions.md`, `AGENTS.md` | `.github/`, `.vscode/` |
+| Gemini CLI (`gemini-cli`) | `.gemini/skills/` | `.gemini/settings.json` | `.geminiignore` | `GEMINI.md` | `.gemini/`, `GEMINI.md` |
+| Cline (`cline`) | `.cline/skills/` | — | `.clineignore` | `AGENTS.md` | `.cline/`, `.clinerules`, `.clineignore` |
+| OpenCode (`opencode`) | `.opencode/skills/` | `opencode.json` | `opencode.json` permissions | `AGENTS.md` | `.opencode/`, `opencode.json`, `opencode.jsonc` |
+| Mimo Code (`mimo-code`) | `.mimocode/skills/` | `.mimocode/mimocode.json` | `mimocode.json` permissions | `AGENTS.md` | `.mimocode/` |
+| Hermes (`hermes`) | `.hermes/skills/` | — | — | `.hermes.md` | `.hermes/`, `.hermes.md`, `HERMES.md` |
+| JetBrains Junie (`junie`) | `.junie/skills/` | `.junie/mcp/mcp.json` | `.aiignore` | `AGENTS.md` | `.junie/` |
 
----
+**Legend:**
+
+- **Skills** — project directory where spawn renders `SKILL.md` per skill (`native` capability; frontmatter `name` matches the directory name).
+- **MCP** — project-scope config file where spawn merges extension MCP servers. "—" means the tool keeps MCP global-only (e.g. `~/.hermes/config.yaml`); spawn warns (`SpawnWarning`) and writes nothing.
+- **Agent ignore** — where spawn merges agent-ignore globs: a dedicated ignore file, or permissions entries in the project config (managed block / spawn-owned entries only; removal never touches user rules). "—" means no upstream ignore mechanism; spawn warns and skips.
+- **Entry point** — file(s) receiving the Spawn-managed instruction block (`<!-- spawn:start -->` ... `<!-- spawn:end -->`); user content around the block is preserved.
+- **Detection markers** — files/directories that make `spawn ide list-supported-ides` (and auto-detection) mark the IDE as used in the repo.
+
+Full per-IDE contracts (config shapes, ignore semantics, caveats): [spec/design/ide-adapters.md](spec/design/ide-adapters.md).
 
 P.S. Below is a diagram that might help you understand how Spawn works.
 
 <p align="center">
   <img src="logo/Scheme.png" alt="How Spawn works" />
 </p>
+
+---
+
+## License
+
+MIT — see [LICENSE](LICENSE).

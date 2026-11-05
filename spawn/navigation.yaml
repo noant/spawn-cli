@@ -12,6 +12,8 @@ read-required:
     description: Local rule file.
   - path: spawn/rules/05-adapter-canonical-config-file.md
     description: Local rule file.
+  - path: spawn/rules/06-new-ide-adapter-checklist.md
+    description: Local rule file.
 - ext: mempalace-ext
   files:
   - path: .mempalace/wakeup.md
@@ -28,6 +30,8 @@ read-contextual:
     description: Optional convention — adapters sanitize skill names to the agent's stricter regex (name==dirname).
   - path: spawn/rules/05-adapter-canonical-config-file.md
     description: Optional convention — adapters write one canonical config file; no variant-format merges, error before mutation.
+  - path: spawn/rules/06-new-ide-adapter-checklist.md
+    description: Optional convention — full checklist (wiring, vacancy, tests, docs) for adding a new IDE adapter.
 - ext: spectask
   files:
   - path: spec/main.md

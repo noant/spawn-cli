@@ -23,7 +23,9 @@ from spawn_cli.ide import (
     DetectResult,
     GeminiCliAdapter,
     GitHubCopilotAdapter,
+    HermesAdapter,
     IdeCapabilities,
+    MimoCodeAdapter,
     StubAdapter,
     WindsurfAdapter,
     detect_supported_ides,
@@ -46,6 +48,8 @@ def test_get_known_adapter() -> None:
     assert isinstance(get("windsurf"), WindsurfAdapter)
     assert isinstance(get("cline"), ClineAdapter)
     assert get("cline").key == "cline"
+    assert isinstance(get("hermes"), HermesAdapter)
+    assert get("hermes").key == "hermes"
 
 
 def test_get_alias() -> None:
@@ -55,6 +59,9 @@ def test_get_alias() -> None:
     g = get("gemini")
     assert g.key == "gemini-cli"
     assert isinstance(g, GeminiCliAdapter)
+    m = get("mimo")
+    assert m.key == "mimo-code"
+    assert isinstance(m, MimoCodeAdapter)
 
 
 def test_get_unknown_raises() -> None:
@@ -77,6 +84,12 @@ def test_detect_supported_ides(tmp_path: Path) -> None:
         assert isinstance(out[key], DetectResult)
         assert out[key].used_in_repo is False
         assert isinstance(out[key].capabilities, IdeCapabilities)
+    assert "mimo-code" in out
+
+
+def test_mimo_code_in_supported_ides(tmp_path: Path) -> None:
+    (tmp_path / ".mimocode").mkdir()
+    assert "mimo-code" in detect_supported_ides(tmp_path)
 
 
 def test_normalize_skill_name() -> None:

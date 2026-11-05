@@ -33,6 +33,9 @@ Mandatory reads:
 - `spawn/rules/01-vacancy-cleanup-subtrees.md` - finalize_*_repo cleanup must know every adapter-written config subtree; avoid dead configs.
 - `spawn/rules/02-agent-config-namespacing.md` - Local rule file.
 - `spawn/rules/03-adapter-spawn-warning.md` - IDE adapters emit warnings via SpawnWarning category for friendly CLI output.
+- `spawn/rules/04-adapter-skill-name-constraints.md` - Local rule file.
+- `spawn/rules/05-adapter-canonical-config-file.md` - Local rule file.
+- `spawn/rules/06-new-ide-adapter-checklist.md` - Local rule file.
 - `spawn/navigation.yaml` - Merged Spawn navigation (read-required, read-contextual).
 
 Contextual reads:

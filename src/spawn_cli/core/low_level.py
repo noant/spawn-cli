@@ -34,6 +34,9 @@ CANONICAL_IDE_KEYS: tuple[str, ...] = (
     "gemini-cli",
     "cline",
     "opencode",
+    "mimo-code",
+    "hermes",
+    "junie",
 )
 
 SPAWN_GITIGNORE_START = "# spawn:start"

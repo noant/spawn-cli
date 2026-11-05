@@ -3,7 +3,11 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from spawn_cli.ide._vacancy import finalize_codex_repo, finalize_opencode_repo
+from spawn_cli.ide._vacancy import (
+    finalize_codex_repo,
+    finalize_hermes_repo,
+    finalize_opencode_repo,
+)
 
 
 def test_finalize_codex_removes_config_with_empty_spawn_profile(tmp_path: Path) -> None:
@@ -51,3 +55,19 @@ def test_finalize_opencode_repo_keeps_user_content(tmp_path: Path) -> None:
     finalize_opencode_repo(tmp_path)
     assert (tmp_path / "opencode.json").exists()
     assert (tmp_path / ".opencode" / "skills" / "s" / "SKILL.md").exists()
+
+
+def test_finalize_hermes_repo_removes_vacant_dotdir(tmp_path: Path) -> None:
+    (tmp_path / ".hermes" / "skills" / "s").mkdir(parents=True)
+    finalize_hermes_repo(tmp_path)
+    assert not (tmp_path / ".hermes").exists()
+
+
+def test_finalize_hermes_repo_keeps_user_content(tmp_path: Path) -> None:
+    (tmp_path / ".hermes" / "skills" / "s").mkdir(parents=True)
+    (tmp_path / ".hermes" / "skills" / "s" / "SKILL.md").write_text("x", encoding="utf-8")
+    (tmp_path / ".hermes" / "rules").mkdir()
+    (tmp_path / ".hermes" / "rules" / "keep.md").write_text("rule", encoding="utf-8")
+    finalize_hermes_repo(tmp_path)
+    assert (tmp_path / ".hermes" / "rules" / "keep.md").is_file()
+    assert (tmp_path / ".hermes").is_dir()

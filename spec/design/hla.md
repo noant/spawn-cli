@@ -50,7 +50,7 @@ Pydantic v2 models for configs, navigation, MCP, skills, and rendered metadata s
 - **Vacancy / cleanup**: e.g. `spawn_cli.ide._vacancy` (empty MCP payloads, guarded removal of vacant IDE dotdirs).
 - **Rendering helpers**: `_helpers` (including `render_skill_md`: frontmatter, skill body, optional **Hints**, **Mandatory reads** with `spawn/navigation.yaml` last, **Contextual reads**).
 - **`StubAdapter`** for tests or in-progress work.
-- **Concrete adapters** (Cursor, Codex, Claude Code, GitHub Copilot, Gemini CLI, Windsurf, Cline, OpenCode) registered for every key in **`CANONICAL_IDE_KEYS`** (defined in `low_level` as the single ordering source for the IDE registry).
+- **Concrete adapters** (Cursor, Codex, Claude Code, GitHub Copilot, Gemini CLI, Windsurf, Cline, OpenCode, Mimo Code, Hermes) registered for every key in **`CANONICAL_IDE_KEYS`** (defined in `low_level` as the single ordering source for the IDE registry). Hermes: project skills under `.hermes/skills/`, entry block in root `.hermes.md` (native highest-priority context file); MCP and agent ignore unsupported (global-only upstream) — warn via `SpawnWarning`.
 
 ### 5. `spawn_cli.core.low_level`
 
