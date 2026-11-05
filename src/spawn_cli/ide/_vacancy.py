@@ -6,6 +6,8 @@ import json
 import shutil
 from pathlib import Path
 
+from spawn_cli.ide._helpers import clear_split_agent_ignore_file
+
 
 def json_value_nonempty(v: object) -> bool:
     """True if nested JSON-ish value carries user-visible substance."""
@@ -224,9 +226,24 @@ def finalize_github_copilot_repo(target_root: Path) -> None:
         pass
 
 
+def finalize_cline_repo(target_root: Path) -> None:
+    """Cline adapter: `.cline/skills` dotdir and root `.clineignore`; drop both when vacant."""
+    finalize_standard_dotdir_skills_and_mcp(
+        target_root,
+        ".cline",
+        allow_delete_entire=True,
+    )
+    ignore = target_root / ".clineignore"
+    if ignore.is_file():
+        clear_split_agent_ignore_file(ignore)
+        if not ignore.read_text(encoding="utf-8").strip():
+            ignore.unlink(missing_ok=True)
+
+
 __all__ = [
     "dir_has_any_file",
     "finalize_claude_repo",
+    "finalize_cline_repo",
     "finalize_codex_repo",
     "finalize_github_copilot_repo",
     "finalize_standard_dotdir_skills_and_mcp",

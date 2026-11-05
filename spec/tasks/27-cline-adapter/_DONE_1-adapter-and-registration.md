@@ -1,8 +1,8 @@
 # Step 1: Cline adapter and registration
 
-Status: Not implemented
+Status: Done
 Suggested model: glm-5.3-flash
-Used model:
+Used model: GLM-5.3-flash
 
 ## Goal
 Create `ClineAdapter` in `src/spawn_cli/ide/cline.py` and register it under canonical key `cline`.

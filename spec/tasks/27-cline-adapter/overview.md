@@ -8,9 +8,9 @@
 - [V] User research review
 - [V] Spec drafting [glm-5.3-flash]
 - [V] Spec self-review [glm-5.3 + kimi-k3.1-pro]
-- [ ] Spec review
-- [ ] Code implementation [model]
-- [ ] Code self-review [model]
+- [V] Spec review
+- [V] Code implementation [GLM-5.3-flash]
+- [V] Code self-review [GLM-5.3 + Kimi-k3.1-pro]
 - [ ] Code review / debugging
 - [ ] Design document update [model]
 

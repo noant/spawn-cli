@@ -17,6 +17,7 @@ from spawn_cli.ide import (
     SPAWN_BLOCK_END,
     SPAWN_BLOCK_START,
     ClaudeCodeAdapter,
+    ClineAdapter,
     CodexAdapter,
     CursorAdapter,
     DetectResult,
@@ -43,6 +44,8 @@ def test_get_known_adapter() -> None:
     assert get("codex").key == "codex"
     assert isinstance(get("github-copilot"), GitHubCopilotAdapter)
     assert isinstance(get("windsurf"), WindsurfAdapter)
+    assert isinstance(get("cline"), ClineAdapter)
+    assert get("cline").key == "cline"
 
 
 def test_get_alias() -> None:
