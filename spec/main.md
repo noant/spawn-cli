@@ -3,10 +3,14 @@
 ## Folder Structure
 
 - spec/main.md — this file.
-- spec/design.yaml — index of architecture documents (`path` + `description` per entry); optional but recommended when multiple design files exist.
+- spec/design.yaml — indexes architecture documents (`path` + `description` per entry); optional but recommended for multiple design files.
 - spec/design/hla.md — project high-level architecture (required).
-- spec/design/{name}.md — other architecture documents (optional; ADRs, notes, etc.); register in **spec/design.yaml** and declare as readable paths for agents — typically via a Spawn extension's `files:` (with appropriate reads) so they appear in `spawn/navigation.yaml`.
-- spec/tasks/{task-code}-{slug}/ — task folder (artifact tree). `{task-code}` identifies the task (often a serial code; may instead be a key from an external tracker). `{slug}` is a short descriptive name.
+- spec/design/{name}.md — other architecture documents (optional; ADRs, notes, etc.)
+  - register in **spec/design.yaml**
+  - declare as readable paths for agents, typically via a Spawn extension's `files:` (with appropriate reads), so they appear in `spawn/navigation.yaml`
+- spec/tasks/{task-code}-{slug}/ — task folder (artifact tree)
+  - `{task-code}` identifies the task (often a serial code or an external tracker key)
+  - `{slug}` is a short descriptive name
 - spec/tasks/{task-code}-{slug}/overview.md — task overview (required).
 - spec/tasks/{task-code}-{slug}/{N}-{description}.md — subtask files (optional; required when `## Execution Scheme` defines 2+ steps).
 - spec/seeds/{X}-{slug}.md — seed file (artifact tree in this methodology pack).
@@ -64,7 +68,7 @@ _Interaction and context_
   - "Ask" / "request from the user" means only those channels
   - **never** treat asking as launching a Task / sub-agent / other agent; those tools are not ask tools
   - if no platform ask tool is available, stop, request from the user, then wait
-  - do not ask when the answer is clear from context; ask only when the answer materially changes the next action
+  - do not ask when context provides the answer; ask only when it materially changes the next action
 - **`R11-navigation`**
   - before drafting a spec, open **`spawn/navigation.yaml`**
   - read all `read-required`
@@ -91,7 +95,8 @@ _Interaction and context_
   - renames and deletes count
   - applies to Step 1 (research), Step 2 (spec), Steps 5–6 (code), Step 8 (design), and any user-requested edits
   - **Propagation:** the executor sub-agent includes the full list in its final response
-  - the coordinator (`A6-coordinator`) aggregates lists from child sub-agents and forwards the complete set to the user (and to its parent when the coordinator itself is a sub-agent)
+  - the coordinator (`A6-coordinator`) aggregates child sub-agent lists and forwards the complete set to the user
+  - a coordinator that is itself a sub-agent also forwards the complete set to its parent
   - do not drop or summarize away paths
 - **`R15-done-marking`**
   - after a Coder (`A5-coder`) replies, the coordinator (`A6-coordinator`) marks the subtask done:
@@ -112,6 +117,16 @@ _Interaction and context_
   - if Ambient context is missing (neither an `Ambient rules:` block nor `Ambient context: none`), the agent **must** clarify via `R10-ask` before launching any sub-agent — mandatory
   - every sub-agent launch must put the resolved Ambient block at the start of the prompt per **Subagent run protocol**
   - each agent passes the block to child sub-agents unchanged
+
+- **`R23-review-scheme`**
+  - review schemes (research review, spec review, code review) are chosen ONCE at the start of the task (Step 1.1 combined ask)
+  - record them in `## Review models` of `overview.md`
+  - format per line: `single agent: {model}` or `cross-review: {model1}, {model2}`
+  - cross-review = TWO `A4-reviewer` subagents of DIFFERENT model families run IN PARALLEL on the same artifact
+  - the coordinator merges verdicts
+  - conflicting verdicts are escalated to the user (`R10-ask`)
+  - schemes apply to Step 1.2.4 (research review), Step 3 (spec review), and Step 6 (code review) respectively
+  - do not re-ask an already chosen scheme mid-process
 
 _Subagent governance_
 
@@ -148,13 +163,16 @@ _Subagent governance_
 
 **Roles:**
 
-Every role has a stable label `[A{n}-{slug}]`. Reference roles by label (e.g. `A1-drafter`), not by number — the label survives renumbering. One agent instance plays one role at a time.
+Every role has a stable label `[A{n}-{slug}]`. Reference roles by label (e.g. `A1-drafter`), not by number — the label survives renumbering.
+
+One agent instance plays one role at a time.
 
 - **`A1-drafter`** (Drafter)
   - main chat coordinator
   - researches the codebase alone or via `A2-researcher` / `A3-explorer`
   - writes the task specification (`overview.md`, subtasks, Execution Scheme)
-  - owns Step 1 (Research) and Step 2 (Spec drafting); may also close Step 8 / Pattern extract in current context
+  - owns Step 1 (Research) and Step 2 (Spec drafting)
+  - may also close Step 8 / Pattern extract in current context
 - **`A2-researcher`** (Researcher)
   - general open-ended research (web, docs, codebase, hypothesis checking)
   - read-only except the research file
@@ -170,8 +188,10 @@ Every role has a stable label `[A{n}-{slug}]`. Reference roles by label (e.g. `A
   - may fix defects found in that review; then stops and prompts the user
 - **`A5-coder`** (Coder)
   - executes one Execution Scheme subtask
-  - performs that subtask only (code, docs, config, rules); lists changed files per `R14-changed-files`
-  - sets `Status: Done` in the subtask file; does not rename to `_DONE_` or write `Used model`
+  - performs only that subtask (code, docs, config, rules)
+  - lists changed files per `R14-changed-files`
+  - sets `Status: Done` in the subtask file
+  - does not rename to `_DONE_` or write `Used model`
   - no subagents
 - **`A6-coordinator`** (Coordinator)
   - coordinates Coders (`A5-coder`) per the Execution Scheme
@@ -185,8 +205,10 @@ Applies to every sub-agent launch for any role (`A2-researcher`, `A3-explorer`, 
 
 1. Resolve Ambient context per `R16-ambient` (clarify if missing; do not ask when `Ambient context: none`).
 2. Put the resolved Ambient block at the very start of the sub-agent prompt (verbatim `Ambient rules: …` or `Ambient context: none`).
-3. Then add role-specific instructions (`R13-model-line`, `R14-changed-files`, Coder protocol, etc.).
-4. Every agent that received Ambient context passes it to each child sub-agent unchanged — same wording, same order; do not drop, summarize, or rewrite.
+3. Add role-specific instructions (`R13-model-line`, `R14-changed-files`, Coder protocol, etc.).
+4. Every agent receiving Ambient context passes it to each child sub-agent unchanged.
+   - Preserve the same wording and order.
+   - Do not drop, summarize, or rewrite it.
 
 ---
 
@@ -205,7 +227,9 @@ Applies to every sub-agent launch for any role (`A2-researcher`, `A3-explorer`, 
 → pattern extract to spawn/rules/
 ```
 
-Mark each status [V] on completion. Prompt the user after steps 3, 6, and 7. Step 0 is a gate, not a status step — it has no status checkbox. After Step 8, run Pattern extract (not a Status checkbox).
+Mark each status [V] on completion. Prompt the user after steps 3, 6, and 7.
+Step 0 is a gate, not a status step — it has no status checkbox.
+After Step 8, run Pattern extract (not a Status checkbox).
 
 ---
 
@@ -214,7 +238,10 @@ Mark each status [V] on completion. Prompt the user after steps 3, 6, and 7. Ste
 **Executor:** `A1-drafter` (current context)
 
 0.1 Classify the request per `R17-classify`:
-  - [A] Question -> answer directly (light mode); no `spec/tasks/` folder, no status checkboxes; optionally launch `A2-researcher`/`A3-explorer` (Subagent run protocol, `R13-model-line`) for accurate facts; if the answer reveals a real task, propose Step 2.
+  - [A] Question -> answer directly (light mode)
+    - no `spec/tasks/` folder or status checkboxes
+    - optionally launch `A2-researcher`/`A3-explorer` (Subagent run protocol, `R13-model-line`) for accurate facts
+    - if the answer reveals a real task, propose Step 2
   - [B] Initiative / task -> proceed to Step 1 (Research).
 0.2 If the type is unclear, ask via `R10-ask` and wait.
 
@@ -224,43 +251,27 @@ Mark each status [V] on completion. Prompt the user after steps 3, 6, and 7. Ste
 
 **Executor:** `A1-drafter`
 
-1.1 **Research depth selection** — ask the user (`R10-ask`) whether research is needed and at what depth:
-  - [inline] — no subagents; the drafter researches in-chat (trivial, one-off questions)
-  - [medium] — launch a single `A3-explorer` (or `A2-researcher` for a narrow single-line question) subagent (default)
-  - [high] — launch several directed `A3-explorer` subagents, one per direction line
-  - [skip] — no research needed; proceed directly to Step 2 (Spec drafting)
-  Default to [medium] if the user does not specify. If the task is trivial and the implementation path is obvious, offer [skip] first.
+1.1 **Combined start-of-task ask** — **MANDATORY!** At the start of the task, ask the user (`R10-ask`) ALL questions below SIMULTANEOUSLY in ONE ask tool call — no follow-up asks. Each question has its own options (or a "default / decide later" option):
 
-1.2 **Research loop** — run research in a loop, up to 3 waves:
-  1.2.1 Decompose — split research into independent direction lines (high = several, medium = one)
-  1.2.2 Launch — launch `A3-explorer`/`A2-researcher` subagents, one per line (Subagent run protocol `R16-ambient`, `R13-model-line`)
-  1.2.3 Collect — record findings into the `## Research summary` section of `overview.md`.
-  1.2.4 Review — launch `A4-reviewer` to review the research (Subagent run protocol)
-  1.2.5 Decide — gaps remain -> another wave (up to 3 total), return to 1.2.1; complete -> proceed to 1.3
-
-1.3 **User research review** — show the research summary, ask the user (`R10-ask`):
-  - [Proceed] — research sufficient, move to Step 2 (Spec drafting)
-  - [Refine] — needs refinement, user points out what to clarify, return to 1.2 (another wave, up to 3)
-  - [Stop] — stop here (finish or move to a separate chat with a prompt)
-
-- set [V] "Research" `[model-name]` (record the model per `R13-model-line`): `- [V] Research [model-name]`
-- list changed files per `R14-changed-files` if any files were edited
-
----
-
-## Step 2: Spec drafting
-
-**Executor:** `A1-drafter`
-
-2.1 **Project rules (navigation)** — **MANDATORY!** Follow `R11-navigation` before writing any spec content.
-
-2.2 **Implementation clarifications** — **MANDATORY!**:
-- Before writing any spec content, identify ambiguous, optional, or convention-dependent aspects.
-- Ask the user explicit questions (`R10-ask`) and wait for answers.
-- Record answers (or agreed defaults) in **Details**.
-- Skip only when there is a single obvious implementation path.
-- If **Ambient context** is not already set in this chat, ask via `R10-ask` (repository, session, and similar); accept a list or explicit `Ambient context: none` (`R16-ambient`).
-- If **motivation** is unclear, ask via `R10-ask` (multiple choice; adapt to context):
+- **Defaults** — for EVERY question the LLM proposes a default from its own judgment: recommended option as `{Option to select} (default)`, others as `{Option to select}` — so the user can accept all defaults in one reply.
+- **Run mode** — [interactive] (default) — user participates: questions, confirmations (Steps 4, 7), prompts as usual; [auto] — fully automatic: research, spec, self-reviews, implementation, reviews run entirely by the LLM, no user participation
+  - user questions and confirmations (Steps 4, 7) are skipped
+  - in `overview.md`, the "Spec review" and "Code review / debugging" checkboxes are NOT checked; record the mode in `## Run mode`
+- **Research depth** — whether research is needed and at what depth:
+  - [inline] — no subagents; drafter researches in-chat (trivial, one-off questions)
+  - [medium] — a single `A3-explorer` (or `A2-researcher` for a narrow single-line question) subagent (default)
+  - [medium-cross] — the SAME single direction line researched by TWO `A3-explorer`/`A2-researcher` subagents of DIFFERENT models
+    - merge findings and highlight disagreements
+  - [high] — several `A3-explorer` subagents, one per direction line
+  - [high-cross] — [high] plus: EACH direction line researched by TWO subagents of DIFFERENT models
+  - [skip] — no research; proceed directly to Step 2 (Spec drafting)
+  Default to [medium] if unspecified.
+  Offer [skip] first when the task is trivial and the implementation path is obvious.
+- **Cross model menu** — two platform models for the cross pair (different families), plus a "not needed" option; always included in the batch, applied only when a cross depth was chosen
+- **Research review scheme** — single (one model) or cross (two models) — for Step 1.2.4 (`R23-review-scheme`)
+- **Spec review scheme** — single (one model) or cross (two models) — for Step 3 (`R23-review-scheme`)
+- **Code review scheme** — single (one model) or cross (two models) — for Step 6 (`R23-review-scheme`)
+- **Motivation** (used in 2.2; if unclear) — multiple choice; adapt to context:
   - bug fix — restore correct behavior, regression, or broken promise
   - new feature — new user-visible capability, use case, or revenue path
   - UX — usability, accessibility, clarity, workflow friction
@@ -272,12 +283,48 @@ Mark each status [V] on completion. Prompt the user after steps 3, 6, and 7. Ste
   - experiment — hypothesis test or MVP slice
   - deprecation / migration — sunset or replace legacy behavior
   - other — name the driver in one sentence
-- Put the chosen motivation in **`## Motivation`** (after **Goal**).
-- Ask the user to choose an **invasiveness level** (`R10-ask`, multiple choice) — the edit scope the spec must respect:
-  - **minimally-invasive** — edits confined to a single layer or library; all other layers/libraries are left untouched, even if the solution is a workaround (crutch).
-  - **medium-invasive** — edits may span several adjacent layers or domains, e.g. backend + frontend, or domain1 + domain2.
-  - **maximally-invasive** — edits may span all layers and all domains; the LLM follows the principle of deep rework over a superficial fix with compromises.
-- Record the chosen level in **`## Invasiveness level`** (after **`## Motivation`**). Every affected file/symbol in the spec must stay within the chosen scope.
+- **Invasiveness level** (used in 2.2) — the edit scope the spec must respect:
+  - minimally-invasive — edits confined to a single layer or library; other layers untouched, even if the solution is a workaround (crutch)
+  - medium-invasive — edits may span several adjacent layers or domains (e.g. backend + frontend, domain1 + domain2)
+  - maximally-invasive — edits may span all layers and domains; deep rework over a superficial fix with compromises
+  - every affected file/symbol in the spec must stay within the chosen scope
+- **Task code** confirmation (`R3-code-num`), when applicable
+- **Ambient context** (`R16-ambient`), when not already set
+
+Record all answers; Steps 1.2, 2.2, 3, and 6 reuse them without re-asking.
+
+1.2 **Research loop** — run research in a loop, up to 3 waves:
+  1.2.1 Decompose — split research into independent direction lines (high / high-cross = several, medium / medium-cross = one)
+  1.2.2 Launch — launch `A3-explorer`/`A2-researcher` subagents, one per line (Subagent run protocol `R16-ambient`, `R13-model-line`)
+    - in cross modes (`medium-cross`, `high-cross`), launch TWO subagents per line with the two chosen models (1.1)
+  1.2.3 Collect — record findings into the `## Research summary` section of `overview.md`
+    - in cross modes, merge the two models' findings per line and explicitly list disagreements (with each model's position and recorded model names)
+  1.2.4 Review — launch `A4-reviewer` per the research review scheme from `## Review models` (`R23-review-scheme`; Subagent run protocol):
+    - single — one reviewer
+    - cross — two reviewers of different models in parallel; merge verdicts and escalate conflicts to the user (`R10-ask`)
+  1.2.5 Decide — gaps remain -> another wave (up to 3 total), return to 1.2.1; complete -> proceed to 1.3
+
+1.3 **User research review** — show the research summary, ask the user (`R10-ask`):
+  - [Proceed] — research sufficient, move to Step 2 (Spec drafting)
+  - [Refine] — needs refinement, user points out what to clarify, return to 1.2 (another wave, up to 3)
+  - [Stop] — stop here (finish or move to a separate chat with a prompt)
+
+- set [V] "Research" `[model-name]` (record the model per `R13-model-line`; cross research records both models, e.g. `[glm-5.3-flash + kimi-k3.1-pro]`): `- [V] Research [model-name]`
+- list changed files per `R14-changed-files` if any files were edited
+
+---
+
+## Step 2: Spec drafting
+
+**Executor:** `A1-drafter`
+
+2.1 **Project rules (navigation)** — **MANDATORY!** Follow `R11-navigation` before writing any spec content.
+
+2.2 **Implementation clarifications** — **MANDATORY!**:
+- Before writing any spec content, identify remaining ambiguous, optional, or convention-dependent aspects.
+- Ask the user explicit questions (`R10-ask`) and wait for answers.
+- Record answers (or agreed defaults) in **Details**.
+- Skip only when there is a single obvious implementation path.
 
 2.3 **Design overview**
 - In the task `overview.md`, add a **Design overview** section:
@@ -305,7 +352,11 @@ Mark each status [V] on completion. Prompt the user after steps 3, 6, and 7. Ste
   - affected files (named classes/methods/functions per path)
   - code changes (before/after)
 - set `Suggested model` for the step; leave `Used model` empty
-- optional: launch `A3-explorer` (or `A2-researcher`) as a new sub-agent for read-only research / codebase analysis to determine accurate **Before** / **After** text, then merge findings into the step files (research / analysis only; `A1-drafter` owns decomposition and the spec); follow **Subagent run protocol** (`R16-ambient`)
+- write the review schemes chosen in Step 1.1 into `## Review models` of `overview.md` (`R23-review-scheme`)
+- optional: launch `A3-explorer` (or `A2-researcher`) as a new sub-agent to determine accurate **Before** / **After** text
+  - read-only research / codebase analysis only; merge findings into the step files
+  - `A1-drafter` owns decomposition and the spec
+  - follow **Subagent run protocol** (`R16-ambient`)
 
 - set [V] "Spec drafting" `[model-name]` (record the model per `R13-model-line`): `- [V] Spec drafting [model-name]`
 - list changed files per `R14-changed-files`
@@ -314,15 +365,18 @@ Mark each status [V] on completion. Prompt the user after steps 3, 6, and 7. Ste
 
 ## Step 3: Spec self-review
 
-**Executor:** `A4-reviewer`
+**Executor:** `A4-reviewer` per the Spec review scheme from `## Review models` (`R23-review-scheme`)
 
+- single: launch one `A4-reviewer` with the chosen model
+- cross: launch TWO `A4-reviewer` subagents of the two chosen models IN PARALLEL, then merge their findings
+  - conflicting verdicts are escalated to the user (`R10-ask`)
 - sub-agent prompt: **Subagent run protocol** first (`R16-ambient`), then the line from `R13-model-line`
 - review the spec for:
   - architectural impact, implementation errors, sequencing issues
   - concrete files, modules, and symbols (classes, methods, functions) per `R8-concrete` in every step and overview
   - compliance with `R11-navigation`
 - fix if needed
-- set [V] "Spec self-review" `[model-name]` (record the model per `R13-model-line`): `- [V] Spec self-review [model-name]`
+- set [V] "Spec self-review" `[model-name]` (record the model per `R13-model-line`; cross review records both models, e.g. `[glm-5.3-flash + kimi-k3.1-pro]`): `- [V] Spec self-review [model-name]`
 - list changed files per `R14-changed-files` if any files were edited
 - prompt: "Spec self-review complete — spec is ready for your review (Step 4). Reply 'spec review passed', 'lgtm', or 'ok' when satisfied."
 
@@ -332,6 +386,7 @@ Mark each status [V] on completion. Prompt the user after steps 3, 6, and 7. Ste
 
 **Executor:** User
 
+- [auto] run mode (Step 1.1): skip; no user confirmation; leave the "Spec review" checkbox unchecked
 - on confirmation ("spec review passed", "lgtm", "ok"):
   - set [V] "Spec review"
   - prompt: "Reply 'implement' to start."
@@ -341,6 +396,7 @@ Mark each status [V] on completion. Prompt the user after steps 3, 6, and 7. Ste
 ## Step 5: Code implementation
 
 **Executor (coordination):** `A6-coordinator`
+- [auto] run mode (Step 1.1): start automatically after Step 3 — no "implement" command needed
 - **Same chat as Steps 1–3:**
   - `A1-drafter` must not act as `A6-coordinator` for Steps 5–6
   - on the implementation command, launch **one new sub-agent** as `A6-coordinator` for Steps 5–6 end-to-end
@@ -375,12 +431,16 @@ Mark each status [V] on completion. Prompt the user after steps 3, 6, and 7. Ste
 
 ## Step 6: Code self-review
 
-**Executor:** `A4-reviewer` (new sub-agent; launched by `A6-coordinator`)
+**Executor:** `A4-reviewer` per the Code review scheme from `## Review models` (`R23-review-scheme`) (new sub-agent or sub-agents; launched by `A6-coordinator`)
 
+- single: launch one `A4-reviewer` with the chosen model
+- cross: launch TWO `A4-reviewer` subagents of the two chosen models IN PARALLEL, then merge their findings
+  - conflicting verdicts are escalated to the user (`R10-ask`)
 - sub-agent prompt: **Subagent run protocol** first (`R16-ambient`), then the line from `R13-model-line`
-- review all changes: inconsistencies, naming, missing imports, broken contracts; respect Ambient context when present
+- review all changes: inconsistencies, naming, missing imports, broken contracts
+- respect Ambient context when present
 - fix if needed
-- set [V] "Code self-review" `[model-name]` (record the model per `R13-model-line`): `- [V] Code self-review [model-name]`
+- set [V] "Code self-review" `[model-name]` (record the model per `R13-model-line`; cross review records both models, e.g. `[glm-5.3-flash + deepseek-v4-flash]`): `- [V] Code self-review [model-name]`
 - list changed files per `R14-changed-files` if any files were edited
 - prompt: "Self review done. Reply 'code review passed' to proceed."
 
@@ -390,6 +450,7 @@ Mark each status [V] on completion. Prompt the user after steps 3, 6, and 7. Ste
 
 **Executor:** User
 
+- [auto] run mode (Step 1.1): skip; no user confirmation; leave the "Code review / debugging" checkbox unchecked
 - on confirmation ("code review passed", "lgtm", "ok"):
   - set [V] "Code review / debugging"
   - prompt: "Will now update design documents (Step 8)."
@@ -402,7 +463,9 @@ If the user requests rework or fixes after Step 5:
 
 - carry out the changes (as `A5-coder` or current context); list changed files per `R14-changed-files`
 - ask via `R10-ask`: "Do you want to update the specifications of the current task?"
-  - Yes: `A1-drafter` (or current context) edits the affected subtask files and/or `overview.md` to match the actual state; do not re-run the spec cycle; list changed files per `R14-changed-files`
+  - Yes: `A1-drafter` (or current context) edits the affected subtask files and/or `overview.md` to match the actual state
+    - do not re-run the spec cycle
+    - list changed files per `R14-changed-files`
   - No: proceed without changes
 
 ---
@@ -411,9 +474,12 @@ If the user requests rework or fixes after Step 5:
 
 **Executor:** `A1-drafter` (current context)
 
-- do not start Step 8 until **Code review / debugging** is marked (Step 7)
-- **Index** — read **spec/design.yaml**; if missing, only **spec/design/hla.md** applies (Folder Structure); add **spec/design.yaml** when you register more than one path under **spec/design/**
-- **Scope** — from subtasks, the Execution Scheme, and the files changed/added in this task, choose the `path` rows to update; update those that matter, skip the rest
+- do not start Step 8 until "Code review / debugging" is marked (Step 7); in [auto] run mode proceed after Step 6 (Step 7 skipped, unchecked)
+- **Index** — read **spec/design.yaml**
+  - if missing, only **spec/design/hla.md** applies (Folder Structure)
+  - add **spec/design.yaml** when you register more than one path under **spec/design/**
+- **Scope** — from subtasks, the Execution Scheme, and the files changed/added in this task, choose the `path` rows to update
+  - update those that matter; skip the rest
 - **Write** — for each chosen path, align the markdown with the repo after this task; create the file if it is listed but missing
 - if the task introduced or renamed architecture docs under **spec/design/**, update **spec/design.yaml** (`path` + `description` for each)
 - rename the folder to _DONE_{task-code}-{name}
@@ -430,7 +496,8 @@ If the user requests rework or fixes after Step 5:
 
 After Step 8, extract reusable approaches into **`spawn/rules/`** as project-standard candidates. Skill: **spectask-extract-patterns**.
 
-The agent filters candidates, presents the final list to the user in this run, then asks per-candidate acceptance via the ask tool (`R10-ask`).
+The agent filters candidates and presents the final list to the user in this run.
+It then asks per-candidate acceptance via the ask tool (`R10-ask`).
 
 **Order (mandatory):**
 
@@ -482,9 +549,12 @@ Reject immediately (do not offer):
 ### Write
 
 1. Write under **`spawn/rules/`** (create the folder if missing).
-2. Prefer an existing **`spawn/rules/`** file on the same topic — merge or revise. If none fits, create a new kebab-case Markdown file.
+2. Prefer an existing **`spawn/rules/`** file on the same topic — merge or revise.
+   If none fits, create a new kebab-case Markdown file.
 3. Prefer short code examples in each rule when applicable (criterion 6).
-4. Add each file to **`spawn/navigation.yaml`** under **`read-required` → `rules`** or **`read-contextual` → `rules`** as the user chose. Row: **`path`** + short **`description`**. Never list the same path in both.
+4. Add each file to **`spawn/navigation.yaml`** under **`read-required` → `rules`** or **`read-contextual` → `rules`** as the user chose.
+   Row: **`path`** + short **`description`**.
+   Never list the same path in both.
 5. Run exactly **`spawn refresh`** in the terminal.
 
 ---
@@ -516,6 +586,15 @@ Reject immediately (do not offer):
 
 ## Invasiveness level
 {minimally-invasive | medium-invasive | maximally-invasive — chosen in Step 2.2; constrains the edit scope of the spec.}
+
+## Review models
+- Research review: single agent: {model} | cross-review: {model1}, {model2}
+- Spec review: single agent: {model} | cross-review: {model1}, {model2}
+- Code review: single agent: {model} | cross-review: {model1}, {model2}
+{One line per scheme, exactly the chosen variant from the Step 1.1 combined ask (`R23-review-scheme`); drop the unused variant.}
+
+## Run mode
+{interactive | auto — from Step 1.1. `auto` = fully LLM-run, no user participation; user confirmations (Steps 4, 7) skipped, checkboxes left unchecked.}
 
 ## Research summary
 {Synthesized research findings with links to research files. Present only when the research phase (Step 1) ran.}
@@ -603,7 +682,9 @@ Used model:
 
 ---
 
-**Seed** — optional: a Markdown file in `spec/seeds/` to capture an idea fast; Steps 1–8 do not require it unless you deliberately start there. Link from `overview.md` when you promote into a spectask; apply Step 8 item 6 when closing the linked seed.
+**Seed** — optional Markdown file in `spec/seeds/` for capturing an idea quickly; Steps 1–8 do not require it unless you deliberately start there.
+Link it from `overview.md` when promoting it into a spectask.
+Apply Step 8 item 6 when closing the linked seed.
 
 ## Seed file template (header)
 

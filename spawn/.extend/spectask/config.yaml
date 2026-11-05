@@ -1,6 +1,6 @@
 schema: 1
 name: spectask
-version: "1.20.0"
+version: "1.22.3"
 
 hints:
   global:
@@ -66,6 +66,11 @@ skills:
   spectask-execute-step-by-step.md:
     name: spectask-execute-step-by-step
     description: "Step 5 — one Execution Scheme subtask per run with per-step self-review; auto Step 6 when all done (spec/main.md)."
+    required-read:
+      - spec/main.md
+  spectask-execute-step-by-step-dual-review.md:
+    name: spectask-execute-step-by-step-dual-review
+    description: "Step 5 — one subtask per run, each reviewed by two reviewer subagents of different models; deviations auto-fix, conceptual problems/spec bugs stop for a user decision (fix spec / spec+code / spec+revert)."
     required-read:
       - spec/main.md
   spectask-code-review-passed.md:
