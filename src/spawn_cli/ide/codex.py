@@ -18,7 +18,11 @@ from spawn_cli.ide.registry import (
 )
 from spawn_cli.io.toml_io import load_toml, save_toml
 from spawn_cli.models.mcp import McpServer, NormalizedMcp
+from spawn_cli.core import low_level as ll
 from spawn_cli.models.skill import SkillMetadata
+
+
+SPAWN_PERMISSIONS_PROFILE = "spawn"
 
 
 def _build_toml_server_entry(server: McpServer) -> dict:
@@ -51,7 +55,7 @@ class CodexAdapter(IdeAdapter):
             capabilities=IdeCapabilities(
                 skills="native",
                 mcp="project",
-                agent_ignore="unsupported",
+                agent_ignore="project",
                 entry_point="agents-md",
             ),
         )
@@ -104,12 +108,62 @@ class CodexAdapter(IdeAdapter):
         save_toml(config_path, data)
 
     def add_agent_ignore(self, target_root: Path, globs: list[str]) -> None:
-        del target_root, globs
-        warnings.warn("codex: agent ignore is unsupported; steer via AGENTS.md policy instead")
+        config_path = target_root / ".codex" / "config.toml"
+        data = load_toml(config_path)
+        if "sandbox_mode" in data:
+            warnings.warn(
+                "codex: sandbox_mode is set; permissions.spawn deny rules are inert "
+                "unless the user switches to default_permissions"
+            )
+        profile = data.setdefault("permissions", {}).setdefault(SPAWN_PERMISSIONS_PROFILE, {})
+        if "extends" not in profile:
+            profile["extends"] = ":workspace"
+        filesystem = profile.setdefault("filesystem", {})
+        if not isinstance(filesystem, dict):
+            filesystem = {}
+            profile["filesystem"] = filesystem
+        fs_rules = filesystem.setdefault(":workspace_roots", {})
+        if not isinstance(fs_rules, dict):
+            fs_rules = {}
+            filesystem[":workspace_roots"] = fs_rules
+        for glob in globs:
+            fs_rules[glob] = "deny"
+        save_toml(config_path, data)
 
     def remove_agent_ignore(self, target_root: Path, globs: list[str]) -> None:
-        del target_root, globs
-        warnings.warn("codex: agent ignore is unsupported")
+        config_path = target_root / ".codex" / "config.toml"
+        if not config_path.is_file():
+            return
+        data = load_toml(config_path)
+        permissions = data.get("permissions")
+        if not isinstance(permissions, dict):
+            return
+        profile = permissions.get(SPAWN_PERMISSIONS_PROFILE)
+        if not isinstance(profile, dict):
+            return
+        fs_rules = profile.get("filesystem")
+        if not isinstance(fs_rules, dict):
+            fs_rules = {}
+            profile["filesystem"] = fs_rules
+        rules = fs_rules.get(":workspace_roots")
+        if isinstance(rules, dict):
+            drop = set(globs)
+            for glob in drop:
+                rules.pop(glob, None)
+            if not rules:
+                fs_rules.pop(":workspace_roots", None)
+                if not fs_rules:
+                    profile.pop("filesystem", None)
+        if not profile or set(profile) <= {"extends"}:
+            permissions.pop(SPAWN_PERMISSIONS_PROFILE, None)
+            if not permissions:
+                data.pop("permissions", None)
+        save_toml(config_path, data)
+
+    def clear_spawn_agent_ignore(self, target_root: Path) -> None:
+        recorded = ll.get_agent_ignore_list(target_root, self.key)
+        if recorded:
+            self.remove_agent_ignore(target_root, recorded)
 
     def rewrite_entry_point(self, target_root: Path, prompt: str) -> str:
         ep = target_root / "AGENTS.md"

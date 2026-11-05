@@ -2,6 +2,10 @@ read-required:
 - rules:
   - path: spawn/rules/00-general.md
     description: General language-agnostic conventions (ASCII, documentation, chat language).
+  - path: spawn/rules/01-vacancy-cleanup-subtrees.md
+    description: finalize_*_repo cleanup must know every adapter-written config subtree; avoid dead configs.
+  - path: spawn/rules/02-agent-config-namespacing.md
+    description: Local rule file.
 - ext: mempalace-ext
   files:
   - path: .mempalace/wakeup.md
@@ -10,6 +14,10 @@ read-required:
   - "When finishing a task that involved editing this repo's code or docs: call mempalace_mine (mempalace-mine-mcp), then mempalace_reconnect on mempalace-mcp if already connected."
   - Prefer codebase search via mempalace-mcp first; use workspace full-text / ripgrep only if MemPalace is unavailable or insufficient.
 read-contextual:
+- ext: ide-adapters
+  files:
+  - path: spawn/rules/02-agent-config-namespacing.md
+    description: Optional convention — spawn-namespaced profiles in agent project configs (project-style adapters).
 - ext: spectask
   files:
   - path: spec/main.md

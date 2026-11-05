@@ -174,14 +174,31 @@ def finalize_claude_repo(target_root: Path) -> None:
 
 
 def finalize_codex_repo(target_root: Path) -> None:
+    from spawn_cli.ide.codex import SPAWN_PERMISSIONS_PROFILE
     from spawn_cli.io.toml_io import load_toml
 
     agents = target_root / ".agents"
     codex_cfg = target_root / ".codex" / "config.toml"
     if codex_cfg.is_file():
         data = load_toml(codex_cfg)
+        if isinstance(data, dict):
+            permissions = data.get("permissions")
+            if isinstance(permissions, dict):
+                profile = permissions.get(SPAWN_PERMISSIONS_PROFILE)
+                if isinstance(profile, dict):
+                    fs = profile.get("filesystem")
+                    fs = fs if isinstance(fs, dict) else {}
+                    if not fs.get(":workspace_roots"):
+                        permissions.pop(SPAWN_PERMISSIONS_PROFILE, None)
+                if not permissions:
+                    data.pop("permissions", None)
         if isinstance(data, dict) and (
-            data == {} or (set(data.keys()) <= {"mcp_servers"} and not data.get("mcp_servers"))
+            data == {}
+            or (
+                set(data.keys()) <= {"mcp_servers", "permissions"}
+                and not data.get("mcp_servers")
+                and not data.get("permissions")
+            )
         ):
             codex_cfg.unlink(missing_ok=True)
     prune_empty_directories_under(codex_cfg.parent)

@@ -76,6 +76,7 @@ Mandatory reads:
 - `.mempalace/guides/configuration.md` - Reference for config.json, mempalace.yaml, env vars, and repo-local palace_path.
 - `.mempalace/wakeup.md` - Bounded MemPalace wake-up context from the palace.
 - `spawn/rules/00-general.md` - General language-agnostic conventions (ASCII, documentation, chat language).
+- `spawn/rules/01-vacancy-cleanup-subtrees.md` - finalize_*_repo cleanup must know every adapter-written config subtree; avoid dead configs.
 - `spawn/navigation.yaml` - Merged Spawn navigation (read-required, read-contextual).
 
 Contextual reads:

@@ -167,7 +167,7 @@ includes a **Hints:** bullet list (full text; warnings only, no truncation).
 | IDE | Skills / rules target | MCP target | Agent ignore target | Entry point | Notes |
 | --- | --- | --- | --- | --- | --- |
 | Cursor | `.cursor/skills/{skill}/SKILL.md`; Project Rules `.cursor/rules/*.md`/`.mdc` | `.cursor/mcp.json`; other MCP JSON under `.cursor/` as detected | `.cursorignore` (repo root) | `AGENTS.md` | Rules and Skills are parallel mechanisms; legacy `.cursorrules` deprecated vs `.cursor/rules`. (Cursor also discovers other tools’ skill dirs for compatibility—outside this column.) |
-| Codex | `.agents/skills/{skill}/SKILL.md` | `.codex/config.toml` | — | `AGENTS.md` | OpenAI documents repo skills under `.agents/skills/` (not under `.codex/`). Requires trusted workspace for project `.codex/` layers. |
+| Codex | `.agents/skills/{skill}/SKILL.md` | `.codex/config.toml` | `.codex/config.toml` `[permissions.spawn]` deny rules (project-style; manual `default_permissions = "spawn"` activation) | `AGENTS.md` | OpenAI documents repo skills under `.agents/skills/` (not under `.codex/`). Requires trusted workspace for project `.codex/` layers. |
 | Qoder | `.qoder/skills/{skill-name}/SKILL.md` | `.mcp.json` | `.qoder/settings.json` `permissions` (and optional `hooks` in the same files) | `AGENTS.md` | `.qoder/rules` in-repo can supersede `.qoder`/memory behavior per Qoder IDE docs. |
 | Claude Code | `.claude/skills/{skill}/SKILL.md` | `.mcp.json` (repository root) | `.claude/settings.json` (`permissions.*`) | `CLAUDE.md` or `.claude/CLAUDE.md` | Spawn metadata/removal for MCP keyed by server name. |
 | Qwen Code | `.qwen/skills/{skill}/SKILL.md` | `.qwen/settings.json` `mcpServers` | `.qwen/settings.json` `permissions`; root `.qwenignore` | `QWEN.md` | Project settings file is repo-root `.qwen/settings.json`. |
@@ -549,7 +549,7 @@ specific and must not pretend to work when there is no supported target.
 | IDE | Agent ignore behavior |
 | --- | --- |
 | Cursor | Merge Spawn-owned globs into `.cursorignore` when present or supported. Terminal/MCP may still reach paths not covered by ignores. |
-| Codex | Unsupported dedicated agent-ignore file (`/.codexignore` not upstream); steer via AGENTS/policy. |
+| Codex | Project-style: write `"glob" = "deny"` entries under the spawn-namespaced profile `[permissions.spawn.filesystem.":workspace_roots"]` in `.codex/config.toml` (`extends = ":workspace"`); never write `default_permissions` (mutually exclusive with `sandbox_mode`) — the user activates the profile manually. No `.codexignore` exists upstream. |
 | Qoder | Use `.qoder/settings.json` permissions allow/ask/deny with gitignore-style path patterns (and hooks co-located in the same JSON). |
 | Claude Code | Prefer `permissions.*` and related keys in `.claude/settings.json` over undocumented single-file ignore semantics. |
 | Qwen Code | Use `permissions` rules (`deny` / `ask` / `allow`) for tool and path blocking; optionally merge Spawn globs into `.qwenignore` for search-scope reduction — not interchangeable with Cursor-style ignores. |
