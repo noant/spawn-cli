@@ -19,6 +19,7 @@ Full IDE adapter for **JetBrains Junie** (`src/spawn_cli/ide/junie.py`), replaci
 - Research agent: GLM-5.3 and Kimi-k3 (two lines, cross-checked).
 - Spec synthesis (drafting): GLM-5.3-flash.
 - Spec review: GLM-5.3.
+- Spec review: GLM-5.3 + Kimi-k3.1-pro.
 - Implementation: GLM-5.3-flash.
 
 When promoting this seed, run **spectask-create**.

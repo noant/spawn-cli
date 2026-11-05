@@ -8,6 +8,10 @@ read-required:
     description: Local rule file.
   - path: spawn/rules/03-adapter-spawn-warning.md
     description: IDE adapters emit warnings via SpawnWarning category for friendly CLI output.
+  - path: spawn/rules/04-adapter-skill-name-constraints.md
+    description: Local rule file.
+  - path: spawn/rules/05-adapter-canonical-config-file.md
+    description: Local rule file.
 - ext: mempalace-ext
   files:
   - path: .mempalace/wakeup.md
@@ -20,6 +24,10 @@ read-contextual:
   files:
   - path: spawn/rules/02-agent-config-namespacing.md
     description: Optional convention — spawn-namespaced profiles in agent project configs (project-style adapters).
+  - path: spawn/rules/04-adapter-skill-name-constraints.md
+    description: Optional convention — adapters sanitize skill names to the agent's stricter regex (name==dirname).
+  - path: spawn/rules/05-adapter-canonical-config-file.md
+    description: Optional convention — adapters write one canonical config file; no variant-format merges, error before mutation.
 - ext: spectask
   files:
   - path: spec/main.md

@@ -226,6 +226,41 @@ def finalize_github_copilot_repo(target_root: Path) -> None:
         pass
 
 
+_OPENCODE_CONFIG = "opencode.json"
+
+
+def _opencode_config_vacant(path: Path) -> bool:
+    data = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(data, dict):
+        return False  # user config in an unexpected shape: keep untouched
+    if data == {}:
+        return True
+    for key, value in data.items():
+        if key in ("mcp", "permission"):
+            if value:  # non-empty -> user content or live servers
+                return False
+        elif json_value_nonempty(value):  # unknown user key with substance
+            return False
+    return True
+
+
+def finalize_opencode_repo(target_root: Path) -> None:
+    """OpenCode adapter: root `opencode.json` (keys mcp, permission) and `.opencode/skills`; drop when vacant."""
+    config = target_root / _OPENCODE_CONFIG
+    if config.is_file():
+        try:
+            vacant = _opencode_config_vacant(config)
+        except json.JSONDecodeError:
+            vacant = False  # keep unparseable user config untouched
+        if vacant:
+            config.unlink()
+    skills_dir = target_root / ".opencode" / "skills"
+    if skills_dir.is_dir() and not dir_has_any_file(skills_dir):
+        prune_empty_directories_under(target_root / ".opencode")
+    if (target_root / ".opencode").is_dir() and not dir_has_any_file(target_root / ".opencode"):
+        (target_root / ".opencode").rmdir()
+
+
 def finalize_cline_repo(target_root: Path) -> None:
     """Cline adapter: `.cline/skills` dotdir and root `.clineignore`; drop both when vacant."""
     finalize_standard_dotdir_skills_and_mcp(
@@ -244,6 +279,7 @@ __all__ = [
     "dir_has_any_file",
     "finalize_claude_repo",
     "finalize_cline_repo",
+    "finalize_opencode_repo",
     "finalize_codex_repo",
     "finalize_github_copilot_repo",
     "finalize_standard_dotdir_skills_and_mcp",

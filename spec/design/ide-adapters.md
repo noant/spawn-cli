@@ -30,6 +30,8 @@ Supported names (canonical):
 - `windsurf`
 - `github-copilot`
 - `gemini-cli`
+- `cline`
+- `opencode`
 
 Additional IDE layouts (Qoder, Qwen Code, Aider, Zed, Devin) are described later
 in this document for future adapters; they are **not** CLI-supported until added
@@ -178,6 +180,7 @@ includes a **Hints:** bullet list (full text; warnings only, no truncation).
 | Gemini CLI | `.gemini/skills/{skill}/SKILL.md` | `.gemini/settings.json` `mcpServers` | `.geminiignore` | `GEMINI.md` (unless overridden via `context.fileName`) | Project `.gemini/settings.json` at repo root. (CLI may also merge `.agents/skills/` discovery—outside this column.) |
 | Devin | `.devin/skills/{skill}/SKILL.md` | `.devin/config.json` `mcpServers` | — | `AGENTS.md` | Imports from other tooling may merge MCP at runtime (`read-config-from`)—outside committed files unless copied. (Optional Spawn-only trees are not part of this matrix.) |
 | Cline | `.cline/skills/{skill}/SKILL.md` (frontmatter `name` must equal directory name) | — (no project-scope MCP; global `cline_mcp_settings.json` only) | `.clineignore` (repo root, gitignore-style) | `AGENTS.md` | MCP unsupported: Spawn warns and writes nothing. Detection markers: `.cline/`, `.clinerules/` or `.clinerules`, `.clineignore`. Legacy `.clinerules` is untouched by cleanup. |
+| OpenCode | `.opencode/skills/{skill}/SKILL.md` (frontmatter `name` must equal directory name; stricter name regex than spawn-wide normalization: `^[a-z0-9]+(-[a-z0-9]+)*$`, so `.`/`_` are sanitized to `-` by the adapter) | Root `opencode.json` key `mcp` | Root `opencode.json` `permission.read` / `permission.edit` `"glob": "deny"` entries (project-style, dict-keyed, idempotent; last matching rule wins) | `AGENTS.md` | Detection markers: `.opencode/`, `opencode.json`, `opencode.jsonc` (`AGENTS.md` alone is NOT a marker — shared with other adapters). Spawn writes only `opencode.json` (never merges JSONC); unparseable JSON errors before mutation. OpenCode also discovers `.claude/skills`/`.agents/skills` (compat — outside this column). No upstream ignore file exists. |
 
 ## Skill Rendering
 
@@ -502,6 +505,36 @@ If project-level Codex config is skipped (e.g. workspace not trusted) or
 unsupported by the installed Codex build, the adapter reports that user-level
 config requires explicit approval.
 
+### OpenCode JSON Shape
+
+OpenCode uses the root `opencode.json` with key `mcp`. Local (stdio) entries
+carry the whole argv in a single `command` array (no separate `args` key);
+remote covers both `streamable-http` and `sse` (the distinction is lost).
+Placeholders use the `{env:VAR}` form, not `${VAR}`.
+
+```json
+{
+  "mcp": {
+    "spawn-proxy": {
+      "type": "local",
+      "command": ["spawn", "mcp_stdio", "extension", "ext-id", "name", "spawn-proxy"],
+      "enabled": true,
+      "environment": { "SPECTASK_TOKEN": "{env:SPECTASK_TOKEN}" }
+    },
+    "remote-srv": {
+      "type": "remote",
+      "url": "https://mcp.example.com/mcp",
+      "headers": { "Authorization": "Bearer {env:MY_API_KEY}" }
+    }
+  }
+}
+```
+
+Spawn always writes `opencode.json` (never merges `opencode.jsonc`; a warning
+is emitted when only the JSONC file exists). Unparseable `opencode.json`
+raises an error before mutation. Removal pops server keys and prunes the
+empty `mcp` key.
+
 ## Entry Point Rendering
 
 Entry point files are user-visible and may already contain user instructions.
@@ -539,6 +572,7 @@ Entry point targets:
 | Gemini CLI | `GEMINI.md` |
 | Devin | `AGENTS.md` |
 | Cline | `AGENTS.md` |
+| OpenCode | `AGENTS.md` |
 
 Gemini CLI additionally reads which context filenames to load via `context.fileName` under the `context` section in `.gemini/settings.json` (a string or array; default behavior still centers on `GEMINI.md` unless changed).
 
@@ -561,6 +595,7 @@ specific and must not pretend to work when there is no supported target.
 | Zed | No Cursor-style `.cursorignore`; approximate exclusions via scan settings and `agent.tool_permissions`. |
 | Gemini CLI | Merge Spawn-owned globs into `.geminiignore`. |
 | Devin | Spawn does not assume a writable ignore-file contract; Terminal may expose `respect_gitignore` for tools only. |
+| OpenCode | Project-style: write `"glob": "deny"` entries under `permission.read` and `permission.edit` in root `opencode.json` (dict-keyed, idempotent; removal prunes only spawn-owned entries and empty subtrees, user rules kept). No ignore file exists upstream; `permission` is the documented mechanism (last matching rule wins). Clear via the metadata `agent-ignore.txt` recorded list. |
 
 When an adapter renders ignore globs into a file that also contains user globs,
 it must use a managed block or an ownership metadata comparison so uninstall
