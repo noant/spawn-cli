@@ -121,7 +121,7 @@ _Interaction and context_
 - **`R23-review-scheme`**
   - review schemes (research review, spec review, code review) are chosen ONCE at the start of the task (Step 1.1 combined ask)
   - record them in `## Review models` of `overview.md`
-  - format per line: `single agent: {model}` or `cross-review: {model1}, {model2}`
+  - format per line: `single agent: {model}` or `cross-review: {model1}, {model2}`; optional `fallback: {model}` — used when a chosen model is unavailable
   - cross-review = TWO `A4-reviewer` subagents of DIFFERENT model families run IN PARALLEL on the same artifact
   - the coordinator merges verdicts
   - conflicting verdicts are escalated to the user (`R10-ask`)
@@ -161,6 +161,14 @@ _Subagent governance_
   - for git files pass the git session id; for ws docs omit it
   - never use navigate to read contents — only to show files in the UI
 
+- **`R24-review-no-fix`**
+  - `A4-reviewer` must not edit anything during review
+  - output: findings list — severity, location (path + symbol), description, suggested fix (text only)
+  - findings go in the response to the launching coordinator
+  - resolution: Step 3 — `A1-drafter` fixes the spec itself; Step 6 — `A6-coordinator` fixes itself or dispatches to `A5-coder`
+  - coordinator may re-launch the reviewer to verify fixes
+  - reviewer edits are a defect; coordinator must revert them
+
 **Roles:**
 
 Every role has a stable label `[A{n}-{slug}]`. Reference roles by label (e.g. `A1-drafter`), not by number — the label survives renumbering.
@@ -185,7 +193,7 @@ One agent instance plays one role at a time.
   - reviews spec / code / research
   - reviews at Spec self-review (Step 3) and Code self-review (Step 6)
   - may launch `A2-researcher` / `A3-explorer`; no deeper
-  - may fix defects found in that review; then stops and prompts the user
+  - never edits itself: returns findings to the coordinator (`R24-review-no-fix`)
 - **`A5-coder`** (Coder)
   - executes one Execution Scheme subtask
   - performs only that subtask (code, docs, config, rules)
@@ -268,6 +276,7 @@ After Step 8, run Pattern extract (not a Status checkbox).
   Default to [medium] if unspecified.
   Offer [skip] first when the task is trivial and the implementation path is obvious.
 - **Cross model menu** — two platform models for the cross pair (different families), plus a "not needed" option; always included in the batch, applied only when a cross depth was chosen
+- **Fallback model** — fallback per chosen model if the primary is unavailable; default: nearest model of another family; one common fallback is acceptable; record in `## Review models` as `fallback: {model}`
 - **Research review scheme** — single (one model) or cross (two models) — for Step 1.2.4 (`R23-review-scheme`)
 - **Spec review scheme** — single (one model) or cross (two models) — for Step 3 (`R23-review-scheme`)
 - **Code review scheme** — single (one model) or cross (two models) — for Step 6 (`R23-review-scheme`)
@@ -375,7 +384,8 @@ Record all answers; Steps 1.2, 2.2, 3, and 6 reuse them without re-asking.
   - architectural impact, implementation errors, sequencing issues
   - concrete files, modules, and symbols (classes, methods, functions) per `R8-concrete` in every step and overview
   - compliance with `R11-navigation`
-- fix if needed
+- reviewer returns findings only, no edits (`R24-review-no-fix`)
+- `A1-drafter` fixes the spec itself (or via `A5-coder`); re-review if needed
 - set [V] "Spec self-review" `[model-name]` (record the model per `R13-model-line`; cross review records both models, e.g. `[glm-5.3-flash + kimi-k3.1-pro]`): `- [V] Spec self-review [model-name]`
 - list changed files per `R14-changed-files` if any files were edited
 - prompt: "Spec self-review complete — spec is ready for your review (Step 4). Reply 'spec review passed', 'lgtm', or 'ok' when satisfied."
@@ -439,7 +449,8 @@ Record all answers; Steps 1.2, 2.2, 3, and 6 reuse them without re-asking.
 - sub-agent prompt: **Subagent run protocol** first (`R16-ambient`), then the line from `R13-model-line`
 - review all changes: inconsistencies, naming, missing imports, broken contracts
 - respect Ambient context when present
-- fix if needed
+- reviewer returns findings only, no edits (`R24-review-no-fix`)
+- `A6-coordinator` fixes itself or dispatches to `A5-coder`; re-review if needed
 - set [V] "Code self-review" `[model-name]` (record the model per `R13-model-line`; cross review records both models, e.g. `[glm-5.3-flash + deepseek-v4-flash]`): `- [V] Code self-review [model-name]`
 - list changed files per `R14-changed-files` if any files were edited
 - prompt: "Self review done. Reply 'code review passed' to proceed."

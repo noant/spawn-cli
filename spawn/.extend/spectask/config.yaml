@@ -1,6 +1,6 @@
 schema: 1
 name: spectask
-version: "1.23.2"
+version: "1.25.1"
 
 hints:
   global:
