@@ -18,6 +18,8 @@ extensions:
     path: .cursor/skills/spectask-from-jira/SKILL.md
   - skill: spectask-seed-create
     path: .cursor/skills/spectask-seed-create/SKILL.md
+  - skill: spectask-shake-out
+    path: .cursor/skills/spectask-shake-out/SKILL.md
   - skill: spectask-spec-review-passed
     path: .cursor/skills/spectask-spec-review-passed/SKILL.md
   mempalace-ext:

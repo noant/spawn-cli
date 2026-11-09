@@ -1,6 +1,6 @@
 schema: 1
 name: spectask
-version: "1.25.1"
+version: "1.26.0"
 
 hints:
   global:
@@ -71,6 +71,11 @@ skills:
   spectask-execute-step-by-step-dual-review.md:
     name: spectask-execute-step-by-step-dual-review
     description: "Step 5 — one subtask per run, each reviewed by two reviewer subagents of different models; deviations auto-fix, conceptual problems/spec bugs stop for a user decision (fix spec / spec+code / spec+revert)."
+    required-read:
+      - spec/main.md
+  spectask-shake-out.md:
+    name: spectask-shake-out
+    description: "Spec shake-out — cross-model panel review of spec subtasks, synthesized fixes with git-diff fix review, final full-spec panel review."
     required-read:
       - spec/main.md
   spectask-code-review-passed.md:
