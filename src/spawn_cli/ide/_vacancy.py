@@ -6,6 +6,8 @@ import json
 import shutil
 from pathlib import Path
 
+from spawn_cli.ide._helpers import clear_split_agent_ignore_file
+
 
 def json_value_nonempty(v: object) -> bool:
     """True if nested JSON-ish value carries user-visible substance."""
@@ -174,14 +176,31 @@ def finalize_claude_repo(target_root: Path) -> None:
 
 
 def finalize_codex_repo(target_root: Path) -> None:
+    from spawn_cli.ide.codex import SPAWN_PERMISSIONS_PROFILE
     from spawn_cli.io.toml_io import load_toml
 
     agents = target_root / ".agents"
     codex_cfg = target_root / ".codex" / "config.toml"
     if codex_cfg.is_file():
         data = load_toml(codex_cfg)
+        if isinstance(data, dict):
+            permissions = data.get("permissions")
+            if isinstance(permissions, dict):
+                profile = permissions.get(SPAWN_PERMISSIONS_PROFILE)
+                if isinstance(profile, dict):
+                    fs = profile.get("filesystem")
+                    fs = fs if isinstance(fs, dict) else {}
+                    if not fs.get(":workspace_roots"):
+                        permissions.pop(SPAWN_PERMISSIONS_PROFILE, None)
+                if not permissions:
+                    data.pop("permissions", None)
         if isinstance(data, dict) and (
-            data == {} or (set(data.keys()) <= {"mcp_servers"} and not data.get("mcp_servers"))
+            data == {}
+            or (
+                set(data.keys()) <= {"mcp_servers", "permissions"}
+                and not data.get("mcp_servers")
+                and not data.get("permissions")
+            )
         ):
             codex_cfg.unlink(missing_ok=True)
     prune_empty_directories_under(codex_cfg.parent)
@@ -207,65 +226,126 @@ def finalize_github_copilot_repo(target_root: Path) -> None:
         pass
 
 
-def opencode_config_json_mcp_is_empty(path: Path) -> bool:
-    """True when opencode.json has no MCP servers and only schema metadata besides."""
-    if not path.is_file():
-        return False
-    try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return False
+_OPENCODE_CONFIG = "opencode.json"
+
+
+def _opencode_config_vacant(path: Path) -> bool:
+    data = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(data, dict):
-        return False
-    mcp = data.get("mcp")
-    if not (mcp in (None, {}) or (isinstance(mcp, dict) and len(mcp) == 0)):
-        return False
-    for k, v in data.items():
-        if k not in ("$schema", "mcp") and json_value_nonempty(v):
+        return False  # user config in an unexpected shape: keep untouched
+    if data == {}:
+        return True
+    for key, value in data.items():
+        if key in ("mcp", "permission"):
+            if value:  # non-empty -> user content or live servers
+                return False
+        elif json_value_nonempty(value):  # unknown user key with substance
             return False
     return True
 
 
-def _clean_skill_subdir(skill_subdir: Path) -> None:
-    for f in skill_subdir.iterdir():
-        if f.is_file():
-            f.unlink()
-    try:
-        if not any(skill_subdir.iterdir()):
-            skill_subdir.rmdir()
-    except OSError:
-        pass
-
-
 def finalize_opencode_repo(target_root: Path) -> None:
-    if opencode_config_json_mcp_is_empty(target_root / "opencode.json"):
-        (target_root / "opencode.json").unlink(missing_ok=True)
-    skills_dir = target_root / ".opencode" / "skills"
-    if skills_dir.is_dir():
-        for skill_subdir in skills_dir.iterdir():
-            if skill_subdir.is_dir():
-                _clean_skill_subdir(skill_subdir)
+    """OpenCode adapter: root `opencode.json` (keys mcp, permission) and `.opencode/skills`; drop when vacant."""
+    config = target_root / _OPENCODE_CONFIG
+    if config.is_file():
         try:
-            if not any(skills_dir.iterdir()):
-                skills_dir.rmdir()
-        except OSError:
-            pass
-    opencode_dir = target_root / ".opencode"
-    if ide_dotdir_is_entirely_removable(opencode_dir, allow_delete_entire=True):
-        shutil.rmtree(opencode_dir, ignore_errors=True)
+            vacant = _opencode_config_vacant(config)
+        except json.JSONDecodeError:
+            vacant = False  # keep unparseable user config untouched
+        if vacant:
+            config.unlink()
+    skills_dir = target_root / ".opencode" / "skills"
+    if skills_dir.is_dir() and not dir_has_any_file(skills_dir):
+        prune_empty_directories_under(target_root / ".opencode")
+    if (target_root / ".opencode").is_dir() and not dir_has_any_file(target_root / ".opencode"):
+        (target_root / ".opencode").rmdir()
+
+
+def finalize_hermes_repo(target_root: Path) -> None:
+    """Hermes adapter: `.hermes/skills` dotdir; drop when vacant."""
+    finalize_standard_dotdir_skills_and_mcp(
+        target_root,
+        ".hermes",
+        allow_delete_entire=True,
+    )
+
+
+def finalize_junie_repo(target_root: Path) -> None:
+    """Junie adapter: `.junie/{skills,mcp/mcp.json}`; drop parts when vacant, keep user content."""
+    junie_root = target_root / ".junie"
+    if not junie_root.is_dir():
+        return
+    try_unlink_empty_mcp_mcp_servers(junie_root / "mcp" / "mcp.json")
+    prune_empty_directories_under(junie_root)
+    if ide_dotdir_is_entirely_removable(junie_root, allow_delete_entire=True):
+        shutil.rmtree(junie_root, ignore_errors=True)
+    ignore = target_root / ".aiignore"
+    if ignore.is_file():
+        clear_split_agent_ignore_file(ignore)
+        if not ignore.read_text(encoding="utf-8").strip():
+            ignore.unlink(missing_ok=True)
+
+
+def finalize_cline_repo(target_root: Path) -> None:
+    """Cline adapter: `.cline/skills` dotdir and root `.clineignore`; drop both when vacant."""
+    finalize_standard_dotdir_skills_and_mcp(
+        target_root,
+        ".cline",
+        allow_delete_entire=True,
+    )
+    ignore = target_root / ".clineignore"
+    if ignore.is_file():
+        clear_split_agent_ignore_file(ignore)
+        if not ignore.read_text(encoding="utf-8").strip():
+            ignore.unlink(missing_ok=True)
+
+
+def _mimo_config_vacant(path: Path) -> bool:
+    data = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(data, dict):
+        return False  # user config in an unexpected shape: keep untouched
+    if data == {}:
+        return True
+    for key, value in data.items():
+        if key in ("mcp", "permission"):
+            if value:  # non-empty -> user content or live servers
+                return False
+        elif json_value_nonempty(value):  # unknown user key with substance
+            return False
+    return True
+
+
+def finalize_mimo_code_repo(target_root: Path) -> None:
+    """Mimo Code adapter: `.mimocode/mimocode.json` (keys mcp, permission) and `.mimocode/skills`; drop when vacant."""
+    config = target_root / ".mimocode" / "mimocode.json"
+    if config.is_file():
+        try:
+            vacant = _mimo_config_vacant(config)
+        except json.JSONDecodeError:
+            vacant = False  # keep unparseable user config untouched
+        if vacant:
+            config.unlink()
+    skills_dir = target_root / ".mimocode" / "skills"
+    if skills_dir.is_dir() and not dir_has_any_file(skills_dir):
+        prune_empty_directories_under(target_root / ".mimocode")
+    if (target_root / ".mimocode").is_dir() and not dir_has_any_file(target_root / ".mimocode"):
+        (target_root / ".mimocode").rmdir()
 
 
 __all__ = [
     "dir_has_any_file",
     "finalize_claude_repo",
+    "finalize_cline_repo",
+    "finalize_hermes_repo",
+    "finalize_junie_repo",
+    "finalize_mimo_code_repo",
+    "finalize_opencode_repo",
     "finalize_codex_repo",
     "finalize_github_copilot_repo",
-    "finalize_opencode_repo",
     "finalize_standard_dotdir_skills_and_mcp",
     "ide_dotdir_is_entirely_removable",
     "json_value_nonempty",
     "mcp_json_mcp_servers_format_is_empty",
-    "opencode_config_json_mcp_is_empty",
     "prune_empty_directories_under",
     "vscode_servers_mcp_json_is_empty",
 ]

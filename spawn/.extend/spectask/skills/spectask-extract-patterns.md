@@ -1,24 +1,23 @@
 ---
 name: spectask-extract-patterns
-description: After Step 7 — present reusable patterns as a single list to the user (no preliminary questions), then write per user's per-candidate decision.
+description: After Step 8 - present reusable patterns as a single list, ask per-candidate via the ask tool, then write per the user's decision.
 ---
 
-**Mandatory:** read **spec/main.md** in full before acting — especially Optional: Pattern extract (after Step 7).
+**Mandatory:** read **spec/main.md** in full — **Pattern extract (after Step 8)**.
 
 **Role:** `A1-drafter`
 
-**Steps:** after Step 7 only — not a Status checkbox.
+**Steps:** after Step 8 only — not a Status checkbox.
 
 **Rules:** `R14-changed-files` (+ Selection criteria and Write rules in **spec/main.md**)
 
-**Roles involved:** `A1-drafter`; User (per-candidate Required/Optional/Decline in one reply)
-
 **Flow:**
 
-1. Read **spec/main.md** fully — **Optional: Pattern extract (after Step 7)** (Discover, Selection criteria, Present, Apply, Write).
-2. Execute **Discover** exactly as written.
-3. If Discover leaves zero candidates, say so briefly and stop (do not ask, do not present, do not invent fillers).
-4. Otherwise **Present** the entire filtered list in **one message** in this run, right after Step 7 — no `R10-ask`, no per-candidate tool questions, no pauses. For each survivor: short title + one-line rationale + suggested scope (Required = `read-required`, Optional = `read-contextual`). End the message with an explicit reply request: tell the user how to respond (per-candidate Required/Optional/Decline, or "decline all" to skip everything).
-5. **Wait** for the user's reply. Do not write rules yet, do not run `spawn refresh`, do not start the next task.
-6. After the reply, **Apply** the user's answer: write only Required/Optional candidates; candidates not addressed default to Decline. If everything is Declined, write nothing.
-7. Execute **Write** exactly as written (Required/Optional only), then `spawn refresh`.
+1. Read **spec/main.md** fully — Pattern extract (Discover, Selection criteria, Present, Ask, Apply, Write).
+2. **Discover** exactly as written.
+3. Zero candidates → say so briefly and stop (no ask, no present, no fillers).
+4. `[auto]`: skip Present/Ask — write all survivors, scope auto-detected (Required = repo-wide rule, Optional = context-specific), update `spawn/navigation.yaml`, `spawn refresh`, list changed files (`R14`).
+5. `[interactive]`: **Present** the entire filtered list in **one message** right after Step 8; per survivor: short title + one-line rationale + scope (Required = `read-required`, Optional = `read-contextual`).
+6. `[interactive]`: **Ask** per-candidate Required/Optional/Decline plus "decline all" via the ask tool (`R10-ask`); wait. Do not write rules, run `spawn refresh`, or start the next task yet.
+7. **Apply**: write only Required/Optional candidates; unanswered candidates default to Decline; all Declined → write nothing.
+8. **Write** exactly as written (Required/Optional only), then `spawn refresh`.

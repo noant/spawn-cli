@@ -102,6 +102,7 @@ ALIASES: dict[str, str] = {
     "gemini": "gemini-cli",
     "copilot": "github-copilot",
     "github": "github-copilot",
+    "mimo": "mimo-code",
 }
 
 _registry: dict[str, IdeAdapter] = {}  # populated at module load by adapter modules

@@ -1,0 +1,35 @@
+---
+name: spectask-execute-step-by-step-dual-review
+description: Interactive mode - Step 5 subtask-per-run like spectask-execute-step-by-step, with per-subtask cross review per the Code review scheme (R23); spec deviations auto-fix, conceptual problems stop for a user decision.
+---
+
+Interactive cross-review variant of **spectask-execute-step-by-step**. Reviewer pairs come from the **Code review scheme** in `## Review models` (`R23-review-scheme`, chosen in Step 1.1). If NOT recorded (fresh execute chat), ask ONCE (`R10-ask`) before the first subtask:
+- cross-review pair — two models of DIFFERENT families;
+- fallback model — per member (or one common) for when the primary is unavailable; default: nearest model of another family.
+Record in `## Review models`; do not re-ask. In `[auto]` run mode use **spectask-execute** instead.
+
+**Mandatory:** read **spec/main.md** in full — Steps 5-6, Coder protocol, Subagent run protocol.
+
+**Role:** `A6-coordinator`
+
+**Rules:** `R7-process`, `R10-ask`, `R13-model-line`, `R14-changed-files`, `R15-done-marking`, `R16-ambient`, `R23-review-scheme`
+
+**Roles involved:** `A6-coordinator`, `A5-coder`, `A4-reviewer` (x2 per step, review-only), `A4-reviewer` (full Step 6)
+
+**Per-subtask loop (each Execution Scheme subtask, in scheme order):**
+
+1. Launch ONE `A5-coder` subagent for the subtask (Subagent run protocol, Coder protocol, `R13`); coder builds and lists changed files (`R14`).
+2. Mark done per `R15-done-marking` (rename `_DONE_{N}`, set `Used model`).
+3. Launch TWO `A4-reviewer` subagents IN PARALLEL (the cross-review pair; if a model is unavailable, use its fallback, record it in the review-findings file), same ambient rules. REVIEW-ONLY: no edits. Each returns a verdict: `OK` / `SPEC_DEVIATIONS` (diverges from spec: wrong/missing symbols, changed behavior) / `CONCEPTUAL_PROBLEM` (spec bug, impossible contract, design flaw, cross-step breakage).
+4. Triage:
+   - both `OK` → next subtask.
+   - `SPEC_DEVIATIONS` or minor inconsistencies (non-critical) → do NOT stop: fix code AND the affected spec files SIMULTANEOUSLY (subtask, overview, scheme) so they stay consistent; optional quick re-check by the stricter reviewer; next subtask.
+   - `CONCEPTUAL_PROBLEM` (critical) → STOP. Present findings; ask (`R10-ask`): a) fix spec + code; b) fix spec and REVERT the codebase to the pre-spec state (reset subtasks: Status: Not implemented, empty `Used model`, rename from `_DONE_`) for a fresh re-run; c) user handles it.
+5. Record accepted fix rounds in the review-findings file and overview `## Details` (numbered rounds: found / decided / changed).
+
+**Completion:** all subtasks done → mark `Code implementation [model]`, run full **Step 6** per spec/main.md, then `[interactive]` wait for user Step 7 / `[auto]` continue to Step 8. Escalation rule stays active during Step 6.
+
+**Notes:**
+- Spec corrections must keep the task re-runnable from scratch (a fresh re-run of the spec must succeed) and must not deviate from the overview/subtask templates (spec/main.md).
+- Reviewer prompts must state: authoritative spec files, implemented file list, round-specific fixes to verify, verdict format, `My model:` line (`R13`).
+- When a coder must deviate for compilation (e.g. aligning earlier-step code with a just-fixed spec), instruct MINIMAL edits reported separately as "alignment edits".

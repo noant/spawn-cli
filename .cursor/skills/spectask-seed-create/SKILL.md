@@ -4,11 +4,11 @@ description: Capture a rough idea as spec/seeds/{X}-{slug}.md (not a full task);
 ---
 
 
-**Mandatory:** read **spec/main.md** in full before acting — especially Seed paragraph and Seed file template.
+**Mandatory:** read **spec/main.md** in full — Seed paragraph and Seed file template.
 
 **Role:** `A1-drafter`
 
-**Steps:** none of 1–7 — seed only. Promotion → **spectask-create**; seed close → Step 7 item 6.
+**Steps:** none of 1-8 — seed only. Promotion → **spectask-create**; seed close → Step 8 item 6.
 
 **Rules:** `R1-paths`, `R2-no-clutter`, `R3-code-num` / `R4-code-tracker` (when promoting later), `R10-ask`
 
@@ -16,7 +16,7 @@ description: Capture a rough idea as spec/seeds/{X}-{slug}.md (not a full task);
 
 1. Read **spec/main.md** fully — Folder Structure (`spec/seeds/`), Seed paragraph, Seed file template (header).
 2. Create `spec/seeds/{X}-{slug}.md` exactly per that template (`linked task: none` unless already bound).
-3. Offer **spectask-create** when the user wants to promote. Do not run Steps 1–7 in this skill.
+3. Offer **spectask-create** when the user wants to promote. Do not run Steps 1-8 in this skill.
 
 
 
@@ -26,11 +26,17 @@ Hints:
 - Use the platform ask tool when available (R10-ask in spec/main.md); otherwise, stop and request input from the user.
 
 Mandatory reads:
-- `spec/main.md` - Spec-Tasks methodology — folder structure, seven-step process, overview template.
+- `spec/main.md` - Spec-Tasks methodology — folder structure, eight-step process, overview template.
 - `spec/design.yaml` - Index of architecture documents under spec/design/ — path and description per entry.
 - `.mempalace/wakeup.md` - Bounded MemPalace wake-up context from the palace.
 - `spawn/rules/00-general.md` - General language-agnostic conventions (ASCII, documentation, chat language).
+- `spawn/rules/01-vacancy-cleanup-subtrees.md` - finalize_*_repo cleanup must know every adapter-written config subtree; avoid dead configs.
+- `spawn/rules/02-agent-config-namespacing.md` - Local rule file.
+- `spawn/rules/03-adapter-spawn-warning.md` - IDE adapters emit warnings via SpawnWarning category for friendly CLI output.
+- `spawn/rules/04-adapter-skill-name-constraints.md` - Local rule file.
+- `spawn/rules/05-adapter-canonical-config-file.md` - Local rule file.
+- `spawn/rules/06-new-ide-adapter-checklist.md` - Local rule file.
 - `spawn/navigation.yaml` - Merged Spawn navigation (read-required, read-contextual).
 
 Contextual reads:
-- `spec/design/hla.md` - Project high-level architecture; updated in Step 7.
+- `spec/design/hla.md` - Project high-level architecture; updated in Step 8.

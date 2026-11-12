@@ -9,7 +9,17 @@ from . import gemini_cli  # noqa: F401
 from . import github_copilot  # noqa: F401
 from . import opencode  # noqa: F401
 from . import windsurf  # noqa: F401
+from . import cline  # noqa: F401
+from . import opencode  # noqa: F401
+from . import mimo_code  # noqa: F401
+from . import hermes  # noqa: F401
+from . import junie  # noqa: F401
 from ._stub import StubAdapter
+from .cline import ClineAdapter
+from .opencode import OpenCodeAdapter
+from .mimo_code import MimoCodeAdapter
+from .hermes import HermesAdapter
+from .junie import JunieAdapter
 from .claude_code import ClaudeCodeAdapter
 from .codex import CodexAdapter
 from .cursor import CursorAdapter
@@ -44,6 +54,11 @@ from .registry import (
 
 __all__ = [
     "ALIASES",
+    "ClineAdapter",
+    "OpenCodeAdapter",
+    "MimoCodeAdapter",
+    "HermesAdapter",
+    "JunieAdapter",
     "ClaudeCodeAdapter",
     "CodexAdapter",
     "CursorAdapter",

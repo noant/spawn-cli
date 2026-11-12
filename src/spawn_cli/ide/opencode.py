@@ -1,68 +1,89 @@
-"""OpenCode IDE adapter: skills under .opencode/skills/{name}/SKILL.md, MCP in opencode.json, AGENTS.md."""
+"""OpenCode CLI adapter: .opencode/skills, root opencode.json (mcp + permission), AGENTS.md."""
 
 from __future__ import annotations
 
 import json
+import re
 import warnings
 from pathlib import Path
-from typing import Any
 
+from spawn_cli.core import low_level as ll
+from spawn_cli.errors import SpawnError, SpawnWarning
 from spawn_cli.ide import _vacancy as _vac
 from spawn_cli.ide.mcp_stdio_argv import mcp_stdio_argv
 from spawn_cli.ide.registry import (
     DetectResult,
     IdeAdapter,
     IdeCapabilities,
-    register,
     normalize_skill_name,
+    register,
     render_skill_md,
     rewrite_managed_block,
 )
 from spawn_cli.models.mcp import McpServer, NormalizedMcp
 from spawn_cli.models.skill import SkillMetadata
 
-
-OPENCODE_CONFIG_JSON_FILENAME = "opencode.json"
-OPENCODE_CONFIG_SCHEMA_URL = "https://opencode.ai/config.json"
-OPENCODE_CONFIG_SCHEMA_KEY = "$schema"
+_CONFIG = "opencode.json"
 
 
-def _build_local_mcp_cmd(server: McpServer) -> list[str]:
+def _load_config(target_root: Path) -> dict:
+    path = target_root / _CONFIG
+    if not path.exists():
+        if (target_root / "opencode.jsonc").exists():
+            warnings.warn(
+                "OpenCode: Spawn manages opencode.json; existing opencode.jsonc is not merged",
+                SpawnWarning,
+            )
+        return {}
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise SpawnError(f"OpenCode config is not valid JSON: {path} ({exc})") from exc
+
+
+def _save_config(target_root: Path, data: dict) -> None:
+    (target_root / _CONFIG).write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+
+
+def _sanitize_skill_name(name: str) -> str:
+    name = normalize_skill_name(name)
+    name = name.replace("_", "-").replace(".", "-")
+    name = re.sub(r"-{2,}", "-", name).strip("-")
+    return name
+
+
+def _build_mcp_entry(server: McpServer) -> dict:
     transport = server.transport
-    cmd = [transport.command] if transport.command else []
-    cmd.extend(transport.args or [])
-    return cmd
-
-
-def _build_opencode_mcp_entry(server: McpServer) -> dict[str, Any]:
-    transport = server.transport
-    entry: dict[str, Any]
     if transport.type == "stdio":
         if server.spawn_stdio_proxy:
-            cmd = ["spawn", *mcp_stdio_argv(server.extension, server.name)]
+            entry = {
+                "type": "local",
+                "command": ["spawn"] + mcp_stdio_argv(server.extension, server.name),
+            }
         else:
-            cmd = _build_local_mcp_cmd(server)
-        entry = {"type": "local", "command": cmd, "enabled": True}
-    elif transport.type in ("streamable-http", "sse"):
-        entry = {"type": "remote", "url": transport.url or "", "enabled": True}
+            entry = {"type": "local", "command": [transport.command, *list(transport.args)]}
+    else:  # streamable-http and sse both render as remote
+        entry = {"type": "remote", "url": transport.url}
         if transport.headers:
-            entry["headers"] = {k: f"${{{v}}}" for k, v in transport.headers.items()}
-    else:
-        cmd = _build_local_mcp_cmd(server)
-        entry = {"type": "local", "command": cmd, "enabled": True}
+            entry["headers"] = {k: f"{{env:{v}}}" for k, v in transport.headers.items()}
+    entry["enabled"] = True
     if server.env:
         entry["environment"] = {
-            k: f"${{{k}}}" if v.secret else v.value or f"${{{k}}}"
+            k: f"{{env:{k}}}" if v.secret else (v.value or f"{{env:{k}}}")
             for k, v in server.env.items()
         }
     return entry
 
 
-class OpencodeAdapter(IdeAdapter):
+class OpenCodeAdapter(IdeAdapter):
     key = "opencode"
 
     def detect(self, target_root: Path) -> DetectResult:
-        used = (target_root / ".opencode").exists() or (target_root / OPENCODE_CONFIG_JSON_FILENAME).exists()
+        used = (
+            (target_root / ".opencode").exists()
+            or (target_root / "opencode.json").exists()
+            or (target_root / "opencode.jsonc").exists()
+        )
         return DetectResult(
             used_in_repo=used,
             capabilities=IdeCapabilities(
@@ -76,15 +97,16 @@ class OpencodeAdapter(IdeAdapter):
     def add_skills(self, target_root: Path, skill_metadata: list[SkillMetadata]) -> list[dict]:
         results = []
         for skill in skill_metadata:
-            name = normalize_skill_name(skill.name)
+            name = _sanitize_skill_name(skill.name)
             skill_dir = target_root / ".opencode" / "skills" / name
             skill_dir.mkdir(parents=True, exist_ok=True)
             skill_path = skill_dir / "SKILL.md"
             if skill_path.exists():
-                warnings.warn(f"Overwriting existing rendered skill: {skill_path}")
-            skill_path.write_text(render_skill_md(skill), encoding="utf-8")
-            rel = skill_path.relative_to(target_root).as_posix()
-            results.append({"skill": skill.name, "path": rel})
+                warnings.warn(f"Overwriting existing rendered skill: {skill_path}", SpawnWarning)
+            # OpenCode requires frontmatter name == directory name.
+            rendered = render_skill_md(skill.model_copy(update={"name": name}))
+            skill_path.write_text(rendered, encoding="utf-8")
+            results.append({"skill": skill.name, "path": skill_path.relative_to(target_root).as_posix()})
         return results
 
     def remove_skills(self, target_root: Path, rendered_paths: list[dict]) -> None:
@@ -96,93 +118,60 @@ class OpencodeAdapter(IdeAdapter):
                 p.parent.rmdir()
 
     def add_mcp(self, target_root: Path, normalized_mcp: NormalizedMcp) -> list[str]:
-        config_path = target_root / OPENCODE_CONFIG_JSON_FILENAME
-        existing_schema = OPENCODE_CONFIG_SCHEMA_URL
-        if config_path.exists():
-            data = json.loads(config_path.read_text(encoding="utf-8"))
-            existing_schema = data.get(OPENCODE_CONFIG_SCHEMA_KEY, OPENCODE_CONFIG_SCHEMA_URL)
-        else:
-            data = {}
-        data.setdefault(OPENCODE_CONFIG_SCHEMA_KEY, existing_schema)
-        mcp_servers = data.setdefault("mcp", {})
-        if not isinstance(mcp_servers, dict):
-            mcp_servers = {}
-            data["mcp"] = mcp_servers
-        rendered_names = []
+        data = _load_config(target_root)
+        mcp = data.setdefault("mcp", {})
         for server in normalized_mcp.servers:
-            mcp_servers[server.name] = _build_opencode_mcp_entry(server)
-            rendered_names.append(server.name)
-        config_path.write_text(json.dumps(data, indent=2), encoding="utf-8")
-        return rendered_names
+            mcp[server.name] = _build_mcp_entry(server)
+        _save_config(target_root, data)
+        return [s.name for s in normalized_mcp.servers]
 
     def remove_mcp(self, target_root: Path, rendered_mcp_names: list[str]) -> None:
-        config_path = target_root / OPENCODE_CONFIG_JSON_FILENAME
-        if not config_path.exists():
+        if not (target_root / _CONFIG).exists():
             return
-        data = json.loads(config_path.read_text(encoding="utf-8"))
-        mcp_servers = data.get("mcp")
-        if isinstance(mcp_servers, dict):
+        data = _load_config(target_root)
+        mcp = data.get("mcp")
+        if isinstance(mcp, dict):
             for name in rendered_mcp_names:
-                mcp_servers.pop(name, None)
-        config_path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+                mcp.pop(name, None)
+            if not mcp:
+                data.pop("mcp", None)
+        _save_config(target_root, data)
 
     def add_agent_ignore(self, target_root: Path, globs: list[str]) -> None:
-        config_path = target_root / OPENCODE_CONFIG_JSON_FILENAME
-        if config_path.exists():
-            data = json.loads(config_path.read_text(encoding="utf-8"))
-        else:
-            data = {}
-        data.setdefault(OPENCODE_CONFIG_SCHEMA_KEY, OPENCODE_CONFIG_SCHEMA_URL)
-        watcher = data.setdefault("watcher", {})
-        if not isinstance(watcher, dict):
-            watcher = {}
-            data["watcher"] = watcher
-        ignore_list = watcher.setdefault("ignore", [])
-        if not isinstance(ignore_list, list):
-            ignore_list = []
-            watcher["ignore"] = ignore_list
-        existing = set(ignore_list)
-        for g in globs:
-            if g not in existing:
-                ignore_list.append(g)
-                existing.add(g)
-        config_path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+        data = _load_config(target_root)
+        perms = data.setdefault("permission", {})
+        for section in ("read", "edit"):
+            rules = perms.setdefault(section, {})
+            if not isinstance(rules, dict):
+                rules = {}
+                perms[section] = rules
+            for glob in globs:
+                rules[glob] = "deny"
+        _save_config(target_root, data)
 
     def remove_agent_ignore(self, target_root: Path, globs: list[str]) -> None:
-        config_path = target_root / OPENCODE_CONFIG_JSON_FILENAME
-        if not config_path.exists():
+        if not (target_root / _CONFIG).exists():
             return
-        data = json.loads(config_path.read_text(encoding="utf-8"))
-        watcher = data.get("watcher")
-        if not isinstance(watcher, dict):
+        data = _load_config(target_root)
+        perms = data.get("permission")
+        if not isinstance(perms, dict):
             return
-        ignore_list = watcher.get("ignore")
-        if not isinstance(ignore_list, list):
-            return
-        drop = {g.strip() for g in globs if g.strip()}
-        watcher["ignore"] = [g for g in ignore_list if g not in drop]
-        if not watcher["ignore"]:
-            del watcher["ignore"]
-        if not watcher:
-            del data["watcher"]
-        config_path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+        drop = set(globs)
+        for section in ("read", "edit"):
+            rules = perms.get(section)
+            if isinstance(rules, dict):
+                for glob in drop:
+                    rules.pop(glob, None)
+                if not rules:
+                    perms.pop(section, None)
+        if not perms:
+            data.pop("permission", None)
+        _save_config(target_root, data)
 
     def clear_spawn_agent_ignore(self, target_root: Path) -> None:
-        self.remove_agent_ignore(target_root, list(self._current_agent_ignore(target_root)))
-
-    def _current_agent_ignore(self, target_root: Path) -> list[str]:
-        config_path = target_root / OPENCODE_CONFIG_JSON_FILENAME
-        if not config_path.exists():
-            return []
-        try:
-            data = json.loads(config_path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError):
-            return []
-        watcher = data.get("watcher")
-        if not isinstance(watcher, dict):
-            return []
-        ignore_list = watcher.get("ignore")
-        return list(ignore_list) if isinstance(ignore_list, list) else []
+        recorded = ll.get_agent_ignore_list(target_root, self.key)
+        if recorded:
+            self.remove_agent_ignore(target_root, recorded)
 
     def rewrite_entry_point(self, target_root: Path, prompt: str) -> str:
         ep = target_root / "AGENTS.md"
@@ -193,6 +182,6 @@ class OpencodeAdapter(IdeAdapter):
         _vac.finalize_opencode_repo(target_root)
 
 
-register(OpencodeAdapter())
+register(OpenCodeAdapter())
 
-__all__ = ["OpencodeAdapter"]
+__all__ = ["OpenCodeAdapter"]

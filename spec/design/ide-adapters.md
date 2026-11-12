@@ -30,7 +30,11 @@ Supported names (canonical):
 - `windsurf`
 - `github-copilot`
 - `gemini-cli`
+- `cline`
 - `opencode`
+- `mimo-code`
+- `hermes`
+- `junie`
 
 Additional IDE layouts (Qoder, Qwen Code, Aider, Zed, Devin) are described later
 in this document for future adapters; they are **not** CLI-supported until added
@@ -43,6 +47,7 @@ claude -> claude-code
 gemini -> gemini-cli
 copilot -> github-copilot
 github -> github-copilot
+mimo -> mimo-code
 ```
 
 Unknown names are errors. Unsupported operations on a known adapter are
@@ -168,7 +173,7 @@ includes a **Hints:** bullet list (full text; warnings only, no truncation).
 | IDE | Skills / rules target | MCP target | Agent ignore target | Entry point | Notes |
 | --- | --- | --- | --- | --- | --- |
 | Cursor | `.cursor/skills/{skill}/SKILL.md`; Project Rules `.cursor/rules/*.md`/`.mdc` | `.cursor/mcp.json`; other MCP JSON under `.cursor/` as detected | `.cursorignore` (repo root) | `AGENTS.md` | Rules and Skills are parallel mechanisms; legacy `.cursorrules` deprecated vs `.cursor/rules`. (Cursor also discovers other tools’ skill dirs for compatibility—outside this column.) |
-| Codex | `.agents/skills/{skill}/SKILL.md` | `.codex/config.toml` | — | `AGENTS.md` | OpenAI documents repo skills under `.agents/skills/` (not under `.codex/`). Requires trusted workspace for project `.codex/` layers. |
+| Codex | `.agents/skills/{skill}/SKILL.md` | `.codex/config.toml` | `.codex/config.toml` `[permissions.spawn]` deny rules (project-style; manual `default_permissions = "spawn"` activation) | `AGENTS.md` | OpenAI documents repo skills under `.agents/skills/` (not under `.codex/`). Requires trusted workspace for project `.codex/` layers. |
 | Qoder | `.qoder/skills/{skill-name}/SKILL.md` | `.mcp.json` | `.qoder/settings.json` `permissions` (and optional `hooks` in the same files) | `AGENTS.md` | `.qoder/rules` in-repo can supersede `.qoder`/memory behavior per Qoder IDE docs. |
 | Claude Code | `.claude/skills/{skill}/SKILL.md` | `.mcp.json` (repository root) | `.claude/settings.json` (`permissions.*`) | `CLAUDE.md` or `.claude/CLAUDE.md` | Spawn metadata/removal for MCP keyed by server name. |
 | Qwen Code | `.qwen/skills/{skill}/SKILL.md` | `.qwen/settings.json` `mcpServers` | `.qwen/settings.json` `permissions`; root `.qwenignore` | `QWEN.md` | Project settings file is repo-root `.qwen/settings.json`. |
@@ -177,8 +182,12 @@ includes a **Hints:** bullet list (full text; warnings only, no truncation).
 | Aider | `CONVENTIONS.md` plus `.aider.conf.yml` `read:` | — | `.aiderignore` (git root default) | `CONVENTIONS.md` | No IDE-style hierarchical skills; conventions are read-only context. |
 | Zed | `AGENTS.md`, `.rules`, `CLAUDE.md`, … per Zed rules doc | `.zed/settings.json` `context_servers` | `agent.tool_permissions` / workspace scan exclusions in settings (no `.cursorignore` equivalent) | `AGENTS.md` | MCP key name is `context_servers`. (Upstream may add repo skills under other paths—outside this column until documented.) |
 | Gemini CLI | `.gemini/skills/{skill}/SKILL.md` | `.gemini/settings.json` `mcpServers` | `.geminiignore` | `GEMINI.md` (unless overridden via `context.fileName`) | Project `.gemini/settings.json` at repo root. (CLI may also merge `.agents/skills/` discovery—outside this column.) |
-| OpenCode | `.opencode/skills/{skill}/SKILL.md` | `opencode.json` (repo root) `mcp` | `opencode.json` `watcher.ignore` | `AGENTS.md` | Stdio MCP uses `"type": "local"` + `"command"` array; HTTP/SSE uses `"type": "remote"` + `"url"` + optional `"headers"`. Reads `.claude/skills/` and `.agents/skills/` via compatibility layer. `CLAUDE.md` is a fallback entry point. |
 | Devin | `.devin/skills/{skill}/SKILL.md` | `.devin/config.json` `mcpServers` | — | `AGENTS.md` | Imports from other tooling may merge MCP at runtime (`read-config-from`)—outside committed files unless copied. (Optional Spawn-only trees are not part of this matrix.) |
+| Cline | `.cline/skills/{skill}/SKILL.md` (frontmatter `name` must equal directory name) | — (no project-scope MCP; global `cline_mcp_settings.json` only) | `.clineignore` (repo root, gitignore-style) | `AGENTS.md` | MCP unsupported: Spawn warns and writes nothing. Detection markers: `.cline/`, `.clinerules/` or `.clinerules`, `.clineignore`. Legacy `.clinerules` is untouched by cleanup. |
+| OpenCode | `.opencode/skills/{skill}/SKILL.md` (frontmatter `name` must equal directory name; stricter name regex than spawn-wide normalization: `^[a-z0-9]+(-[a-z0-9]+)*$`, so `.`/`_` are sanitized to `-` by the adapter) | Root `opencode.json` key `mcp` | Root `opencode.json` `permission.read` / `permission.edit` `"glob": "deny"` entries (project-style, dict-keyed, idempotent; last matching rule wins) | `AGENTS.md` | Detection markers: `.opencode/`, `opencode.json`, `opencode.jsonc` (`AGENTS.md` alone is NOT a marker — shared with other adapters). Spawn writes only `opencode.json` (never merges JSONC); unparseable JSON errors before mutation. OpenCode also discovers `.claude/skills`/`.agents/skills` (compat — outside this column). No upstream ignore file exists. |
+| Mimo Code | `.mimocode/skills/{skill}/SKILL.md` (skill name read from YAML frontmatter; no stricter upstream regex — spawn-wide `normalize_skill_name` suffices; dirname kept equal to frontmatter name) | `.mimocode/mimocode.json` key `mcp` (same local/remote + `enabled` shape as OpenCode) | `.mimocode/mimocode.json` `permission.read` / `permission.edit` glob -> `"deny"` entries (project-style, dict-keyed, idempotent; no upstream ignore file) | `AGENTS.md` | Detection marker: `.mimocode/` (`AGENTS.md` alone is NOT a marker). Canonical config `.mimocode/mimocode.json`; warns (SpawnWarning) when only `mimocode.jsonc` exists; unparseable JSON errors before mutation. MiMo Code is an OpenCode fork — adapter mirrors `opencode.py`; vacancy pruner `finalize_mimo_code_repo` (known keys `mcp`, `permission`). |
+| Hermes | `.hermes/skills/{skill}/SKILL.md` (spawn-wide `normalize_skill_name`; frontmatter name rewritten to match dirname via `model_copy`) | — (no project-scope MCP; global `~/.hermes/config.yaml` `mcp_servers` only) | — (no upstream agent-ignore file) | `.hermes.md` | MCP unsupported: Spawn warns (SpawnWarning) and writes nothing. Agent ignore unsupported: warns and writes nothing. Detection markers: `.hermes/`, `.hermes.md`, `HERMES.md`. Project context priority upstream: `.hermes.md` > `AGENTS.override.md` > `AGENTS.md` — the `.hermes.md` entry block is the only guaranteed-to-be-read slot. Project skills require upstream `hermes skills trust` before Hermes loads them. `.agents/skills` intentionally NOT used (owned by the Codex adapter). Vacancy pruner `finalize_hermes_repo` (`.hermes/` dropped when vacant). |
+| JetBrains Junie | `.junie/skills/{skill}/SKILL.md` (spawn-wide `normalize_skill_name`; frontmatter name rewritten to match dirname via `model_copy`) | `.junie/mcp/mcp.json` top-level `mcpServers` (same Generic JSON MCP shape as Cursor; stdio entries omit `type`; remote `type`/`url`/`headers`; `${VAR}` placeholders) | `.aiignore` (repo root, gitignore syntax; `# spawn:` comment markers are inert to Junie's parser) | `AGENTS.md` | Detection marker: `.junie/` directory (`AGENTS.md` alone is NOT a marker — shared with other adapters). Capabilities: skills `native`, mcp `project`, agent ignore `native`, entry point `agents-md`. User content under `.junie/` (`memory/`, `rules/`, `playbook.md`) is never touched; vacancy pruner `finalize_junie_repo` deletes `.junie/` only when it contains zero files and clears the `.aiignore` spawn block. Adapter mirrors `cursor.py`; rules 03 (`SpawnWarning`) and 04 (frontmatter name == dirname) apply. |
 
 ## Skill Rendering
 
@@ -503,6 +512,41 @@ If project-level Codex config is skipped (e.g. workspace not trusted) or
 unsupported by the installed Codex build, the adapter reports that user-level
 config requires explicit approval.
 
+### OpenCode JSON Shape
+
+OpenCode uses the root `opencode.json` with key `mcp`. Local (stdio) entries
+carry the whole argv in a single `command` array (no separate `args` key);
+remote covers both `streamable-http` and `sse` (the distinction is lost).
+Placeholders use the `{env:VAR}` form, not `${VAR}`.
+
+```json
+{
+  "mcp": {
+    "spawn-proxy": {
+      "type": "local",
+      "command": ["spawn", "mcp_stdio", "extension", "ext-id", "name", "spawn-proxy"],
+      "enabled": true,
+      "environment": { "SPECTASK_TOKEN": "{env:SPECTASK_TOKEN}" }
+    },
+    "remote-srv": {
+      "type": "remote",
+      "url": "https://mcp.example.com/mcp",
+      "headers": { "Authorization": "Bearer {env:MY_API_KEY}" }
+    }
+  }
+}
+```
+
+Spawn always writes `opencode.json` (never merges `opencode.jsonc`; a warning
+is emitted when only the JSONC file exists). Unparseable `opencode.json`
+raises an error before mutation. Removal pops server keys and prunes the
+empty `mcp` key.
+
+Mimo Code uses the same shape (OpenCode fork): `.mimocode/mimocode.json` with
+the same `mcp` local/remote entries, `{env:VAR}` placeholders, and canonical
+file rules (canonical `.json`; SpawnWarning when only `mimocode.jsonc` exists;
+SpawnError on unparseable JSON before mutation).
+
 ## Entry Point Rendering
 
 Entry point files are user-visible and may already contain user instructions.
@@ -538,8 +582,12 @@ Entry point targets:
 | Aider | `CONVENTIONS.md` |
 | Zed | `AGENTS.md` |
 | Gemini CLI | `GEMINI.md` |
-| OpenCode | `AGENTS.md` |
 | Devin | `AGENTS.md` |
+| Cline | `AGENTS.md` |
+| OpenCode | `AGENTS.md` |
+| Mimo Code | `AGENTS.md` |
+| Hermes | `.hermes.md` |
+| JetBrains Junie | `AGENTS.md` |
 
 Gemini CLI additionally reads which context filenames to load via `context.fileName` under the `context` section in `.gemini/settings.json` (a string or array; default behavior still centers on `GEMINI.md` unless changed).
 
@@ -552,7 +600,7 @@ specific and must not pretend to work when there is no supported target.
 | IDE | Agent ignore behavior |
 | --- | --- |
 | Cursor | Merge Spawn-owned globs into `.cursorignore` when present or supported. Terminal/MCP may still reach paths not covered by ignores. |
-| Codex | Unsupported dedicated agent-ignore file (`/.codexignore` not upstream); steer via AGENTS/policy. |
+| Codex | Project-style: write `"glob" = "deny"` entries under the spawn-namespaced profile `[permissions.spawn.filesystem.":workspace_roots"]` in `.codex/config.toml` (`extends = ":workspace"`); never write `default_permissions` (mutually exclusive with `sandbox_mode`) — the user activates the profile manually. No `.codexignore` exists upstream. |
 | Qoder | Use `.qoder/settings.json` permissions allow/ask/deny with gitignore-style path patterns (and hooks co-located in the same JSON). |
 | Claude Code | Prefer `permissions.*` and related keys in `.claude/settings.json` over undocumented single-file ignore semantics. |
 | Qwen Code | Use `permissions` rules (`deny` / `ask` / `allow`) for tool and path blocking; optionally merge Spawn globs into `.qwenignore` for search-scope reduction — not interchangeable with Cursor-style ignores. |
@@ -562,7 +610,10 @@ specific and must not pretend to work when there is no supported target.
 | Zed | No Cursor-style `.cursorignore`; approximate exclusions via scan settings and `agent.tool_permissions`. |
 | Gemini CLI | Merge Spawn-owned globs into `.geminiignore`. |
 | Devin | Spawn does not assume a writable ignore-file contract; Terminal may expose `respect_gitignore` for tools only. |
-| OpenCode | Merge Spawn-owned globs into `watcher.ignore` array in `opencode.json`. Excludes paths from file watching; agent may still reach ignored paths via direct tool calls. |
+| OpenCode | Project-style: write `"glob": "deny"` entries under `permission.read` and `permission.edit` in root `opencode.json` (dict-keyed, idempotent; removal prunes only spawn-owned entries and empty subtrees, user rules kept). No ignore file exists upstream; `permission` is the documented mechanism (last matching rule wins). Clear via the metadata `agent-ignore.txt` recorded list. |
+| Mimo Code | Project-style, identical to OpenCode: `"glob": "deny"` entries under `permission.read` / `permission.edit` in `.mimocode/mimocode.json` (dict-keyed, idempotent; removal prunes only spawn-owned entries and empty subtrees). No upstream ignore file (`watcher.ignore` controls the file watcher only — never used for agent ignore). Clear via the metadata `agent-ignore.txt` recorded list. |
+| Hermes | Unsupported: no upstream agent-ignore file. `add_agent_ignore` / `remove_agent_ignore` warn (SpawnWarning) and write nothing. |
+| JetBrains Junie | Merge Spawn-owned globs into `.aiignore` (repo root, gitignore syntax) via the `# spawn:start`/`# spawn:end` managed block; split-region (`# spawn:core:`/`# spawn:ext:`) overrides and `clear_spawn_agent_ignore` supported, mirroring Cursor/Cline. |
 
 When an adapter renders ignore globs into a file that also contains user globs,
 it must use a managed block or an ownership metadata comparison so uninstall

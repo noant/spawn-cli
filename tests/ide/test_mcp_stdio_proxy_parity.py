@@ -17,7 +17,10 @@ from spawn_cli.ide.codex import CodexAdapter
 from spawn_cli.ide.cursor import CursorAdapter
 from spawn_cli.ide.gemini_cli import GeminiCliAdapter
 from spawn_cli.ide.github_copilot import GitHubCopilotAdapter
+from spawn_cli.ide.junie import JunieAdapter
 from spawn_cli.ide.mcp_stdio_argv import mcp_stdio_argv
+from spawn_cli.ide.mimo_code import MimoCodeAdapter
+from spawn_cli.ide.opencode import OpenCodeAdapter
 from spawn_cli.io.toml_io import load_toml
 from spawn_cli.models.mcp import McpEnvVar, McpServer, McpTransport, NormalizedMcp
 
@@ -35,6 +38,12 @@ def _assert_stdio_wrapper_golden(proxy_entry: dict, *, extension_id: str, server
     assert "tool-uv-name" not in proxy_entry["args"]
 
 
+def _assert_stdio_wrapper_golden_opencode(proxy_entry: dict, *, extension_id: str, server_name: str) -> None:
+    # opencode emits a single argv-array ("command": ["spawn", ...], no "args" key).
+    assert proxy_entry["command"] == ["spawn"] + mcp_stdio_argv(extension_id, server_name)
+    assert "tool-uv-name" not in proxy_entry["command"]
+
+
 @pytest.mark.parametrize(
     "adapter, read_entries",
     [
@@ -43,6 +52,9 @@ def _assert_stdio_wrapper_golden(proxy_entry: dict, *, extension_id: str, server
         pytest.param(GeminiCliAdapter(), "gemini_json", id="gemini_cli"),
         pytest.param(CodexAdapter(), "codex_toml", id="codex"),
         pytest.param(GitHubCopilotAdapter(), "vscode_json", id="github_copilot"),
+        pytest.param(OpenCodeAdapter(), "opencode_json", id="opencode"),
+        pytest.param(MimoCodeAdapter(), "mimocode_json", id="mimocode"),
+        pytest.param(JunieAdapter(), "junie_json", id="junie"),
     ],
 )
 def test_stdio_spawn_proxy_preserves_env_and_stable_spawn_wrapper(
@@ -95,10 +107,25 @@ def test_stdio_spawn_proxy_preserves_env_and_stable_spawn_wrapper(
         data = load_toml(tmp_path / ".codex" / "config.toml")
         inline_entry = dict(data["mcp_servers"][inline.name])
         proxy_entry = dict(data["mcp_servers"][proxied.name])
+    elif read_entries == "opencode_json":
+        data = json.loads((tmp_path / "opencode.json").read_text(encoding="utf-8"))
+        inline_entry = dict(data["mcp"][inline.name])
+        proxy_entry = dict(data["mcp"][proxied.name])
+    elif read_entries == "mimocode_json":
+        data = json.loads((tmp_path / ".mimocode" / "mimocode.json").read_text(encoding="utf-8"))
+        inline_entry = dict(data["mcp"][inline.name])
+        proxy_entry = dict(data["mcp"][proxied.name])
+    elif read_entries == "junie_json":
+        data = json.loads((tmp_path / ".junie" / "mcp" / "mcp.json").read_text(encoding="utf-8"))
+        inline_entry = dict(data["mcpServers"][inline.name])
+        proxy_entry = dict(data["mcpServers"][proxied.name])
     else:
         raise AssertionError(read_entries)
 
-    _assert_stdio_wrapper_golden(proxy_entry, extension_id=ext_id, server_name=proxied.name)
+    if read_entries in ("opencode_json", "mimocode_json"):
+        _assert_stdio_wrapper_golden_opencode(proxy_entry, extension_id=ext_id, server_name=proxied.name)
+    else:
+        _assert_stdio_wrapper_golden(proxy_entry, extension_id=ext_id, server_name=proxied.name)
     ie, pe = dict(inline_entry), dict(proxy_entry)
     _pop_command_args(ie)
     _pop_command_args(pe)

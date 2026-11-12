@@ -6,6 +6,8 @@ extensions:
     path: .cursor/skills/spectask-create/SKILL.md
   - skill: spectask-design
     path: .cursor/skills/spectask-design/SKILL.md
+  - skill: spectask-execute-step-by-step-dual-review
+    path: .cursor/skills/spectask-execute-step-by-step-dual-review/SKILL.md
   - skill: spectask-execute-step-by-step
     path: .cursor/skills/spectask-execute-step-by-step/SKILL.md
   - skill: spectask-execute
@@ -16,6 +18,8 @@ extensions:
     path: .cursor/skills/spectask-from-jira/SKILL.md
   - skill: spectask-seed-create
     path: .cursor/skills/spectask-seed-create/SKILL.md
+  - skill: spectask-shake-out
+    path: .cursor/skills/spectask-shake-out/SKILL.md
   - skill: spectask-spec-review-passed
     path: .cursor/skills/spectask-spec-review-passed/SKILL.md
   mempalace-ext:

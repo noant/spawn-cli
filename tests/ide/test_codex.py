@@ -5,8 +5,9 @@ from pathlib import Path
 
 import pytest
 
-from spawn_cli.ide import IGNORE_BLOCK_END, IGNORE_BLOCK_START, SPAWN_BLOCK_END, SPAWN_BLOCK_START
+from spawn_cli.ide import SPAWN_BLOCK_END, SPAWN_BLOCK_START
 from spawn_cli.ide.codex import CodexAdapter
+from spawn_cli.core import low_level as ll
 from spawn_cli.io.toml_io import load_toml
 from spawn_cli.models.mcp import McpEnvVar, McpServer, McpTransport, NormalizedMcp
 from spawn_cli.models.skill import SkillMetadata
@@ -21,7 +22,7 @@ def test_detect_with_codex_dir(adapter: CodexAdapter, tmp_path: Path) -> None:
     (tmp_path / ".codex").mkdir()
     r = adapter.detect(tmp_path)
     assert r.used_in_repo is True
-    assert r.capabilities.agent_ignore == "unsupported"
+    assert r.capabilities.agent_ignore == "project"
 
 
 def test_detect_with_agents_dir(adapter: CodexAdapter, tmp_path: Path) -> None:
@@ -154,19 +155,66 @@ def test_remove_mcp_removes_table(adapter: CodexAdapter, tmp_path: Path) -> None
     assert "b" in text
 
 
-def test_add_agent_ignore_warns(adapter: CodexAdapter, tmp_path: Path) -> None:
-    with warnings.catch_warnings(record=True) as w:
-        warnings.simplefilter("always")
-        adapter.add_agent_ignore(tmp_path, ["**"])
-        assert len(w) == 1
-        assert "unsupported" in str(w[0].message).lower()
+def test_add_agent_ignore_writes_permissions_profile(adapter: CodexAdapter, tmp_path: Path) -> None:
+    adapter.add_agent_ignore(tmp_path, ["spawn/.core/**", "secrets/**"])
+    data = load_toml(tmp_path / ".codex" / "config.toml")
+    fs = data["permissions"]["spawn"]["filesystem"][":workspace_roots"]
+    assert fs["spawn/.core/**"] == "deny"
+    assert fs["secrets/**"] == "deny"
+    assert data["permissions"]["spawn"]["extends"] == ":workspace"
 
 
-def test_remove_agent_ignore_warns(adapter: CodexAdapter, tmp_path: Path) -> None:
+def test_add_agent_ignore_idempotent(adapter: CodexAdapter, tmp_path: Path) -> None:
+    adapter.add_agent_ignore(tmp_path, ["a/**"])
+    adapter.add_agent_ignore(tmp_path, ["a/**", "b/**"])
+    data = load_toml(tmp_path / ".codex" / "config.toml")
+    fs = data["permissions"]["spawn"]["filesystem"][":workspace_roots"]
+    assert set(fs) == {"a/**", "b/**"}
+
+
+def test_add_agent_ignore_warns_on_sandbox_mode(adapter: CodexAdapter, tmp_path: Path) -> None:
+    (tmp_path / ".codex").mkdir(parents=True, exist_ok=True)
+    (tmp_path / ".codex" / "config.toml").write_text(
+        'sandbox_mode = "danger-full-access"\n', encoding="utf-8"
+    )
     with warnings.catch_warnings(record=True) as w:
         warnings.simplefilter("always")
-        adapter.remove_agent_ignore(tmp_path, ["**"])
-        assert len(w) == 1
+        adapter.add_agent_ignore(tmp_path, ["a/**"])
+        assert any("sandbox_mode" in str(x.message) for x in w)
+
+
+def test_remove_agent_ignore_drops_globs_keeps_user_content(
+    adapter: CodexAdapter, tmp_path: Path
+) -> None:
+    (tmp_path / ".codex").mkdir(parents=True, exist_ok=True)
+    (tmp_path / ".codex" / "config.toml").write_text(
+        'other = "keep"\n\n[permissions.spawn.filesystem.":workspace_roots"]\n'
+        '"a/**" = "deny"\n"b/**" = "deny"\n',
+        encoding="utf-8",
+    )
+    adapter.remove_agent_ignore(tmp_path, ["a/**"])
+    data = load_toml(tmp_path / ".codex" / "config.toml")
+    assert data["other"] == "keep"
+    assert set(data["permissions"]["spawn"]["filesystem"][":workspace_roots"]) == {"b/**"}
+
+
+def test_remove_agent_ignore_prunes_empty_tables(adapter: CodexAdapter, tmp_path: Path) -> None:
+    adapter.add_agent_ignore(tmp_path, ["a/**"])
+    adapter.remove_agent_ignore(tmp_path, ["a/**"])
+    data = load_toml(tmp_path / ".codex" / "config.toml")
+    assert "permissions" not in data
+
+
+def test_clear_spawn_agent_ignore_uses_recorded_state(
+    adapter: CodexAdapter, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    adapter.add_agent_ignore(tmp_path, ["a/**", "b/**"])
+    monkeypatch.setattr(
+        ll, "get_agent_ignore_list", lambda root, key: ["a/**", "b/**"]
+    )
+    adapter.clear_spawn_agent_ignore(tmp_path)
+    data = load_toml(tmp_path / ".codex" / "config.toml")
+    assert "permissions" not in data
 
 
 def test_rewrite_entry_point_agents_md(adapter: CodexAdapter, tmp_path: Path) -> None:
