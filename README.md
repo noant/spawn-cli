@@ -44,7 +44,7 @@ Force a fresh resolver for a one-shot run:
 uvx --refresh --from spawn-cli spawn --help
 ```
 
-Additional installers (**pip**, **pipx**, local checkout) and upgrade notes: **[spec/design/user-guide.md](spec/design/user-guide.md#other-installation-options)**.
+Additional installers (**pipx**, local checkout) and upgrade notes: **[spec/design/user-guide.md](spec/design/user-guide.md#other-installation-options)**.
 
 ## How spawn-cli works
 

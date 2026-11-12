@@ -2,6 +2,8 @@
 __pycache__/
 uv.lock
 *.egg-info/
+build/
+dist/
 # spawn:start
 spawn/.metadata/temp/**
 spawn/.metadata/.spawn.lock
@@ -9,6 +11,10 @@ spawn/.metadata/.spawn.lock
 **/.mempalace/palace/
 spec/.config/**
 # spawn:end
+
+# Build artifacts
+build/
+dist/
 
 # MemPalace per-project files (issue #185)
 mempalace.yaml

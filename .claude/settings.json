@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "deny": [
+      "**/.mempalace/chroma/**",
+      "**/.mempalace/ext/mine_mcp_server.py",
+      "**/.mempalace/palace/**",
+      "spawn/.core/**",
+      "spawn/.extend/**",
+      "spawn/.metadata/**",
+      "spec/seeds/_DONE_*.md",
+      "spec/tasks/**/_DONE_*/_DONE_*.md"
+    ]
+  }
+}

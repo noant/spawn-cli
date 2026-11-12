@@ -37,3 +37,27 @@ where = ["src"]
 testpaths = ["tests"]
 addopts = "-v"
 pythonpath = ["src"]
+
+[tool.pyright]
+include = ["src", "tests"]
+pythonVersion = "3.10"
+typeCheckingMode = "standard"
+venvPath = "."
+venv = ".venv"
+exclude = ["**/__pycache__", "**/build", "**/dist", "**/.venv", "**/node_modules"]
+
+# Enable useful checks beyond standard mode
+reportIncompatibleMethodOverride = true
+reportIncompatibleVariableOverride = true
+reportUnnecessaryTypeIgnoreComment = true
+
+# Suppress noisy rules
+reportMissingParameterType = false
+reportImplicitOverride = false
+reportImplicitStringConcatenation = false
+
+[dependency-groups]
+dev = [
+    "pyright>=1.1",
+    "pytest>=9.0.3",
+]

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import warnings
 from pathlib import Path
 from subprocess import CompletedProcess
@@ -66,6 +67,7 @@ def test_run_after_install_failure_warns(tmp_path: Path) -> None:
     with warnings.catch_warnings(record=True) as wrec:
         warnings.simplefilter("always")
         scripts.run_after_install_scripts(tmp_path, "e")
+    assert wrec is not None
     assert any(issubclass(w.category, SpawnWarning) for w in wrec)
 
 
@@ -115,7 +117,7 @@ def test_env_vars_passed(tmp_path: Path) -> None:
     assert kwargs["env"]["SPAWN_EXT_VERSION"] == "1.0.0"
 
 
-def test_run_before_install_prints_progress_to_stderr(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+def test_run_before_install_prints_progress_to_stderr(caplog: pytest.LogCaptureFixture, tmp_path: Path) -> None:
     _write_ext(
         tmp_path,
         "e",
@@ -124,6 +126,6 @@ def test_run_before_install_prints_progress_to_stderr(tmp_path: Path, capsys: py
     )
     fake = CompletedProcess(args=[], returncode=0, stdout=None, stderr=None)
     with patch("spawn_cli.core.scripts.subprocess.run", return_value=fake):
-        scripts.run_before_install_scripts(tmp_path, "e")
-    err = capsys.readouterr().err
-    assert "spawn: running before-install script: hook.py" in err
+        with caplog.at_level(logging.DEBUG, logger="spawn"):
+            scripts.run_before_install_scripts(tmp_path, "e")
+    assert "spawn: running before-install script: hook.py" in caplog.text

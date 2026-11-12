@@ -7,6 +7,7 @@ from . import claude_code  # noqa: F401
 from . import codex  # noqa: F401
 from . import gemini_cli  # noqa: F401
 from . import github_copilot  # noqa: F401
+from . import opencode  # noqa: F401
 from . import windsurf  # noqa: F401
 from . import cline  # noqa: F401
 from . import opencode  # noqa: F401

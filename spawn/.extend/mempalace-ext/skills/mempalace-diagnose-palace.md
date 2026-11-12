@@ -7,6 +7,7 @@ When the user reports **MemPalace not working**, **empty search**, **MCP errors*
 
 1. **Pack / Python**
    - Run **`spawn extension healthcheck mempalace`** (or `healthcheck.py` with the same Python Spawn uses). Failure → install **`mempalace`** in **that exact interpreter** (the healthcheck prints it). If **`python -c "import mempalace"`** in your shell works but healthcheck exits 1, Spawn is using a different Python — align them or install into the interpreter Spawn uses.
+   - Healthcheck also imports **`mempalace.backends.chroma`** (same chain as **`mempalace mine`**). If you see **`ModuleNotFoundError: No module named 'attrs'`** or **`jsonschema`** import errors while **`import mempalace`** alone works, stale **`attrs<22`** is likely (often from old **`pdflatex`** pins). Fix: **`uv pip install -r .mempalace/ext/requirements-mempalace.txt`** or **`uv pip install "attrs>=22.2.0"`** in the Spawn/MCP interpreter, then re-run healthcheck. If you need both MemPalace and **`pdflatex`**, use separate venvs — they conflict on attrs version.
    - Use **`.mempalace/ext/requirements-mempalace.txt`** and `after_install.py` skip flags **`MEMPALACE_EXTENSION_SKIP_PIP`** / **`MEMPALACE_EXTENSION_SKIP_INIT`** as needed.
    - From the **repo root**, run **`python -c "import mempalace"`** and **`python -m mempalace --version`** (or **`py -m mempalace`** on Windows if that is the configured interpreter).
 

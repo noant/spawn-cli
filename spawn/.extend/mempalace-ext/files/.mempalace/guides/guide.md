@@ -13,12 +13,12 @@
 
 This extension ships two stdio MCP servers (see **`extsrc/mcp/*.json`**); each merges **`MEMPALACE_PALACE_PATH=.mempalace/palace`** (**repo-local Chroma**) relative to **`cwd`**.
 
-Unicode (including Cyrillic) over MCP JSON-RPC is handled by enabling **CPython UTF-8 mode** via **`-X utf8`** in every platform file’s **`transport.args`** (**`py -3 -X utf8 …`** on Windows, **`python3 -X utf8 …`** on Linux/macOS). Do **not** put **`PYTHONIOENCODING`** in pack **`env`**: when **`spawn_stdio_proxy`** merges into IDE MCP, some adapters rewrite it as **`${PYTHONIOENCODING}`** without resolving it, which crashes Python (**`unknown encoding: ${PYTHONIOENCODING}`**). Do **not** set **`PYTHONUTF8`** in merged **`env`** either — invalid merged values trigger **`invalid PYTHONUTF8`** at interpreter startup; **`-X utf8`** avoids that. If searches still misbehave after that, rule out upstream **`mempalace`** / embedding behavior separately from this pack.
+Unicode (including Cyrillic) over MCP JSON-RPC is handled by enabling **CPython UTF-8 mode** via **`-X utf8`** in every platform file’s **`transport.args`** (**`uv run py -3 -X utf8 …`** on Windows, **`uv run python3 -X utf8 …`** on Linux/macOS). Do **not** put **`PYTHONIOENCODING`** in pack **`env`**: when **`spawn_stdio_proxy`** merges into IDE MCP, some adapters rewrite it as **`${PYTHONIOENCODING}`** without resolving it, which crashes Python (**`unknown encoding: ${PYTHONIOENCODING}`**). Do **not** set **`PYTHONUTF8`** in merged **`env`** either — invalid merged values trigger **`invalid PYTHONUTF8`** at interpreter startup; **`-X utf8`** avoids that. If searches still misbehave after that, rule out upstream **`mempalace`** / embedding behavior separately from this pack.
 
 | Server id | Purpose |
 |-----------|---------|
-| **`mempalace-mcp`** | Official MemPalace stdio server: **`py -3 -X utf8 -m mempalace.mcp_server`** (Windows pack defaults) or **`python3 -X utf8 -m mempalace.mcp_server`** (Linux/macOS): search, drawers, graph, diary, etc. No **`Scripts`** shim on **`PATH`** required (**`mempalace-mcp`** is the upstream console entry if you wire it manually elsewhere). **`mempalace mcp`** / **`python -m mempalace mcp`** is CLI *setup/help only* — it prints instructions and exits; hosts must run **`mempalace.mcp_server`** over stdio for MCP tools. |
-| **`mempalace-mine-mcp`** | Thin bridge: tool **`mempalace_mine`** runs **`mempalace mine`** via **`py -3 -X utf8`** / **`python3 -X utf8`** + **`.mempalace/ext/mine_mcp_server.py`** with workspace **`cwd`** (interpreter name matches the platform file). |
+| **`mempalace-mcp`** | Official MemPalace stdio server: **`uv run py -3 -X utf8 -m mempalace.mcp_server`** (Windows pack defaults) or **`uv run python3 -X utf8 -m mempalace.mcp_server`** (Linux/macOS): search, drawers, graph, diary, etc. No **`Scripts`** shim on **`PATH`** required (**`mempalace-mcp`** is the upstream console entry if you wire it manually elsewhere). **`mempalace mcp`** / **`python -m mempalace mcp`** is CLI *setup/help only* — it prints instructions and exits; hosts must run **`mempalace.mcp_server`** over stdio for MCP tools. |
+| **`mempalace-mine-mcp`** | Thin bridge: tool **`mempalace_mine`** runs **`mempalace mine`** via **`uv run py -3 -X utf8`** / **`uv run python3 -X utf8`** + **`.mempalace/ext/mine_mcp_server.py`** with workspace **`cwd`** (interpreter name matches the platform file). |
 
 Both servers must use an interpreter where the **`mempalace`** package is installed (same venv as your terminal, or override **`command`** in the IDE adapter). On Windows, if **`python`** is missing, use **`py`** or a full venv **`python.exe`** path in your override for **both** servers together.
 
@@ -30,7 +30,7 @@ After a successful **`mempalace_mine`**, this bridge also runs **`mempalace wake
 
 After **`spawn extension add`**, Spawn merges this pack’s **`extsrc/mcp/<platform>.json`** into the target’s MCP config — keep server **`name`** values unique across all extensions in that target.
 
-Confirm both server processes see a Python environment where **`mempalace`** is installed (same venv as your terminal, or adjust the adapter’s **`command`** / **`args`** consistently for **both** servers). Pack defaults: **`command`** is **`py`** on Windows and **`python3`** on Linux/macOS; **`mempalace-mcp`** uses **`py -3 -X utf8 -m mempalace.mcp_server`** (**`python3 -X utf8 …`** on Unix). Override if your host only exposes **`python`** on Unix, or a venv **`python.exe`** on Windows. For human-readable MCP wiring hints run **`mempalace mcp`** or **`python -m mempalace mcp`** in a terminal; that CLI subcommand does not start the MCP protocol.
+Confirm both server processes see a Python environment where **`mempalace`** is installed (same venv as your terminal, or adjust the adapter’s **`command`** / **`args`** consistently for **both** servers). Pack defaults: **`command`** is **`uv`** on all platforms; **`mempalace-mcp`** uses **`uv run py -3 -X utf8 -m mempalace.mcp_server`** (**`uv run python3 -X utf8 …`** on Unix). Override if your host only exposes **`python`** on Unix, or a venv **`python.exe`** on Windows. For human-readable MCP wiring hints run **`mempalace mcp`** or **`python -m mempalace mcp`** in a terminal; that CLI subcommand does not start the MCP protocol.
 
 After changing MCP config or env vars, restart MCP / the IDE per client rules and verify tools are listed (**`mempalace_mine`** on **`mempalace-mine-mcp`**). If nothing appears despite a valid merged config, check the IDE’s MCP or extensions toggles — some shells keep servers disabled until explicitly enabled.
 
@@ -40,7 +40,7 @@ Official tool list: [mempalaceofficial.com](https://mempalaceofficial.com/).
 
 When Spawn materializes this pack (**`spawn extension add`** / **`spawn extension update mempalace`**), it **runs** **`after_install.py`** because **`setup.after-install`** is set in the extension `config.yaml`. The script:
 
-1. Runs **`pip install mempalace==<pinned>`** using the **same Python** that executes the hook (not necessarily your day-to-day venv), unless **`MEMPALACE_EXTENSION_SKIP_PIP=1`** (or `true` / `yes`). If that Python has no `pip` module, the script falls back to **`uv pip install --python=...`** when `uv` is on `PATH`.
+1. Runs **`uv pip install mempalace==<pinned>`** using the **same Python** that executes the hook (not necessarily your day-to-day venv), unless **`MEMPALACE_EXTENSION_SKIP_PIP=1`** (or `true` / `yes`). If `uv` is not available, falls back to **`python -m pip install`** when the `pip` module is available.
 2. Runs **`mempalace init .`** in the **current working directory** (expect the target repo root), unless **`MEMPALACE_EXTENSION_SKIP_INIT=1`**. The **`init`** subprocess inherits Spawn’s stdin/stdout/stderr so you can confirm entities and respond to prompts (e.g. “mine now?”). For **`init`** (and **`--auto-mine`** when enabled), **`MEMPALACE_PALACE_PATH`** is set to **`<repo>/.mempalace/palace`** when not already exported and unless **`MEMPALACE_EXTENSION_GLOBAL_PALACE`** opts into MemPalace’s default **`~/.mempalace/palace`**. To mine immediately without that prompt flow, set **`MEMPALACE_EXTENSION_AUTO_MINE=1`** (adds **`--auto-mine`**; can take a long time on large trees).
 
 You can verify the package with **`spawn extension healthcheck mempalace`** when `healthcheck` is configured in this pack. On failure it prints stderr *and* stdout (including **`sys.executable`**) — if **`python -c "import mempalace"`** works in your shell but healthcheck fails, Spawn is using a different interpreter; install **`mempalace`** into that interpreter.
@@ -50,7 +50,7 @@ You can verify the package with **`spawn extension healthcheck mempalace`** when
 If you set **`MEMPALACE_EXTENSION_SKIP_PIP`** / **`MEMPALACE_EXTENSION_SKIP_INIT`**, or use a different environment than the hook’s Python:
 
 ```bash
-pip install -r .mempalace/ext/requirements-mempalace.txt
+uv pip install -r .mempalace/ext/requirements-mempalace.txt
 cd /path/to/this/repo
 mempalace init .
 ```

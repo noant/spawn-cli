@@ -1,4 +1,4 @@
-"""Spawn healthcheck: verify ``mempalace`` is importable in the current Python."""
+"""Spawn healthcheck: verify ``mempalace`` and Chroma backend imports in the current Python."""
 
 from __future__ import annotations
 
@@ -14,17 +14,20 @@ def _emit(msg: str) -> None:
 def main() -> int:
     try:
         import mempalace  # noqa: F401
-    except ImportError:
+        from mempalace.backends import chroma  # noqa: F401
+    except ImportError as exc:
         _emit(
-            "mempalace healthcheck: cannot import mempalace in this interpreter. "
-            "Install pinned deps from .mempalace/ext/requirements-mempalace.txt "
-            "(or pip install mempalace). "
+            "mempalace healthcheck: import failed (mine/MCP need Chroma deps). "
+            f"{exc}. Install pinned deps from .mempalace/ext/requirements-mempalace.txt "
+            f"(includes attrs>=22.2.0 for jsonschema). "
             f"Interpreter:\n  {sys.executable}",
         )
         return 1
     except Exception as exc:  # pragma: no cover - defensive against broken partial installs
         _emit(
             f"mempalace healthcheck: import raised {type(exc).__name__}: {exc}. "
+            f"Install pinned deps from .mempalace/ext/requirements-mempalace.txt "
+            f"(includes attrs>=22.2.0 for jsonschema). "
             f"Interpreter:\n  {sys.executable}",
         )
         return 1

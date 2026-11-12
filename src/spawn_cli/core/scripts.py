@@ -11,8 +11,8 @@ from pathlib import Path
 
 from spawn_cli.core.errors import SpawnError, SpawnWarning
 from spawn_cli.io.yaml_io import load_yaml
+from spawn_cli.log import get_logger
 from spawn_cli.models.config import ExtensionConfig
-from spawn_cli.models.config import SourceYaml as SY
 
 SCRIPT_ENV_VARS = (
     "SPAWN_EXT_NAME",
@@ -51,17 +51,6 @@ def _extension_config_at(ext_layout: Path) -> ExtensionConfig:
     return ExtensionConfig.model_validate(raw)
 
 
-def _installed_source_version(target_root: Path, extension: str) -> str | None:
-    p = _extend_dir(target_root, extension) / "source.yaml"
-    if not p.is_file():
-        return None
-    raw = load_yaml(p)
-    if not raw:
-        return None
-    sy = SY.model_validate(raw)
-    return sy.installed.version
-
-
 def _run_script(
     target_root: Path,
     extension: str,
@@ -70,29 +59,28 @@ def _run_script(
     *,
     ext_layout: Path,
     blocking: bool,
-) -> subprocess.CompletedProcess[str | None]:
+) -> subprocess.CompletedProcess[str]:
     script_path = _setup_script_path(ext_layout, script_filename)
     if not script_path.is_file():
         raise SpawnError(f"setup script missing: {script_path}")
     cfg = _extension_config_at(ext_layout)
     ext_ver = cfg.version
     tgt_ver = _core_version(target_root)
-    src_ver = _installed_source_version(target_root, extension) or ext_ver
     env = os.environ.copy()
     env["SPAWN_TARGET_ROOT"] = str(target_root.resolve())
     env["SPAWN_EXT_NAME"] = extension
     env["SPAWN_EXT_PATH"] = str(ext_layout.resolve())
     env["SPAWN_EXT_VERSION"] = ext_ver
     env["SPAWN_TARGET_VERSION"] = tgt_ver
-    print(
-        f"spawn: running {phase} script: {Path(script_filename).name}",
-        file=sys.stderr,
+    get_logger().debug(
+        "spawn: running %s script: %s", phase, Path(script_filename).name,
     )
     proc = subprocess.run(
         [sys.executable, str(script_path)],
         cwd=str(target_root),
         env=env,
         check=False,
+        text=True,
     )
     if proc.returncode != 0:
         msg = (
@@ -199,15 +187,15 @@ def run_after_uninstall_from_snapshot(
     env["SPAWN_EXT_PATH"] = str(ghost_ext.resolve())
     env["SPAWN_EXT_VERSION"] = snap.ext_version
     env["SPAWN_TARGET_VERSION"] = _core_version(target_root)
-    print(
-        f"spawn: running after-uninstall script: {snap.script_path.name}",
-        file=sys.stderr,
+    get_logger().debug(
+        "spawn: running after-uninstall script: %s", snap.script_path.name,
     )
     proc = subprocess.run(
         [sys.executable, str(snap.script_path)],
         cwd=str(target_root),
         env=env,
         check=False,
+        text=True,
     )
     if proc.returncode != 0:
         msg = (
@@ -222,9 +210,8 @@ def run_healthcheck_scripts(target_root: Path, extension: str, *, ext_layout: Pa
     cfg = _extension_config_at(layout)
     if not cfg.setup or not cfg.setup.healthcheck:
         return True
-    print(
-        f"spawn: running healthcheck script: {Path(cfg.setup.healthcheck).name}",
-        file=sys.stderr,
+    get_logger().debug(
+        "spawn: running healthcheck script: %s", Path(cfg.setup.healthcheck).name,
     )
     proc = subprocess.run(
         [
@@ -241,6 +228,7 @@ def run_healthcheck_scripts(target_root: Path, extension: str, *, ext_layout: Pa
             "SPAWN_TARGET_VERSION": _core_version(target_root),
         },
         check=False,
+        text=True,
     )
     return proc.returncode == 0
 

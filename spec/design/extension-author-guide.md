@@ -368,7 +368,7 @@ All snippets are the contents of **one** platform file (`windows.json`, `linux.j
 }
 ```
 
-**4 — Stdio via a Python module (interpreter must be on `PATH` where the IDE launches MCP):**
+**4 — Stdio via a Python module (using `uv` to run from the project environment):**
 
 ```json
 {
@@ -377,8 +377,8 @@ All snippets are the contents of **one** platform file (`windows.json`, `linux.j
       "name": "acme-python-mcp",
       "transport": {
         "type": "stdio",
-        "command": "python",
-        "args": ["-m", "acme_mcp", "--stdio"],
+        "command": "uv",
+        "args": ["run", "python", "-m", "acme_mcp", "--stdio"],
         "cwd": "."
       }
     }
@@ -386,7 +386,7 @@ All snippets are the contents of **one** platform file (`windows.json`, `linux.j
 }
 ```
 
-You can swap `"command": "python"` for e.g. **`uv`** / **`pipx`**-backed wrappers if your team standardizes on them:
+You can also use **`pipx`**-backed wrappers or a bare **`python`** command if your team standardizes on them:
 
 ```json
 "command": "uv",
