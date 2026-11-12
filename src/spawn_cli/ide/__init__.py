@@ -25,7 +25,6 @@ from .codex import CodexAdapter
 from .cursor import CursorAdapter
 from .gemini_cli import GeminiCliAdapter
 from .github_copilot import GitHubCopilotAdapter
-from .opencode import OpencodeAdapter
 from .mcp_stdio_argv import mcp_stdio_argv
 from .windsurf import WindsurfAdapter
 from .registry import (
@@ -64,7 +63,6 @@ __all__ = [
     "CursorAdapter",
     "GeminiCliAdapter",
     "GitHubCopilotAdapter",
-    "OpencodeAdapter",
     "DetectResult",
     "CORE_IGNORE_BLOCK_END",
     "CORE_IGNORE_BLOCK_START",
