@@ -104,3 +104,23 @@ def test_install_build(tmp_path: Path) -> None:
     ):
         dl.install_build(tmp_path, str(build))
     assert sorted(ll.list_extensions(tmp_path)) == ["pack-one", "pack-two"]
+
+
+@pytest.mark.parametrize(
+    "path,expected",
+    [
+        ("https://github.com/noant/x.git", True),
+        ("http://example.com/x.git", True),
+        ("ssh://git@gitlab.moisport.team/d.savchenko/x.git", True),
+        ("git://github.com/x/y.git", True),
+        ("git@gitlab.moisport.team:d.savchenko/x.git", True),
+        ("git@github.com:noant/x.git", True),
+        ("/Users/dsavax/Projects/AI/spawn-cli", False),
+        ("./relative/path", False),
+        ("../up/one", False),
+        ("extsrc", False),
+    ],
+)
+def test_is_git_source(path: str, expected: bool) -> None:
+    """Git sources include ssh:// and scp-style remotes; local paths do not."""
+    assert dl._is_git_source(path) is expected
