@@ -279,11 +279,28 @@ def _resolve_local_spec(path_str: str) -> Path:
     return p.resolve()
 
 
+def _is_git_source(path: str) -> bool:
+    """True when *path* denotes a git source rather than a local filesystem path.
+
+    Accepts ``http(s)://`` URLs, ``ssh://``/``git://`` URLs, and scp-style
+    ``git@host:owner/repo.git`` remotes. The scp form carries no URL scheme,
+    so it is detected by its ``user@host:path`` shape.
+    """
+    p = urlparse(path)
+    if p.scheme in ("http", "https", "ssh", "git"):
+        return True
+    if p.scheme:
+        return False
+    # scp-style remote: user@host:path (no "//" after the colon)
+    head, sep, tail = path.partition(":")
+    return bool(sep) and "@" in head and bool(head.split("@", 1)[0]) and not tail.startswith("//")
+
+
 def stage_repository_root(path: str, branch: str | None, temp_base: Path) -> Path:
     """Return the root of a cloned or extracted repository (for build manifests or target repos)."""
     p = urlparse(path)
-    if p.scheme in ("http", "https"):
-        if path.lower().endswith(".zip"):
+    if _is_git_source(path):
+        if p.scheme in ("http", "https") and path.lower().endswith(".zip"):
             ensure_dir(temp_base)
             zf = temp_base / "repo.zip"
             _download_zip(path, zf)
@@ -360,8 +377,8 @@ def _stage_from_path_string(
 ) -> tuple[Path, SourceYaml.SourceInfo]:
     del target_root
     p = urlparse(path)
-    if p.scheme in ("http", "https"):
-        if path.lower().endswith(".zip"):
+    if _is_git_source(path):
+        if p.scheme in ("http", "https") and path.lower().endswith(".zip"):
             ensure_dir(temp_base)
             zf = temp_base / "src.zip"
             _download_zip(path, zf)
