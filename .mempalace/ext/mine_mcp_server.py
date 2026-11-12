@@ -5,7 +5,7 @@ Spawn / Cursor run this with workspace cwd set to the repo root, e.g.:
 
     python .mempalace/ext/mine_mcp_server.py
 
-Requires the ``mempalace`` CLI from the same environment (``pip install mempalace``).
+Requires the ``mempalace`` CLI from the same environment (``uv pip install mempalace``).
 Protocol shape aligned with MemPalace's ``mcp_server.py`` (initialize, tools/list, tools/call).
 """
 
@@ -230,27 +230,64 @@ TOOLS: dict[str, dict[str, Any]] = {
 }
 
 
+def _handle_initialize(params: dict, req_id: Any) -> dict:
+    client_version = params.get("protocolVersion", SUPPORTED_PROTOCOL_VERSIONS[-1])
+    negotiated = (
+        client_version
+        if client_version in SUPPORTED_PROTOCOL_VERSIONS
+        else SUPPORTED_PROTOCOL_VERSIONS[0]
+    )
+    return {
+        "jsonrpc": "2.0",
+        "id": req_id,
+        "result": {
+            "protocolVersion": negotiated,
+            "capabilities": {"tools": {}},
+            "serverInfo": {"name": "mempalace-mine-mcp", "version": "1.0.0"},
+        },
+    }
+
+
+def _handle_tools_call(params: dict, req_id: Any) -> dict:
+    tool_name: str = params.get("name") or ""
+    tool_args = params.get("arguments") or {}
+    if tool_name not in TOOLS:
+        return {
+            "jsonrpc": "2.0",
+            "id": req_id,
+            "error": {"code": -32601, "message": f"Unknown tool: {tool_name}"},
+        }
+    schema_props = TOOLS[tool_name]["input_schema"].get("properties", {})
+    tool_args = {k: v for k, v in tool_args.items() if k in schema_props}
+    try:
+        result = TOOLS[tool_name]["handler"](**tool_args)
+        return {
+            "jsonrpc": "2.0",
+            "id": req_id,
+            "result": {"content": [{"type": "text", "text": json.dumps(result, indent=2)}]},
+        }
+    except TypeError as e:
+        return {
+            "jsonrpc": "2.0",
+            "id": req_id,
+            "error": {"code": -32602, "message": str(e)},
+        }
+    except (RuntimeError, ValueError, OSError):
+        logger.exception("tool error")
+        return {
+            "jsonrpc": "2.0",
+            "id": req_id,
+            "error": {"code": -32000, "message": "Internal tool error"},
+        }
+
+
 def _handle_request(request: dict) -> dict | None:
     method = request.get("method") or ""
     params = request.get("params") or {}
     req_id = request.get("id")
 
     if method == "initialize":
-        client_version = params.get("protocolVersion", SUPPORTED_PROTOCOL_VERSIONS[-1])
-        negotiated = (
-            client_version
-            if client_version in SUPPORTED_PROTOCOL_VERSIONS
-            else SUPPORTED_PROTOCOL_VERSIONS[0]
-        )
-        return {
-            "jsonrpc": "2.0",
-            "id": req_id,
-            "result": {
-                "protocolVersion": negotiated,
-                "capabilities": {"tools": {}},
-                "serverInfo": {"name": "mempalace-mine-mcp", "version": "1.0.0"},
-            },
-        }
+        return _handle_initialize(params, req_id)
 
     if method == "ping":
         return {"jsonrpc": "2.0", "id": req_id, "result": {}}
@@ -271,36 +308,7 @@ def _handle_request(request: dict) -> dict | None:
         }
 
     if method == "tools/call":
-        tool_name = params.get("name")
-        tool_args = params.get("arguments") or {}
-        if tool_name not in TOOLS:
-            return {
-                "jsonrpc": "2.0",
-                "id": req_id,
-                "error": {"code": -32601, "message": f"Unknown tool: {tool_name}"},
-            }
-        schema_props = TOOLS[tool_name]["input_schema"].get("properties", {})
-        tool_args = {k: v for k, v in tool_args.items() if k in schema_props}
-        try:
-            result = TOOLS[tool_name]["handler"](**tool_args)
-            return {
-                "jsonrpc": "2.0",
-                "id": req_id,
-                "result": {"content": [{"type": "text", "text": json.dumps(result, indent=2)}]},
-            }
-        except TypeError as e:
-            return {
-                "jsonrpc": "2.0",
-                "id": req_id,
-                "error": {"code": -32602, "message": str(e)},
-            }
-        except Exception:
-            logger.exception("tool error")
-            return {
-                "jsonrpc": "2.0",
-                "id": req_id,
-                "error": {"code": -32000, "message": "Internal tool error"},
-            }
+        return _handle_tools_call(params, req_id)
 
     if req_id is None:
         return None
@@ -327,10 +335,10 @@ def main() -> None:
                 sys.stdout.flush()
         except KeyboardInterrupt:
             break
-        except json.JSONDecodeError as e:
-            logger.error("bad json: %s", e)
-        except Exception as e:
-            logger.error("server error: %s", e)
+        except json.JSONDecodeError:
+            logger.exception("bad json")
+        except (RuntimeError, ValueError, OSError):
+            logger.exception("server error")
 
 
 if __name__ == "__main__":
