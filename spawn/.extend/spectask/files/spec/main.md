@@ -14,6 +14,8 @@
 - spec/tasks/{task-code}-{slug}/overview.md — task overview (required).
 - spec/tasks/{task-code}-{slug}/{N}-{description}.md — subtask files (optional; required when `## Execution Scheme` defines 2+ steps).
 - spec/seeds/{X}-{slug}.md — seed file (artifact tree in this methodology pack).
+- spec/scripts/ — helper scripts shipped with the methodology pack.
+- spec/tasks/__history/ — archived `_DONE_*` task folders (see Step 8); agent-ignored.
 
 **Embedded rules:**
 
@@ -495,6 +497,9 @@ If the user requests rework or fixes after Step 5:
 - if the task introduced or renamed architecture docs under **spec/design/**, update **spec/design.yaml** (`path` + `description` for each)
 - rename the folder to _DONE_{task-code}-{name}
 - if the Source seed Path in the overview is concrete and the listed spec/seeds file is linked to this overview, rename it once with _DONE_ added
+- run the history rotation (moves `_DONE_*` folders older than the newest 10 into `spec/tasks/__history/`):
+  - Windows: `py spec/scripts/rotate_history.py`
+  - Linux/macOS: `python3 spec/scripts/rotate_history.py`
 - set [V] "Design document update" — fill the model name in brackets: `- [V] Design document update [model-name]`
 - list changed files per `R14-changed-files`
 - continue with **Pattern extract** below (same run when closing via Steps 7–8)

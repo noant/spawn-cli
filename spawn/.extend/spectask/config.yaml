@@ -1,6 +1,6 @@
 schema: 1
 name: spectask
-version: "1.26.0"
+version: "1.27.0"
 
 hints:
   global:
@@ -17,6 +17,7 @@ folders:
 agent-ignore:
   - spec/seeds/_DONE_*.md
   - spec/tasks/**/_DONE_*/_DONE_*.md
+  - spec/tasks/__history/**
   - spec/.config/**
 
 git-ignore:
@@ -26,6 +27,11 @@ setup:
   after-install: install_spectask_mcp.py
 
 files:
+  spec/scripts/rotate_history.py:
+    description: "History rotation script — moves done task folders older than the newest 10 into spec/tasks/__history/ (Step 8)."
+    mode: static
+    globalRead: no
+    localRead: no
   spec/main.md:
     description: "Spec-Tasks methodology — folder structure, eight-step process, overview template."
     mode: static
