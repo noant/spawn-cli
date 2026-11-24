@@ -216,6 +216,21 @@ def test_rewrite_managed_block_creates(tmp_path: Path) -> None:
     assert text.startswith(f"{SPAWN_BLOCK_START}\nhello\n{SPAWN_BLOCK_END}\n")
 
 
+def test_rewrite_managed_block_backslash_replacement(tmp_path: Path) -> None:
+    # Entry-point prompts embed navigation.yaml content; "\" (e.g. \u in a
+    # description) must not be parsed as re.sub template escapes (task 34 fixup).
+    f = tmp_path / "AGENTS.md"
+    f.write_text(
+        f"before\n{SPAWN_BLOCK_START}\nold \\g1 old\n{SPAWN_BLOCK_END}\nafter\n",
+        encoding="utf-8",
+    )
+    prompt = "safe UTF-8 text without \\u escapes"
+    rewrite_managed_block(f, prompt)
+    text = f.read_text(encoding="utf-8")
+    assert prompt in text
+    assert "old" not in text
+
+
 def test_rewrite_managed_block_replaces(tmp_path: Path) -> None:
     f = tmp_path / "AGENTS.md"
     f.write_text(

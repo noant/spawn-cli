@@ -61,9 +61,11 @@ def rewrite_managed_block(file_path: Path, prompt: str) -> None:
     content = file_path.read_text(encoding="utf-8") if file_path.exists() else ""
     block = f"{SPAWN_BLOCK_START}\n{prompt}\n{SPAWN_BLOCK_END}"
     if SPAWN_BLOCK_START in content:
+        # lambda replacement: `block` may contain "\" (e.g. \u in navigation
+        # descriptions) which re would otherwise parse as template escapes
         content = re.sub(
             rf"{re.escape(SPAWN_BLOCK_START)}.*?{re.escape(SPAWN_BLOCK_END)}",
-            block,
+            lambda _m: block,
             content,
             flags=re.DOTALL,
         )
