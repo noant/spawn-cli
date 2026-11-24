@@ -415,7 +415,7 @@ Equivalent **full-replace** strategy is acceptable if the adapter applies a sing
 
 | Step | Calls / data | Persistence |
 | --- | --- | --- |
-| 1 | Build prompt: **`SPAWN_ENTRY_POINT_PROMPT`** plus optional **`Hints:`** bullets (before the reads) from **`rollup_hints_for_agents`** plus **`Mandatory reads:`**/**`Contextual reads:`** bullet lists flattened from **`spawn/navigation.yaml`** via **`low_level.navigation_refs_for_agents`** (required refs in YAML order; contextual refs deduped against required; hint-only rows skipped) (see **`warn_if_agents_hints_exceed_measurement`**; navigation reads are excluded from the hint budget; missing navigation.yaml raises `SpawnError`) | — |
+| 1 | Build prompt: **`SPAWN_ENTRY_POINT_PROMPT`** plus optional hint bullets (no caption, before the reads) from **`rollup_hints_for_agents`** plus **`Mandatory reads:`**/**`Contextual reads:`** bullet lists flattened from **`spawn/navigation.yaml`** via **`low_level.navigation_refs_for_agents`** (required refs in YAML order; contextual refs deduped against required; hint-only rows skipped) (see **`warn_if_agents_hints_exceed_measurement`**; navigation reads are excluded from the hint budget; missing navigation.yaml raises `SpawnError`) | — |
 | 2 | `ide.Get(ide).rewrite_entry_point(targetRoot, prompt)` | Entry file with managed `<!-- spawn:start -->` block |
 
 **Semantics:** Ensure every initialized IDE has the same **navigation contract**;

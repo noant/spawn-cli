@@ -177,7 +177,7 @@ def test_render_skill_md_entry_instruction() -> None:
     assert "read `AGENTS.md` first" in md
     idx_body = md.index("body")
     idx_entry = md.index("Before this skill")
-    idx_hints = md.index("Hints:")
+    idx_hints = md.index("- alpha")
     idx_mand = md.index("Mandatory reads:")
     assert idx_body < idx_entry < idx_hints < idx_mand
     assert "spawn/navigation.yaml" not in md
@@ -201,7 +201,7 @@ def test_render_skill_md_hints_before_mandatory_reads() -> None:
         )
     )
     idx_body = md.index("body")
-    idx_hints = md.index("Hints:")
+    idx_hints = md.index("- alpha")
     idx_mand = md.index("Mandatory reads:")
     assert idx_body < idx_hints < idx_mand
     assert "- alpha" in md and "- beta" in md

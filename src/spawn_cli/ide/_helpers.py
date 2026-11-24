@@ -40,7 +40,6 @@ def render_skill_md(skill: SkillMetadata, entry_file: str | None = None) -> str:
             "",
         ]
     if skill.hints:
-        lines += ["Hints:"]
         for h in skill.hints:
             lines += [f"- {h}"]
         lines += [""]

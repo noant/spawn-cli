@@ -81,7 +81,7 @@ Navigation is generated from two sources:
 - extension files with `globalRead: required` or `globalRead: auto`;
 - user-maintained local rules under `spawn/rules/`.
 
-Merged **`spawn/navigation.yaml`** may also carry **hints**: each extension’s **`- ext:`** entry can include a **`hints`** list (mirrored from that pack’s **`hints.global`** in **`config.yaml`**). Under **`read-required` → `rules`**, maintainer reminders use **hint-only** rows (a **`hint`** mapping with **no** mandatory **`path`**); file-backed rows list **`path`** and **`description`** only—**`hint`** must not sit on the same row as **`path`** (refresh moves any legacy **`path`+`hint`** pair into a separate hint-only row). Only these maintainer hints and extension **`hints`** feed the IDE **Hints:** rollup for the **entry file** (`AGENTS.md` and equivalents); rendered skills carry only the owning extension's **`hints.local`** (**`hint`** on **`read-contextual` → `rules`** is ignored for all pipelines). Deduping is by exact stripped string (first occurrence wins ordering across streams).
+Merged **`spawn/navigation.yaml`** may also carry **hints**: each extension’s **`- ext:`** entry can include a **`hints`** list (mirrored from that pack’s **`hints.global`** in **`config.yaml`**). Under **`read-required` → `rules`**, maintainer reminders use **hint-only** rows (a **`hint`** mapping with **no** mandatory **`path`**); file-backed rows list **`path`** and **`description`** only—**`hint`** must not sit on the same row as **`path`** (refresh moves any legacy **`path`+`hint`** pair into a separate hint-only row). Only these maintainer hints and extension **`hints`** feed the IDE hint-bullet rollup for the **entry file** (`AGENTS.md` and equivalents); rendered skills carry only the owning extension's **`hints.local`** (**`hint`** on **`read-contextual` → `rules`** is ignored for all pipelines). Deduping is by exact stripped string (first occurrence wins ordering across streams).
 
 Example:
 
@@ -135,7 +135,7 @@ context through the entrypoint instruction instead of listing navigation
 paths itself.
 
 **Hints in rendered skills:** normalized metadata carries only **`hints.local`**
-of the extension that owns the skill, rendered as a **Hints:** section **after**
+of the extension that owns the skill, rendered as plain hint bullets **after**
 the skill **body** and **before** **Mandatory reads** (plain-text strings,
 deduped by exact stripped string). Per-hint and combined-size budgets still
 apply to the skill block: **`SpawnWarning`** when limits are exceeded, and the
@@ -157,7 +157,6 @@ Read every file listed under `Mandatory reads`.
 Inspect `Contextual reads` descriptions and read only files relevant to the
 current task.
 
-Hints:
 - {rollup hints, full text}
 
 Mandatory reads:
@@ -171,7 +170,7 @@ Contextual reads:
 When `spawn/navigation.yaml` is missing, refresh emits `SpawnError` instead of
 rendering an empty block.
 
-When hints are present, Spawn renders a **`Hints:`** bullet list (full text, no truncation) before the reads lists; the rollup is built from **`rollup_hints_for_agents`** — extension **`hints.global`** in installed-extension order, then maintainer **`read-required` → `rules`** hints — and may emit warnings if size thresholds are exceeded.
+When hints are present, Spawn renders hint bullets (full text, no caption, no truncation) before the reads lists; the rollup is built from **`rollup_hints_for_agents`** — extension **`hints.global`** in installed-extension order, then maintainer **`read-required` → `rules`** hints — and may emit warnings if size thresholds are exceeded.
 
 Adapters may format the block differently, but the semantic contract is the
 same across IDEs.
@@ -275,7 +274,6 @@ loaded, read `AGENTS.md` first.
 
 Optional when hints exist:
 
-Hints:
 - Prefer spectask steps in order.
 
 Mandatory reads:

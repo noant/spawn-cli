@@ -236,7 +236,7 @@ def _navigation_read_required_rule_hints_ordered(target_root: Path) -> list[str]
 
 
 def _finalize_hints_for_skill_metadata(merged_hints: list[str]) -> list[str]:
-    """512 codepoints per hint + 4096 char ``Hints:`` section (terminal ``- ...`` when clipped)."""
+    """512 codepoints per hint + 4096 char hint-bullet block (terminal ``- ...`` when clipped)."""
 
     trimmed: list[str] = []
     for h in merged_hints:
@@ -248,7 +248,7 @@ def _finalize_hints_for_skill_metadata(merged_hints: list[str]) -> list[str]:
             )
         trimmed.append(t)
 
-    header = "Hints:\n"
+    header = ""  # bullets only; no caption line in rendered output
     warn_combined = (
         "Skill hints truncated to fit combined 4096 character budget for the Hints section; "
         "shorten hints and/or split skills."
@@ -363,7 +363,7 @@ def warn_if_agents_hints_exceed_measurement(hints: list[str]) -> None:
         )
     block = ""
     if hints:
-        block = "Hints:\n" + "\n".join(f"- {h}" for h in hints)
+        block = "\n".join(f"- {h}" for h in hints)
     if hints and len(block) > _SKILL_HINT_SECTION_COMBINED_MAX_CHARS:
         warnings.warn(
             "AGENTS.md hints exceed combined 4096 character measurement "

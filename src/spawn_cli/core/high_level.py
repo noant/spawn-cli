@@ -216,7 +216,7 @@ def refresh_entry_point(target_root: Path, ide: str) -> None:
     ll.warn_if_agents_hints_exceed_measurement(rollup)
     prompt = SPAWN_ENTRY_POINT_PROMPT + "\n"
     if rollup:
-        prompt += "Hints:\n" + "\n".join(f"- {h}" for h in rollup) + "\n\n"
+        prompt += "\n".join(f"- {h}" for h in rollup) + "\n\n"
     prompt += _navigation_reads_section(target_root)
     ide_get(ide).rewrite_entry_point(target_root, prompt)
 

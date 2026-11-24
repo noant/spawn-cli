@@ -139,8 +139,8 @@ auto-read:
 
 `SkillMetadata.hints` carries plain-text hint strings (possibly empty): only
 the owning pack's **`hints.local`** (`generate_skills_metadata`). IDE Markdown
-rendering lists them in a **Hints:** section **after** the skill body and
-**before** **Mandatory reads** (`spawn_cli.ide._helpers.render_skill_md`).
+rendering lists them as plain hint bullets **after** the skill body and
+**before** **Mandatory reads** (no section caption; `spawn_cli.ide._helpers.render_skill_md`).
 Rendered skills do not include `spawn/navigation.yaml` among their reads;
 global context is reached through the entry file's Spawn block, referenced by
 an entrypoint instruction rendered after the skill body.
@@ -174,7 +174,7 @@ The entry point prompt is generated once by Spawn core and passed to every
 adapter. It must tell the agent to read `spawn/navigation.yaml`, read all
 `read-required` entries, and choose `read-contextual` entries by task relevance.
 When **`rollup_hints_for_agents`** returns non-empty hints, the prompt also
-includes a **Hints:** bullet list (full text; warnings only, no truncation).
+includes a hint bullet list (full text, no caption; warnings only, no truncation).
 
 ## IDE Matrix
 
@@ -236,7 +236,6 @@ description: Execute approved spectasks.
 Before this skill, if the Spawn block instructions from `AGENTS.md` are not
 loaded, read `AGENTS.md` first.
 
-Hints:
 - Short plain-text reminder when `hints` metadata is non-empty.
 
 Mandatory reads:
@@ -284,7 +283,6 @@ alwaysApply: false
 
 {skill body}
 
-Hints:
 - Short reminder when hints exist.
 
 Mandatory reads:
@@ -314,7 +312,6 @@ Description: Execute approved spectasks.
 
 {skill body}
 
-Hints:
 - Short reminder when hints exist.
 
 Mandatory reads:
@@ -582,7 +579,6 @@ spawn/navigation.yaml:
 <full merged navigation.yaml content>
 ```
 
-Hints:
 - Example maintainer or extension-global reminder.
 <!-- spawn:end -->
 ````

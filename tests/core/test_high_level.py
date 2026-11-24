@@ -567,7 +567,7 @@ def test_refresh_entry_point_hints_rollup_skips_local(tmp_path: Path) -> None:
         hl.refresh_entry_point(target, "cursor")
     prompt = mock.rewrite_entry_point.call_args[0][1]
     assert hl.SPAWN_ENTRY_POINT_PROMPT in prompt
-    assert "Hints:" in prompt
+    assert "Hints:" not in prompt
     assert "- global-for-agents" in prompt
     assert "- maintainer-required" in prompt
     assert "locals-only" not in prompt

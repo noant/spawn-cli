@@ -431,7 +431,7 @@ def test_generate_skills_metadata_combined_budget_adds_ellipsis_hint(tmp_path: P
         warnings.simplefilter("always")
         m = next(x for x in ll.generate_skills_metadata(tmp_path, "spectask") if x.name == "one")
     assert "..." in m.hints
-    block = "Hints:\n" + "\n".join(f"- {h}" for h in m.hints)
+    block = "\n".join(f"- {h}" for h in m.hints)
     assert len(block) <= ll._SKILL_HINT_SECTION_COMBINED_MAX_CHARS
     assert any(issubclass(w.category, SpawnWarning) and "4096" in str(w.message) for w in wrec)
 
