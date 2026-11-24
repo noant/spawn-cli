@@ -201,14 +201,17 @@ def _navigation_reads_section(target_root: Path) -> str:
         raise SpawnError("spawn/navigation.yaml is missing; run spawn refresh")
     required, contextual = ll.navigation_refs_for_agents(target_root)
     # Each instruction sentence sits directly before its reads list; hint
-    # bullets are prepended by refresh_entry_point.
-    lines = [SPAWN_ENTRY_POINT_PROMPT_MANDATORY]
+    # bullets are prepended by refresh_entry_point. Empty lists render no
+    # header and no instruction.
+    lines: list[str] = []
     if required:
-        lines += ["Mandatory reads:"]
-    for ref in required:
-        lines.append(f"- `{ref.file}` - {ref.description}")
+        lines += [SPAWN_ENTRY_POINT_PROMPT_MANDATORY, "Mandatory reads:"]
+        for ref in required:
+            lines.append(f"- `{ref.file}` - {ref.description}")
     if contextual:
-        lines += ["", SPAWN_ENTRY_POINT_PROMPT_CONTEXTUAL, "Contextual reads:"]
+        if lines:
+            lines += [""]
+        lines += [SPAWN_ENTRY_POINT_PROMPT_CONTEXTUAL, "Contextual reads:"]
         for ref in contextual:
             lines.append(f"- `{ref.file}` - {ref.description}")
     return "\n".join(lines) + "\n"
@@ -221,7 +224,7 @@ def refresh_entry_point(target_root: Path, ide: str) -> None:
     prompt = ""
     if rollup:
         prompt += "\n".join(f"- {h}" for h in rollup) + "\n\n"
-    prompt += _navigation_reads_section(target_root)
+    prompt += _navigation_reads_section(target_root).rstrip()
     ide_get(ide).rewrite_entry_point(target_root, prompt)
 
 

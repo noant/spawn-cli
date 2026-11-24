@@ -582,8 +582,9 @@ def test_refresh_entry_point_empty_sections_omitted(target: Path) -> None:
     prompt = mock.rewrite_entry_point.call_args[0][1]
     assert "Mandatory reads:" not in prompt  # empty reads lists are omitted
     assert "Contextual reads:" not in prompt
-    assert hl.SPAWN_ENTRY_POINT_PROMPT_MANDATORY in prompt
+    assert hl.SPAWN_ENTRY_POINT_PROMPT_MANDATORY not in prompt
     assert hl.SPAWN_ENTRY_POINT_PROMPT_CONTEXTUAL not in prompt
+    assert prompt == ""  # nothing to render when both reads lists are empty
 
 
 @patch("spawn_cli.core.high_level.ide_get", lambda *_a, **_k: _stub_ide())

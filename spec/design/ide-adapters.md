@@ -585,8 +585,8 @@ Contextual reads:
 ````
 
 Hint bullets (no caption) come first; each instruction sentence sits directly
-before its reads list. Empty reads lists render no section header (and no
-contextual instruction when `Contextual reads` is empty).
+before its reads list. Empty reads lists render no section header and no
+instruction (a fully empty navigation renders only the hint bullets).
 
 If the IDE requires a whole-file entry point, the adapter must warn before
 overwriting. The warning should name the file and recommend backing up user
