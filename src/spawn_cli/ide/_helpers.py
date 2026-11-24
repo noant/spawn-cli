@@ -21,15 +21,21 @@ EXT_IGNORE_BLOCK_START = "# spawn:ext:start"
 EXT_IGNORE_BLOCK_END = "# spawn:ext:end"
 
 def render_skill_md(skill: SkillMetadata, entry_file: str | None = None) -> str:
-    """Render normalized skill to Markdown with frontmatter, skill body,
-    entrypoint instruction (when entry_file given), hints, mandatory reads,
-    and contextual reads."""
+    """Render normalized skill to Markdown with frontmatter, hint bullets
+    (no caption) right after frontmatter, skill body, entrypoint instruction
+    (when entry_file given), mandatory reads, and contextual reads."""
     lines = [
         "---",
         f"name: {skill.name}",
         f"description: {skill.description}",
         "---",
         "",
+    ]
+    if skill.hints:
+        for h in skill.hints:
+            lines += [f"- {h}"]
+        lines += [""]
+    lines += [
         skill.content,
         "",
     ]

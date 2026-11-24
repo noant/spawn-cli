@@ -135,8 +135,8 @@ context through the entrypoint instruction instead of listing navigation
 paths itself.
 
 **Hints in rendered skills:** normalized metadata carries only **`hints.local`**
-of the extension that owns the skill, rendered as plain hint bullets **after**
-the skill **body** and **before** **Mandatory reads** (plain-text strings,
+of the extension that owns the skill, rendered as plain hint bullets **right
+after the frontmatter**, before the skill **body** (plain-text strings,
 deduped by exact stripped string). Per-hint and combined-size budgets still
 apply to the skill block: **`SpawnWarning`** when limits are exceeded, and the
 block may be **truncated** (including a terminal bullet with `...`).
@@ -153,16 +153,15 @@ The Spawn-managed IDE entrypoint block should express this logic in plain
 agent-facing language:
 
 ```markdown
-Read every file listed under `Mandatory reads`.
-Inspect `Contextual reads` descriptions and read only files relevant to the
-current task.
-
 - {rollup hints, full text}
 
+Read every file listed under `Mandatory reads`.
 Mandatory reads:
 - `spawn/rules/team.yaml` - Team rules.
 - `spec/main.md` - Spec task process.
 
+Inspect `Contextual reads` descriptions and read only files relevant to the
+current task.
 Contextual reads:
 - `spec/design/hla.md` - High-level architecture.
 ```
@@ -170,7 +169,7 @@ Contextual reads:
 When `spawn/navigation.yaml` is missing, refresh emits `SpawnError` instead of
 rendering an empty block.
 
-When hints are present, Spawn renders hint bullets (full text, no caption, no truncation) before the reads lists; the rollup is built from **`rollup_hints_for_agents`** — extension **`hints.global`** in installed-extension order, then maintainer **`read-required` → `rules`** hints — and may emit warnings if size thresholds are exceeded.
+When hints are present, Spawn renders hint bullets (full text, no caption, no truncation) first, before the instructions; each instruction sentence sits directly before its reads list. The rollup is built from **`rollup_hints_for_agents`** — extension **`hints.global`** in installed-extension order, then maintainer **`read-required` → `rules`** hints — and may emit warnings if size thresholds are exceeded.
 
 Adapters may format the block differently, but the semantic contract is the
 same across IDEs.
@@ -267,14 +266,14 @@ name: spectask-execute
 description: Execute approved spectasks.
 ---
 
+Optional when hints exist:
+
+- Prefer spectask steps in order.
+
 Use this skill body...
 
 Before this skill, if the Spawn block instructions from `AGENTS.md` are not
 loaded, read `AGENTS.md` first.
-
-Optional when hints exist:
-
-- Prefer spectask steps in order.
 
 Mandatory reads:
 - `spec/main.md` - Spec task process.

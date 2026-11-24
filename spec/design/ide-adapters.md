@@ -203,11 +203,11 @@ includes a hint bullet list (full text, no caption; warnings only, no truncation
 Adapters must preserve the same semantic content:
 
 1. Skill name and description.
-2. Original skill body (extension source markdown after frontmatter).
-3. An entrypoint instruction: read the IDE entry file (such as `AGENTS.md`)
+2. **Hints** bullets from `SkillMetadata.hints` (owner `hints.local` only),
+   when non-empty, right after the frontmatter (no caption).
+3. Original skill body (extension source markdown after frontmatter).
+4. An entrypoint instruction: read the IDE entry file (such as `AGENTS.md`)
    when its Spawn block is not in context, rendered right after the body.
-4. **Hints** bullets from `SkillMetadata.hints` (owner `hints.local` only),
-   when non-empty, after the entrypoint instruction and before mandatory reads.
 5. Mandatory reads: skill-local `required-read` paths only (no
    `spawn/navigation.yaml` bullet).
 6. Contextual reads from `auto-read`.
@@ -231,12 +231,12 @@ name: spectask-execute
 description: Execute approved spectasks.
 ---
 
+- Short plain-text reminder when `hints` metadata is non-empty.
+
 {source skill content}
 
 Before this skill, if the Spawn block instructions from `AGENTS.md` are not
 loaded, read `AGENTS.md` first.
-
-- Short plain-text reminder when `hints` metadata is non-empty.
 
 Mandatory reads:
 - `spec/main.md` - Spec task process.
@@ -570,18 +570,21 @@ Adapters must update only a Spawn-managed block when possible:
 
 ````
 <!-- spawn:start -->
-Read every file listed under `read-required`.
-Inspect `read-contextual` descriptions and read only files relevant to the
-current task.
-
-spawn/navigation.yaml:
-```yaml
-<full merged navigation.yaml content>
-```
-
 - Example maintainer or extension-global reminder.
+
+Read every file listed under `Mandatory reads`.
+Mandatory reads:
+- `spawn/rules/00-general.md` - General conventions.
+
+Inspect `Contextual reads` descriptions and read only files relevant to the
+current task.
+Contextual reads:
+- `spec/design/hla.md` - Project high-level architecture.
 <!-- spawn:end -->
 ````
+
+Hint bullets (no caption) come first; each instruction sentence sits directly
+before its reads list.
 
 If the IDE requires a whole-file entry point, the adapter must warn before
 overwriting. The warning should name the file and recommend backing up user

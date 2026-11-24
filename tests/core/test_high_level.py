@@ -518,8 +518,10 @@ def test_refresh_entry_point(target: Path) -> None:
         hl.refresh_entry_point(target, "cursor")
     mock.rewrite_entry_point.assert_called_once()
     prompt = mock.rewrite_entry_point.call_args[0][1]
-    assert hl.SPAWN_ENTRY_POINT_PROMPT in prompt
-    assert "Mandatory reads:" in prompt
+    assert hl.SPAWN_ENTRY_POINT_PROMPT_MANDATORY in prompt
+    assert prompt.index("Mandatory reads:") > prompt.index(hl.SPAWN_ENTRY_POINT_PROMPT_MANDATORY)
+    assert prompt.index("Mandatory reads:") < prompt.index(hl.SPAWN_ENTRY_POINT_PROMPT_CONTEXTUAL)
+    assert prompt.index("Contextual reads:") > prompt.index(hl.SPAWN_ENTRY_POINT_PROMPT_CONTEXTUAL)
     assert "- `spawn/rules/r.md` - rule file" in prompt
     assert "- `spec/main.md` - process doc" in prompt
     assert "Contextual reads:" in prompt
@@ -566,7 +568,7 @@ def test_refresh_entry_point_hints_rollup_skips_local(tmp_path: Path) -> None:
     with patch("spawn_cli.core.high_level.ide_get", return_value=mock):
         hl.refresh_entry_point(target, "cursor")
     prompt = mock.rewrite_entry_point.call_args[0][1]
-    assert hl.SPAWN_ENTRY_POINT_PROMPT in prompt
+    assert prompt.index("- global-for-agents") < prompt.index(hl.SPAWN_ENTRY_POINT_PROMPT_MANDATORY)
     assert "Hints:" not in prompt
     assert "- global-for-agents" in prompt
     assert "- maintainer-required" in prompt

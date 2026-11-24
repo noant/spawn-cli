@@ -15,10 +15,10 @@ from spawn_cli.io.paths import ensure_dir, safe_path
 from spawn_cli.io.yaml_io import load_yaml, save_yaml
 from spawn_cli.models.config import ExtensionConfig, ReadFlag
 
-SPAWN_ENTRY_POINT_PROMPT = """\
-Read every file listed under `Mandatory reads`.
-Inspect `Contextual reads` descriptions and read only files relevant to the current task.
-"""
+SPAWN_ENTRY_POINT_PROMPT_MANDATORY = "Read every file listed under `Mandatory reads`."
+SPAWN_ENTRY_POINT_PROMPT_CONTEXTUAL = (
+    "Inspect `Contextual reads` descriptions and read only files relevant to the current task."
+)
 
 MCP_MERGED_NOTICE = (
     "MCP was merged for this workspace; you may need to press Enable in your IDE MCP UI."
@@ -200,11 +200,13 @@ def _navigation_reads_section(target_root: Path) -> str:
     if not nav_path.is_file():
         raise SpawnError("spawn/navigation.yaml is missing; run spawn refresh")
     required, contextual = ll.navigation_refs_for_agents(target_root)
-    lines = ["Mandatory reads:"]
+    # Each instruction sentence sits directly before its reads list; hint
+    # bullets are prepended by refresh_entry_point.
+    lines = [SPAWN_ENTRY_POINT_PROMPT_MANDATORY, "Mandatory reads:"]
     for ref in required:
         lines.append(f"- `{ref.file}` - {ref.description}")
     if contextual:
-        lines += ["", "Contextual reads:"]
+        lines += ["", SPAWN_ENTRY_POINT_PROMPT_CONTEXTUAL, "Contextual reads:"]
         for ref in contextual:
             lines.append(f"- `{ref.file}` - {ref.description}")
     return "\n".join(lines) + "\n"
@@ -214,7 +216,7 @@ def refresh_entry_point(target_root: Path, ide: str) -> None:
     _require_init(target_root)
     rollup = ll.rollup_hints_for_agents(target_root)
     ll.warn_if_agents_hints_exceed_measurement(rollup)
-    prompt = SPAWN_ENTRY_POINT_PROMPT + "\n"
+    prompt = ""
     if rollup:
         prompt += "\n".join(f"- {h}" for h in rollup) + "\n\n"
     prompt += _navigation_reads_section(target_root)
@@ -667,7 +669,8 @@ def install_extension(target_root: Path, path: str, branch: str | None = None) -
 
 __all__ = [
     "MCP_MERGED_NOTICE",
-    "SPAWN_ENTRY_POINT_PROMPT",
+    "SPAWN_ENTRY_POINT_PROMPT_CONTEXTUAL",
+    "SPAWN_ENTRY_POINT_PROMPT_MANDATORY",
     "_refresh_extension_core",
     "add_ide",
     "extension_check",
