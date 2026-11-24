@@ -1,11 +1,9 @@
 <!-- spawn:start -->
-Read every file listed under `Mandatory reads`.
-Inspect `Contextual reads` descriptions and read only files relevant to the current task.
-
 - When finishing a task that involved editing this repo's code or docs: call mempalace_mine (mempalace-mine-mcp), then mempalace_reconnect on mempalace-mcp if already connected.
 - Prefer codebase search via mempalace-mcp first; use workspace full-text / ripgrep only if MemPalace is unavailable or insufficient.
 - Use the platform ask tool when available (R10-ask in spec/main.md); otherwise, stop and request input from the user.
 
+Read every file listed under `Mandatory reads`.
 Mandatory reads:
 - `spawn/rules/00-general.md` - General language-agnostic conventions (ASCII, documentation, chat language).
 - `spawn/rules/01-vacancy-cleanup-subtrees.md` - finalize_*_repo cleanup must know every adapter-written config subtree; avoid dead configs.
@@ -16,6 +14,7 @@ Mandatory reads:
 - `spawn/rules/06-new-ide-adapter-checklist.md` - Local rule file.
 - `.mempalace/wakeup.md` - Bounded MemPalace wake-up context from the palace.
 
+Inspect `Contextual reads` descriptions and read only files relevant to the current task.
 Contextual reads:
 - `spec/main.md` - Spec-Tasks methodology — folder structure, eight-step process, overview template.
 - `spec/design/hla.md` - Project high-level architecture; updated in Step 8.
