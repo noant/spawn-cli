@@ -15,3 +15,8 @@ Conventions:
 4. On removal, prune only spawn-owned keys and their empty subtrees; keep the
    file when any user content remains (paired rule:
    `spawn/rules/01-vacancy-cleanup-subtrees.md`).
+5. When the tool accepts the same config in several locations (e.g. Kilo Code:
+   root `kilo.json` vs `.kilo/kilo.json`), pick ONE canonical path and emit a
+   `SpawnWarning` naming every other existing location that spawn does NOT
+   merge — the unmanaged file may shadow or duplicate the canonical one
+   (precedent: `kilo_code.py` `_load_config`, task 34).

@@ -26,6 +26,7 @@ from spawn_cli.ide import (
     HermesAdapter,
     IdeCapabilities,
     JunieAdapter,
+    KiloCodeAdapter,
     MimoCodeAdapter,
     OpenCodeAdapter,
     StubAdapter,
@@ -52,6 +53,8 @@ def test_get_known_adapter() -> None:
     assert get("cline").key == "cline"
     assert isinstance(get("hermes"), HermesAdapter)
     assert get("hermes").key == "hermes"
+    assert isinstance(get("kilo-code"), KiloCodeAdapter)
+    assert get("kilo-code").key == "kilo-code"
 
 
 def test_get_alias() -> None:
@@ -64,6 +67,9 @@ def test_get_alias() -> None:
     m = get("mimo")
     assert m.key == "mimo-code"
     assert isinstance(m, MimoCodeAdapter)
+    k = get("kilo")
+    assert k.key == "kilo-code"
+    assert isinstance(k, KiloCodeAdapter)
 
 
 def test_get_unknown_raises() -> None:
@@ -323,6 +329,7 @@ ADAPTER_ENTRY_FILES = [
     (GitHubCopilotAdapter, ".github/copilot-instructions.md"),
     (HermesAdapter, ".hermes.md"),
     (JunieAdapter, "AGENTS.md"),
+    (KiloCodeAdapter, "AGENTS.md"),
     (MimoCodeAdapter, "AGENTS.md"),
     (OpenCodeAdapter, "AGENTS.md"),
     (WindsurfAdapter, "AGENTS.md"),

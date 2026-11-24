@@ -13,12 +13,14 @@ from . import opencode  # noqa: F401
 from . import mimo_code  # noqa: F401
 from . import hermes  # noqa: F401
 from . import junie  # noqa: F401
+from . import kilo_code  # noqa: F401
 from ._stub import StubAdapter
 from .cline import ClineAdapter
 from .opencode import OpenCodeAdapter
 from .mimo_code import MimoCodeAdapter
 from .hermes import HermesAdapter
 from .junie import JunieAdapter
+from .kilo_code import KiloCodeAdapter
 from .claude_code import ClaudeCodeAdapter
 from .codex import CodexAdapter
 from .cursor import CursorAdapter
@@ -57,6 +59,7 @@ __all__ = [
     "MimoCodeAdapter",
     "HermesAdapter",
     "JunieAdapter",
+    "KiloCodeAdapter",
     "ClaudeCodeAdapter",
     "CodexAdapter",
     "CursorAdapter",

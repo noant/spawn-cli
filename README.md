@@ -238,6 +238,7 @@ Then run **`spawn refresh`** so skills and entry points pick up the hint.
 | Mimo Code (`mimo-code`) | `.mimocode/skills/` | `.mimocode/mimocode.json` | `mimocode.json` permissions | `AGENTS.md` | `.mimocode/` |
 | Hermes (`hermes`) | `.hermes/skills/` | — | — | `.hermes.md` | `.hermes/`, `.hermes.md`, `HERMES.md` |
 | JetBrains Junie (`junie`) | `.junie/skills/` | `.junie/mcp/mcp.json` | `.aiignore` | `AGENTS.md` | `.junie/` |
+| Kilo Code (`kilo-code`) | `.kilo/skills/` | `.kilo/kilo.json` | `.kilocodeignore` | `AGENTS.md` | `.kilo/`, `.kilocode/`, `kilo.json`, `kilo.jsonc` |
 
 **Legend:**
 

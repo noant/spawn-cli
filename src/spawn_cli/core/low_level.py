@@ -37,6 +37,7 @@ CANONICAL_IDE_KEYS: tuple[str, ...] = (
     "mimo-code",
     "hermes",
     "junie",
+    "kilo-code",
 )
 
 SPAWN_GITIGNORE_START = "# spawn:start"

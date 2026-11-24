@@ -103,6 +103,7 @@ ALIASES: dict[str, str] = {
     "copilot": "github-copilot",
     "github": "github-copilot",
     "mimo": "mimo-code",
+    "kilo": "kilo-code",
 }
 
 _registry: dict[str, IdeAdapter] = {}  # populated at module load by adapter modules

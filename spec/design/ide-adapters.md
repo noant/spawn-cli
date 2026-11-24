@@ -35,6 +35,7 @@ Supported names (canonical):
 - `mimo-code`
 - `hermes`
 - `junie`
+- `kilo-code`
 
 Additional IDE layouts (Qoder, Qwen Code, Aider, Zed, Devin) are described later
 in this document for future adapters; they are **not** CLI-supported until added
@@ -48,6 +49,7 @@ gemini -> gemini-cli
 copilot -> github-copilot
 github -> github-copilot
 mimo -> mimo-code
+kilo -> kilo-code
 ```
 
 Unknown names are errors. Unsupported operations on a known adapter are
@@ -192,6 +194,7 @@ includes a **Hints:** bullet list (full text; warnings only, no truncation).
 | Cline | `.cline/skills/{skill}/SKILL.md` (frontmatter `name` must equal directory name) | — (no project-scope MCP; global `cline_mcp_settings.json` only) | `.clineignore` (repo root, gitignore-style) | `AGENTS.md` | MCP unsupported: Spawn warns and writes nothing. Detection markers: `.cline/`, `.clinerules/` or `.clinerules`, `.clineignore`. Legacy `.clinerules` is untouched by cleanup. |
 | OpenCode | `.opencode/skills/{skill}/SKILL.md` (frontmatter `name` must equal directory name; stricter name regex than spawn-wide normalization: `^[a-z0-9]+(-[a-z0-9]+)*$`, so `.`/`_` are sanitized to `-` by the adapter) | Root `opencode.json` key `mcp` | Root `opencode.json` `permission.read` / `permission.edit` `"glob": "deny"` entries (project-style, dict-keyed, idempotent; last matching rule wins) | `AGENTS.md` | Detection markers: `.opencode/`, `opencode.json`, `opencode.jsonc` (`AGENTS.md` alone is NOT a marker — shared with other adapters). Spawn writes only `opencode.json` (never merges JSONC); unparseable JSON errors before mutation. OpenCode also discovers `.claude/skills`/`.agents/skills` (compat — outside this column). No upstream ignore file exists. |
 | Mimo Code | `.mimocode/skills/{skill}/SKILL.md` (skill name read from YAML frontmatter; no stricter upstream regex — spawn-wide `normalize_skill_name` suffices; dirname kept equal to frontmatter name) | `.mimocode/mimocode.json` key `mcp` (same local/remote + `enabled` shape as OpenCode) | `.mimocode/mimocode.json` `permission.read` / `permission.edit` glob -> `"deny"` entries (project-style, dict-keyed, idempotent; no upstream ignore file) | `AGENTS.md` | Detection marker: `.mimocode/` (`AGENTS.md` alone is NOT a marker). Canonical config `.mimocode/mimocode.json`; warns (SpawnWarning) when only `mimocode.jsonc` exists; unparseable JSON errors before mutation. MiMo Code is an OpenCode fork — adapter mirrors `opencode.py`; vacancy pruner `finalize_mimo_code_repo` (known keys `mcp`, `permission`). |
+| Kilo Code | `.kilo/skills/{skill}/SKILL.md` (frontmatter `name` must equal directory name; stricter name regex `^[a-z0-9]+(-[a-z0-9]+)*$` max 64 chars — `.`/`_` sanitized to `-` by the adapter) | `.kilo/kilo.json` key `mcp` (same local/remote + `enabled` shape as OpenCode/Mimo; `{env:VAR}` placeholders) | `.kilocodeignore` (repo root, gitignore-style; file keeps the legacy kilocode prefix) | `AGENTS.md` | Detection markers: `.kilo/`, legacy `.kilocode/`, root `kilo.json`/`kilo.jsonc` (`AGENTS.md` alone is NOT a marker — shared). Canonical config `.kilo/kilo.json`; warns (SpawnWarning) when only `kilo.jsonc` exists; unparseable JSON errors before mutation. Kilo also auto-loads `.agents/skills`/`.claude/skills` (compat — outside this column). Vacancy pruner `finalize_kilo_code_repo` (known key `mcp`). |
 | Hermes | `.hermes/skills/{skill}/SKILL.md` (spawn-wide `normalize_skill_name`; frontmatter name rewritten to match dirname via `model_copy`) | — (no project-scope MCP; global `~/.hermes/config.yaml` `mcp_servers` only) | — (no upstream agent-ignore file) | `.hermes.md` | MCP unsupported: Spawn warns (SpawnWarning) and writes nothing. Agent ignore unsupported: warns and writes nothing. Detection markers: `.hermes/`, `.hermes.md`, `HERMES.md`. Project context priority upstream: `.hermes.md` > `AGENTS.override.md` > `AGENTS.md` — the `.hermes.md` entry block is the only guaranteed-to-be-read slot. Project skills require upstream `hermes skills trust` before Hermes loads them. `.agents/skills` intentionally NOT used (owned by the Codex adapter). Vacancy pruner `finalize_hermes_repo` (`.hermes/` dropped when vacant). |
 | JetBrains Junie | `.junie/skills/{skill}/SKILL.md` (spawn-wide `normalize_skill_name`; frontmatter name rewritten to match dirname via `model_copy`) | `.junie/mcp/mcp.json` top-level `mcpServers` (same Generic JSON MCP shape as Cursor; stdio entries omit `type`; remote `type`/`url`/`headers`; `${VAR}` placeholders) | `.aiignore` (repo root, gitignore syntax; `# spawn:` comment markers are inert to Junie's parser) | `AGENTS.md` | Detection marker: `.junie/` directory (`AGENTS.md` alone is NOT a marker — shared with other adapters). Capabilities: skills `native`, mcp `project`, agent ignore `native`, entry point `agents-md`. User content under `.junie/` (`memory/`, `rules/`, `playbook.md`) is never touched; vacancy pruner `finalize_junie_repo` deletes `.junie/` only when it contains zero files and clears the `.aiignore` spawn block. Adapter mirrors `cursor.py`; rules 03 (`SpawnWarning`) and 04 (frontmatter name == dirname) apply. |
 
@@ -558,6 +561,11 @@ the same `mcp` local/remote entries, `{env:VAR}` placeholders, and canonical
 file rules (canonical `.json`; SpawnWarning when only `mimocode.jsonc` exists;
 SpawnError on unparseable JSON before mutation).
 
+Kilo Code uses the same shape in `.kilo/kilo.json` (canonical JSON; JSONC
+sibling not merged). Note: when a root `kilo.json`/`kilo.jsonc` coexists,
+Kilo may prioritize it; spawn warns it is not merged but still writes the
+canonical `.kilo/kilo.json`.
+
 ## Entry Point Rendering
 
 Entry point files are user-visible and may already contain user instructions.
@@ -603,6 +611,7 @@ Entry point targets:
 | Mimo Code | `AGENTS.md` |
 | Hermes | `.hermes.md` |
 | JetBrains Junie | `AGENTS.md` |
+| Kilo Code | `AGENTS.md` |
 
 Gemini CLI additionally reads which context filenames to load via `context.fileName` under the `context` section in `.gemini/settings.json` (a string or array; default behavior still centers on `GEMINI.md` unless changed).
 
@@ -629,6 +638,7 @@ specific and must not pretend to work when there is no supported target.
 | Mimo Code | Project-style, identical to OpenCode: `"glob": "deny"` entries under `permission.read` / `permission.edit` in `.mimocode/mimocode.json` (dict-keyed, idempotent; removal prunes only spawn-owned entries and empty subtrees). No upstream ignore file (`watcher.ignore` controls the file watcher only — never used for agent ignore). Clear via the metadata `agent-ignore.txt` recorded list. |
 | Hermes | Unsupported: no upstream agent-ignore file. `add_agent_ignore` / `remove_agent_ignore` warn (SpawnWarning) and write nothing. |
 | JetBrains Junie | Merge Spawn-owned globs into `.aiignore` (repo root, gitignore syntax) via the `# spawn:start`/`# spawn:end` managed block; split-region (`# spawn:core:`/`# spawn:ext:`) overrides and `clear_spawn_agent_ignore` supported, mirroring Cursor/Cline. |
+| Kilo Code | Merge Spawn-owned globs into `.kilocodeignore` (repo root, gitignore syntax) via the managed block; split-region overrides and `clear_spawn_agent_ignore` supported, mirroring Cline. |
 
 When an adapter renders ignore globs into a file that also contains user globs,
 it must use a managed block or an ownership metadata comparison so uninstall

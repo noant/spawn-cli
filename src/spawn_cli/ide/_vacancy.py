@@ -332,12 +332,53 @@ def finalize_mimo_code_repo(target_root: Path) -> None:
         (target_root / ".mimocode").rmdir()
 
 
+def _kilo_config_vacant(path: Path) -> bool:
+    data = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(data, dict):
+        return False  # user config in an unexpected shape: keep untouched
+    if data == {}:
+        return True
+    for key, value in data.items():
+        if key in ("mcp",):
+            if value:
+                return False
+        elif json_value_nonempty(value):
+            return False
+    return True
+
+
+def finalize_kilo_code_repo(target_root: Path) -> None:
+    """Kilo Code adapter: `.kilo/kilo.json` (key mcp), `.kilo/skills`, legacy `.kilocode/`, root `.kilocodeignore`; drop when vacant."""
+    config = target_root / ".kilo" / "kilo.json"
+    if config.is_file():
+        try:
+            vacant = _kilo_config_vacant(config)
+        except json.JSONDecodeError:
+            vacant = False  # keep unparseable user config untouched
+        if vacant:
+            config.unlink()
+    for dotdir in (".kilo", ".kilocode"):
+        # .kilocode is a legacy upstream marker dir; spawn never writes into it —
+        # prune only the empty dir, never any user content (rule 01 ownership).
+        root = target_root / dotdir
+        if root.is_dir():
+            prune_empty_directories_under(root)
+            if not dir_has_any_file(root):
+                root.rmdir()
+    ignore = target_root / ".kilocodeignore"
+    if ignore.is_file():
+        clear_split_agent_ignore_file(ignore)
+        if not ignore.read_text(encoding="utf-8").strip():
+            ignore.unlink(missing_ok=True)
+
+
 __all__ = [
     "dir_has_any_file",
     "finalize_claude_repo",
     "finalize_cline_repo",
     "finalize_hermes_repo",
     "finalize_junie_repo",
+    "finalize_kilo_code_repo",
     "finalize_mimo_code_repo",
     "finalize_opencode_repo",
     "finalize_codex_repo",
