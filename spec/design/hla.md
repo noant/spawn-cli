@@ -48,7 +48,7 @@ Pydantic v2 models for configs, navigation, MCP, skills, and rendered metadata s
 - **`IdeAdapter`** ABC: optional `rewrite_core_agent_ignore`, `rewrite_extension_agent_ignore`, `clear_spawn_agent_ignore` (defaults), `finalize_repo_after_ide_removed`.
 - **Registry**: `get`, `register`, `detect_supported_ides`.
 - **Vacancy / cleanup**: e.g. `spawn_cli.ide._vacancy` (empty MCP payloads, guarded removal of vacant IDE dotdirs).
-- **Rendering helpers**: `_helpers` (including `render_skill_md`: frontmatter, skill body, optional **Hints**, **Mandatory reads** with `spawn/navigation.yaml` last, **Contextual reads**).
+- **Rendering helpers**: `_helpers` (including `render_skill_md`: frontmatter, skill body, entrypoint instruction to read the IDE entry file when its Spawn block is not in context, optional **Hints** (owner `hints.local` only), skill-local **Mandatory reads**, **Contextual reads**).
 - **`StubAdapter`** for tests or in-progress work.
 - **Concrete adapters** (Cursor, Codex, Claude Code, GitHub Copilot, Gemini CLI, Windsurf, Cline, OpenCode, Mimo Code, Hermes) registered for every key in **`CANONICAL_IDE_KEYS`** (defined in `low_level` as the single ordering source for the IDE registry). Hermes: project skills under `.hermes/skills/`, entry block in root `.hermes.md` (native highest-priority context file); MCP and agent ignore unsupported (global-only upstream) — warn via `SpawnWarning`.
 
@@ -56,7 +56,7 @@ Pydantic v2 models for configs, navigation, MCP, skills, and rendered metadata s
 
 Direct filesystem and metadata: extension and IDE lists, skill/MCP/navigation helpers (`list_mcp` reads `spawn/.extend/{name}/mcp/{windows,linux,macos}.json` for the host OS), rendered ownership YAML, `.gitignore` managed blocks, `init()` layout, **`sync_core_config_from_defaults`** (overwrite `spawn/.core/config.yaml` from bundled **`CoreConfig`** after validating parse of any existing file), **`remove_ide_metadata_dir`**, **`prune_metadata_temp`** (stale UUID dirs under `spawn/.metadata/temp/` older than **24 hours** during extension staging).
 
-**Navigation / skills metadata**: when building skill metadata and extension slices of `spawn/navigation.yaml`, the same repo-relative path is not both mandatory and contextual (normalized comparison; **read-required** wins). Persisted `spawn/navigation.yaml` keeps top-level **`read-required`** then **`read-contextual`** (unknown keys after), via **`_ensure_navigation_root_key_order`** and reorder before dump. **`generate_skills_metadata`** loads **`rules`** groups from merged navigation and folds them into each skill’s mandatory and contextual read lists, deduped with extension-driven reads the same way.
+**Navigation / skills metadata**: when building skill metadata, the same repo-relative path is not both mandatory and contextual (normalized comparison; **read-required** wins). **`generate_skills_metadata`** builds skill-local records only: skill `required-read` plus the owner extension's `localRead` files; no global reads, no navigation `rules` groups, and no navigation paths are folded into skills.
 
 ### 6. `spawn_cli.core.download`
 
@@ -93,7 +93,7 @@ Immediately before each configured hook or healthcheck subprocess, **stderr** pr
 
 Short hints originate in extension **`config.yaml`** (`hints.global` / `hints.local`, see [`extension-author-guide.md`](extension-author-guide.md)) and in maintainer **`read-required` → `rules`** **hint-only** rows (no **`path`** on that row), which contribute hints only and do not add mandatory reads. File-backed rule rows carry **`path`** and **`description`** only; legacy **`path`+`hint`** pairs are split on refresh. On navigation refresh, each extension’s **`hints.global`** is mirrored under that extension’s **`- ext:`** stanza in **`spawn/navigation.yaml`** as a **`hints`** string list (normalize, dedupe).
 
-**Rendered skills**: **`SkillMetadata.hints`** merges every installed extension’s **`hints.global`** (sorted extension id), then **`hints.local`** for the owning extension, then maintainer **hint-only** rule rows from **`read-required`** (deterministic dedupe; see **`generate_skills_metadata`**).
+**Rendered skills**: **`SkillMetadata.hints`** carries only **`hints.local`** for the owning extension (deterministic dedupe; see **`generate_skills_metadata`**); global and maintainer hints stay in the entry-point rollup.
 
 **IDE entry points**: **`rollup_hints_for_agents`** lists global extension hints across installed packs plus maintainer rule hints; **`hints.local`** appears in skills only, not in AGENTS.
 

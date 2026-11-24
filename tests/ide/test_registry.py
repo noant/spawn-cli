@@ -25,7 +25,9 @@ from spawn_cli.ide import (
     GitHubCopilotAdapter,
     HermesAdapter,
     IdeCapabilities,
+    JunieAdapter,
     MimoCodeAdapter,
+    OpenCodeAdapter,
     StubAdapter,
     WindsurfAdapter,
     detect_supported_ides,
@@ -110,12 +112,10 @@ def test_render_skill_md_minimal() -> None:
         )
     )
     assert "---\nname: spectask-run\ndescription: Run tasks.\n---" in md
-    assert "Read `spawn/navigation.yaml` first." not in md
+    assert "spawn/navigation.yaml" not in md
     idx_body = md.index("Skill body line.")
     idx_mand = md.index("Mandatory reads:")
     assert idx_body < idx_mand
-    assert "- `spawn/navigation.yaml` - Merged Spawn navigation (read-required, read-contextual)." in md
-    assert md.index("- `spawn/navigation.yaml`") > md.rindex("Mandatory reads:")
     assert "Contextual reads:" not in md
 
 
@@ -133,7 +133,8 @@ def test_render_skill_md_full() -> None:
             auto_read=[
                 SkillFileRef(file="doc/hla.md", description="HLA"),
             ],
-        )
+        ),
+        entry_file="AGENTS.md",
     )
     idx_body = md.index("body")
     idx_mand = md.index("Mandatory reads:")
@@ -141,49 +142,41 @@ def test_render_skill_md_full() -> None:
     assert idx_body < idx_mand < idx_ctx
     assert "- `spec/main.md` - Main spec" in md
     assert "- `doc/hla.md` - HLA" in md
-    assert "- `spawn/navigation.yaml` - Merged Spawn navigation (read-required, read-contextual)." in md
-    mand = md.split("Contextual reads:", 1)[0]
-    assert mand.index("spec/main.md") < mand.index("spawn/navigation.yaml")
+    assert "read `AGENTS.md` first" in md
+    assert "spawn/navigation.yaml" not in md
 
 
-def test_render_skill_md_mandatory_nav_reordered() -> None:
+def test_render_skill_md_entry_instruction() -> None:
     from spawn_cli.models.skill import SkillFileRef, SkillMetadata
 
+    skill = SkillMetadata(
+        name="s",
+        description="d",
+        content="body",
+        required_read=[SkillFileRef(file="a.md", description="ad")],
+        auto_read=[],
+        hints=[],
+    )
     md = render_skill_md(
         SkillMetadata(
-            name="a",
-            description="b",
-            content="c",
-            required_read=[
-                SkillFileRef(file="spawn/navigation.yaml", description="Custom nav"),
-                SkillFileRef(file="spec/main.md", description="Main"),
-            ],
+            name="s",
+            description="d",
+            content="body",
+            required_read=[SkillFileRef(file="a.md", description="ad")],
             auto_read=[],
-        )
+            hints=["alpha"],
+        ),
+        "AGENTS.md",
     )
-    mand = md.split("Contextual reads:")[0] if "Contextual reads:" in md else md
-    assert mand.index("spec/main.md") < mand.index("spawn/navigation.yaml")
-    assert "- `spawn/navigation.yaml` - Custom nav" in md
-
-
-def test_render_skill_md_mandatory_nav_deduped() -> None:
-    from spawn_cli.models.skill import SkillFileRef, SkillMetadata
-
-    md = render_skill_md(
-        SkillMetadata(
-            name="a",
-            description="b",
-            content="c",
-            required_read=[
-                SkillFileRef(file="spawn/navigation.yaml", description="First"),
-                SkillFileRef(file=r"spawn\navigation.yaml", description="Second"),
-            ],
-            auto_read=[],
-        )
-    )
-    assert md.count("spawn/navigation.yaml") + md.count(r"spawn\navigation.yaml") == 1
-    assert " - First" in md
-    assert "Second" not in md
+    assert "read `AGENTS.md` first" in md
+    idx_body = md.index("body")
+    idx_entry = md.index("Before this skill")
+    idx_hints = md.index("Hints:")
+    idx_mand = md.index("Mandatory reads:")
+    assert idx_body < idx_entry < idx_hints < idx_mand
+    assert "spawn/navigation.yaml" not in md
+    md_no_entry = render_skill_md(skill)
+    assert "AGENTS.md" not in md_no_entry
 
 
 def test_render_skill_md_hints_before_mandatory_reads() -> None:
@@ -319,3 +312,37 @@ def test_stub_add_skills_warns() -> None:
         assert len(w) == 1
         assert "cursor" in str(w[0].message)
         assert "skill rendering not yet implemented" in str(w[0].message)
+
+
+ADAPTER_ENTRY_FILES = [
+    (ClaudeCodeAdapter, "CLAUDE.md"),
+    (ClineAdapter, "AGENTS.md"),
+    (CodexAdapter, "AGENTS.md"),
+    (CursorAdapter, "AGENTS.md"),
+    (GeminiCliAdapter, "GEMINI.md"),
+    (GitHubCopilotAdapter, ".github/copilot-instructions.md"),
+    (HermesAdapter, ".hermes.md"),
+    (JunieAdapter, "AGENTS.md"),
+    (MimoCodeAdapter, "AGENTS.md"),
+    (OpenCodeAdapter, "AGENTS.md"),
+    (WindsurfAdapter, "AGENTS.md"),
+]
+
+
+@pytest.mark.parametrize(
+    ("adapter_cls", "entry_file"),
+    ADAPTER_ENTRY_FILES,
+    ids=lambda x: x if isinstance(x, str) else x.__name__,
+)
+def test_adapter_renders_entry_instruction(adapter_cls, entry_file, tmp_path: Path) -> None:
+    from spawn_cli.models.skill import SkillMetadata
+
+    adapter = adapter_cls()
+    results = adapter.add_skills(
+        tmp_path,
+        [SkillMetadata(name="s", description="d", content="Body.")],
+    )
+    skill_path = tmp_path / results[0]["path"]
+    text = skill_path.read_text(encoding="utf-8")
+    assert f"read `{entry_file}` first" in text
+    assert "spawn/navigation.yaml" not in text

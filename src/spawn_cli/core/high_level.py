@@ -16,9 +16,8 @@ from spawn_cli.io.yaml_io import load_yaml, save_yaml
 from spawn_cli.models.config import ExtensionConfig, ReadFlag
 
 SPAWN_ENTRY_POINT_PROMPT = """\
-Before working, read `spawn/navigation.yaml`.
-Read every file listed under `read-required`.
-Inspect `read-contextual` descriptions and read only files relevant to the current task.
+Read every file listed under `Mandatory reads`.
+Inspect `Contextual reads` descriptions and read only files relevant to the current task.
 """
 
 MCP_MERGED_NOTICE = (
@@ -196,18 +195,29 @@ def remove_mcp(target_root: Path, ide: str, extension: str) -> None:
     ll.save_mcp_rendered(target_root, ide, extension, [])
 
 
+def _navigation_reads_section(target_root: Path) -> str:
+    nav_path = target_root / "spawn" / "navigation.yaml"
+    if not nav_path.is_file():
+        raise SpawnError("spawn/navigation.yaml is missing; run spawn refresh")
+    required, contextual = ll.navigation_refs_for_agents(target_root)
+    lines = ["Mandatory reads:"]
+    for ref in required:
+        lines.append(f"- `{ref.file}` - {ref.description}")
+    if contextual:
+        lines += ["", "Contextual reads:"]
+        for ref in contextual:
+            lines.append(f"- `{ref.file}` - {ref.description}")
+    return "\n".join(lines) + "\n"
+
+
 def refresh_entry_point(target_root: Path, ide: str) -> None:
     _require_init(target_root)
     rollup = ll.rollup_hints_for_agents(target_root)
     ll.warn_if_agents_hints_exceed_measurement(rollup)
+    prompt = SPAWN_ENTRY_POINT_PROMPT + "\n"
     if rollup:
-        prompt = (
-            f"{SPAWN_ENTRY_POINT_PROMPT}\nHints:\n"
-            + "\n".join(f"- {h}" for h in rollup)
-            + "\n"
-        )
-    else:
-        prompt = SPAWN_ENTRY_POINT_PROMPT
+        prompt += "Hints:\n" + "\n".join(f"- {h}" for h in rollup) + "\n\n"
+    prompt += _navigation_reads_section(target_root)
     ide_get(ide).rewrite_entry_point(target_root, prompt)
 
 

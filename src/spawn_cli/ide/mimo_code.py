@@ -94,7 +94,7 @@ class MimoCodeAdapter(IdeAdapter):
             if skill_path.exists():
                 warnings.warn(f"Overwriting existing rendered skill: {skill_path}", SpawnWarning)
             # Mimo Code requires frontmatter name == directory name.
-            rendered = render_skill_md(skill.model_copy(update={"name": name}))
+            rendered = render_skill_md(skill.model_copy(update={"name": name}), "AGENTS.md")
             skill_path.write_text(rendered, encoding="utf-8")
             results.append({"skill": skill.name, "path": skill_path.relative_to(target_root).as_posix()})
         return results

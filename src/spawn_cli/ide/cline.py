@@ -56,7 +56,7 @@ class ClineAdapter(IdeAdapter):
             if skill_path.exists():
                 warnings.warn(f"Overwriting existing rendered skill: {skill_path}")
             # Cline requires frontmatter name == directory name.
-            rendered = render_skill_md(skill.model_copy(update={"name": name}))
+            rendered = render_skill_md(skill.model_copy(update={"name": name}), "AGENTS.md")
             skill_path.write_text(rendered, encoding="utf-8")
             rel = skill_path.relative_to(target_root).as_posix()
             results.append({"skill": skill.name, "path": rel})

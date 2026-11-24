@@ -255,9 +255,7 @@ _BETA_GLOBAL_META = {
 def test_refresh_extension_core_rebuilds_peer_skills_when_new_ext_adds_global_read(
     target: Path,
 ) -> None:
-    """Installing a second extension must re-render the first extension's skills
-    so merged global ``required_read`` lists stay current.
-    """
+    """Global reads of a second extension never leak into peer skills (skill-local metadata)."""
     ll.add_ide_to_list(target, "cursor")
     _install_ext(target, "alpha", skills={"a.md": {"name": "alpha-skill", "description": "d"}})
     hl._refresh_extension_core(target, "alpha")
@@ -267,7 +265,7 @@ def test_refresh_extension_core_rebuilds_peer_skills_when_new_ext_adds_global_re
     _install_ext(target, "beta", files=dict(_BETA_GLOBAL_META))
     hl._refresh_extension_core(target, "beta")
     m_after = ll.generate_skills_metadata(target, "alpha")[0]
-    assert BETA_GLOBAL_READ_FILE in {r.file for r in m_after.required_read}
+    assert BETA_GLOBAL_READ_FILE not in {r.file for r in m_after.required_read}
 
 
 @patch("spawn_cli.core.high_level.ide_get", lambda *_a, **_k: _stub_ide())
@@ -278,7 +276,7 @@ def test_remove_extension_rebuilds_survivor_skills_without_removed_global_read(
     _install_ext(target, "alpha", skills={"a.md": {"name": "alpha-skill", "description": "d"}})
     _install_ext(target, "beta", files=dict(_BETA_GLOBAL_META))
     hl._refresh_extension_core(target, "beta")
-    assert BETA_GLOBAL_READ_FILE in {
+    assert BETA_GLOBAL_READ_FILE not in {
         r.file for r in ll.generate_skills_metadata(target, "alpha")[0].required_read
     }
 
@@ -486,12 +484,59 @@ def test_remove_skills(target: Path) -> None:
 
 @patch("spawn_cli.core.high_level.ide_get", lambda *_a, **_k: _stub_ide())
 def test_refresh_entry_point(target: Path) -> None:
+    _write_yaml(
+        target / "spawn" / "navigation.yaml",
+        {
+            "read-required": [
+                {
+                    "rules": [
+                        {"path": "spawn/rules/r.md", "description": "rule file"},
+                        {"hint": "standalone hint"},
+                    ]
+                },
+                {
+                    "ext": "e1",
+                    "files": [
+                        {"path": "spec/main.md", "description": "process doc"},
+                    ],
+                },
+            ],
+            "read-contextual": [
+                {
+                    "ext": "e2",
+                    "files": [
+                        {"path": "spec/design/hla.md", "description": "architecture"},
+                        {"path": "spawn/rules/r.md", "description": "dup of required"},
+                    ],
+                },
+            ],
+        },
+    )
     ll.add_ide_to_list(target, "cursor")
     mock = MagicMock(wraps=_stub_ide())
     with patch("spawn_cli.core.high_level.ide_get", return_value=mock):
         hl.refresh_entry_point(target, "cursor")
     mock.rewrite_entry_point.assert_called_once()
-    assert hl.SPAWN_ENTRY_POINT_PROMPT in mock.rewrite_entry_point.call_args[0][1]
+    prompt = mock.rewrite_entry_point.call_args[0][1]
+    assert hl.SPAWN_ENTRY_POINT_PROMPT in prompt
+    assert "Mandatory reads:" in prompt
+    assert "- `spawn/rules/r.md` - rule file" in prompt
+    assert "- `spec/main.md` - process doc" in prompt
+    assert "Contextual reads:" in prompt
+    assert "- `spec/design/hla.md` - architecture" in prompt
+    # required path duplicated in contextual is not repeated
+    assert prompt.count("`spawn/rules/r.md`") == 1
+    # skill-like bullet form, not raw yaml
+    assert "```yaml" not in prompt
+    assert "read-required:" not in prompt
+    assert "Before working, read" not in prompt
+
+
+@patch("spawn_cli.core.high_level.ide_get", lambda *_a, **_k: _stub_ide())
+def test_refresh_entry_point_missing_navigation(target: Path) -> None:
+    (target / "spawn" / "navigation.yaml").unlink()
+    with pytest.raises(SpawnError):
+        hl.refresh_entry_point(target, "cursor")
 
 
 @patch("spawn_cli.core.high_level.ide_get", lambda *_a, **_k: _stub_ide())

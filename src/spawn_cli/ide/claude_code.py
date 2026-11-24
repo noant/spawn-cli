@@ -67,7 +67,7 @@ class ClaudeCodeAdapter(IdeAdapter):
             skill_path = skill_dir / "SKILL.md"
             if skill_path.exists():
                 warnings.warn(f"Overwriting existing rendered skill: {skill_path}")
-            skill_path.write_text(render_skill_md(skill), encoding="utf-8")
+            skill_path.write_text(render_skill_md(skill, "CLAUDE.md"), encoding="utf-8")
             rel = skill_path.relative_to(target_root).as_posix()
             results.append({"skill": skill.name, "path": rel})
         return results

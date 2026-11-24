@@ -144,10 +144,10 @@ config files. |
 
 | Aspect | Detail |
 | --- | --- |
-| **Reads** | `list-skills` + per-skill `get-skill-raw-info`; **`get-required-read-global()`** (no extension arg — **dict** keyed by extension; **flatten** all values to build the “all global required” file set across the repo); **`get-auto-read-global()`** same for auto; **`get-required-read-ext-local(extension)`** and **`get-auto-read-local(extension)`** (**flat** lists for the current extension only). |
-| **How** | `required-read = distinct(skill.required-read ∪ local_required ∪ flattened_global_required)`; `auto-read = distinct(local_auto ∪ flattened_global_auto)`; first-seen description wins on duplicates (`2-core-low-level.md` notes). |
+| **Reads** | `list-skills` + per-skill `get-skill-raw-info`; **`get-required-read-ext-local(extension)`** and **`get-auto-read-local(extension)`** (**flat** lists for the current extension only). |
+| **How** | `required-read = distinct(skill.required-read ∪ local_required)`; `auto-read = distinct(local_auto)`; first-seen description wins on duplicates (`2-core-low-level.md` notes). |
 | **Writes** | None (pure transform). |
-| **Meaning** | Produce **normalized `SkillMetadata[]`** for all IDE `add_skills` adapters — single contract across Cursor, Codex, etc. Populates **`hints`** from **every** extension's **`hints.global`** (flatten order), then **`hints.local`** only for **this** extension, then maintainer **`read-required` → `rules`** `hint` strings (same ordering idea as flattened global mandatory reads); skill-only size limits apply after merge. |
+| **Meaning** | Produce **normalized `SkillMetadata[]`** for all IDE `add_skills` adapters — single contract across Cursor, Codex, etc. Metadata is skill-local only: no global reads and no navigation rules groups are merged in (global context is delivered via the entry file's Spawn block, referenced by the skill's entrypoint instruction). Populates **`hints`** from **`hints.local`** of **this** extension only; skill-only size limits apply after merge. |
 
 ---
 
@@ -415,11 +415,12 @@ Equivalent **full-replace** strategy is acceptable if the adapter applies a sing
 
 | Step | Calls / data | Persistence |
 | --- | --- | --- |
-| 1 | Build prompt: static **`SPAWN_ENTRY_POINT_PROMPT`** spine plus optional **`Hints:`** bullets from **`rollup_hints_for_agents`** (see `low_level.rollup_hints_for_agents`, **`warn_if_agents_hints_exceed_measurement`**) | — |
+| 1 | Build prompt: **`SPAWN_ENTRY_POINT_PROMPT`** plus optional **`Hints:`** bullets (before the reads) from **`rollup_hints_for_agents`** plus **`Mandatory reads:`**/**`Contextual reads:`** bullet lists flattened from **`spawn/navigation.yaml`** via **`low_level.navigation_refs_for_agents`** (required refs in YAML order; contextual refs deduped against required; hint-only rows skipped) (see **`warn_if_agents_hints_exceed_measurement`**; navigation reads are excluded from the hint budget; missing navigation.yaml raises `SpawnError`) | — |
 | 2 | `ide.Get(ide).rewrite_entry_point(targetRoot, prompt)` | Entry file with managed `<!-- spawn:start -->` block |
 
-**Semantics:** Ensure every initialized IDE has the same **navigation contract**
-without duplicating full rule text (`ide-adapters.md`).
+**Semantics:** Ensure every initialized IDE has the same **navigation contract**;
+the entrypoint renders the navigation reads as skill-like bullet lists so agents
+need no separate read of `spawn/navigation.yaml` (`agentic-flow.md`, `ide-adapters.md`).
 
 ---
 

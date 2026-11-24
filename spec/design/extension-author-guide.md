@@ -159,7 +159,7 @@ Optional top-level map. Values are **lists of plain strings** (YAML keys **`glob
 | | **`global`** | **`local`** |
 |---|--------------|-------------|
 | **`spawn/navigation.yaml`** | Mirrored on this pack’s **`read-required`** **`- ext:`** block as **`hints`** | Not written |
-| **Rendered skills** | Every skill includes **all** packs’ **`hints.global`**, in installed-extension order (same breadth idea as flattened global mandatory reads), then this pack’s **`local`**, then maintainer **`read-required` → `rules` → `hint`** | Only skills **owned by this pack** |
+| **Rendered skills** | Only this pack's **`hints.local`** (global and maintainer hints stay in the entry rollup) | Only skills **owned by this pack** |
 | **AGENTS / entry rollup** | Included (all packs + maintainer hints) | Omitted |
 
 Strip and dedupe by exact string (first occurrence wins). Oversize strings may emit **`SpawnWarning`**; persisted navigation may truncate past **512** Unicode codepoints. Rendered skill **Hints** blocks may truncate overall size; **`AGENTS.md`** keeps full hint text but can still warn on the same measurement thresholds.
@@ -207,7 +207,7 @@ The **body** is everything after the closing frontmatter `---`, or the whole fil
 
 Spawn does **not** copy this file as-is into the IDE. It builds **normalized metadata** (name, description, body text, merged required reads, contextual reads) and each **IDE adapter** writes its own format (e.g. per-IDE skill files).
 
-Spawn’s shared **`render_skill_md`** output order is: YAML frontmatter (`name`, `description`), the **skill body**, an optional **Hints** bullet list (cross-extension **`hints.global`**, this pack’s **`hints.local`**, then maintainer **`read-required` rule** hints), **Mandatory reads** (paths + descriptions, with **`spawn/navigation.yaml` last among mandatory bullets), then **Contextual reads** when present. Agents should treat mandatory reads (including the navigation file) as the index for repo-wide context.
+Spawn’s shared **`render_skill_md`** output order is: YAML frontmatter (`name`, `description`), the **skill body**, an entrypoint instruction (read the IDE entry file, such as `AGENTS.md`, when its Spawn block is not in context), an optional **Hints** bullet list (this pack’s **`hints.local`** only), skill-local **Mandatory reads** (paths + descriptions from `required-read` and `localRead: required` — no `spawn/navigation.yaml` bullet), then **Contextual reads** when present. Repo-wide context is delivered by the entry file's Spawn block; skills reference it through the entrypoint instruction.
 
 Keep the source body **short and procedural**; long reference material should live under `extsrc/files/` and be exposed via `globalRead` / `localRead` or skill `required-read`.
 

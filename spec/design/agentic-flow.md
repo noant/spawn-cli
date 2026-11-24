@@ -7,7 +7,8 @@ navigation files, extension configs, rendered skills, and target-local rules.
 
 Agents should normally read:
 
-- `spawn/navigation.yaml`;
+- the Spawn block of the IDE entry file (mandatory/contextual reads rendered
+  from `spawn/navigation.yaml`);
 - files listed by navigation;
 - rendered IDE skills;
 - target-local files such as `spawn/rules/{file}.yaml`.
@@ -15,9 +16,10 @@ Agents should normally read:
 Agents should not read `spawn/.extend/{ext}` during normal work. That directory
 is the installed extension source used by the utility to rebuild outputs.
 
-Each IDE entry point should contain a small Spawn-managed instruction block.
-The block tells the agent that `spawn/navigation.yaml` is the repository index,
-that `read-required` is mandatory before work, and that `read-contextual`
+Each IDE entry point should contain a Spawn-managed instruction block.
+The block renders the navigation reads as bullets (like a rendered skill),
+states that
+`read-required` is mandatory before work, and that `read-contextual`
 contains optional context selected by task relevance. IDE adapters render this
 block into the IDE's native entry file, such as `AGENTS.md`, `CLAUDE.md`, or an
 equivalent tool-specific file.
@@ -26,9 +28,11 @@ equivalent tool-specific file.
 
 At the start of work in a target repository:
 
-1. Read `spawn/navigation.yaml`.
-2. Read every file listed under `read-required`.
-3. Consider files listed under `read-contextual` and read only those relevant
+1. The IDE entrypoint block lists every mandatory and contextual read as
+   bullets (skill-like form), so agents get the full navigation surface
+   directly in the entry file.
+2. Read every file listed under `Mandatory reads`.
+3. Consider files listed under `Contextual reads` and read only those relevant
    to the task.
 4. If the user task triggers a rendered skill, follow that skill's mandatory
    and contextual reads.
@@ -77,7 +81,7 @@ Navigation is generated from two sources:
 - extension files with `globalRead: required` or `globalRead: auto`;
 - user-maintained local rules under `spawn/rules/`.
 
-Merged **`spawn/navigation.yaml`** may also carry **hints**: each extension’s **`- ext:`** entry can include a **`hints`** list (mirrored from that pack’s **`hints.global`** in **`config.yaml`**). Under **`read-required` → `rules`**, maintainer reminders use **hint-only** rows (a **`hint`** mapping with **no** mandatory **`path`**); file-backed rows list **`path`** and **`description`** only—**`hint`** must not sit on the same row as **`path`** (refresh moves any legacy **`path`+`hint`** pair into a separate hint-only row). Only these maintainer hints and extension **`hints`** are merged into **skills** and the IDE **Hints:** rollup for **`AGENTS.md`** (**`hint`** on **`read-contextual` → `rules`** is ignored for those pipelines). Deduping is by exact stripped string (first occurrence wins ordering across streams).
+Merged **`spawn/navigation.yaml`** may also carry **hints**: each extension’s **`- ext:`** entry can include a **`hints`** list (mirrored from that pack’s **`hints.global`** in **`config.yaml`**). Under **`read-required` → `rules`**, maintainer reminders use **hint-only** rows (a **`hint`** mapping with **no** mandatory **`path`**); file-backed rows list **`path`** and **`description`** only—**`hint`** must not sit on the same row as **`path`** (refresh moves any legacy **`path`+`hint`** pair into a separate hint-only row). Only these maintainer hints and extension **`hints`** feed the IDE **Hints:** rollup for the **entry file** (`AGENTS.md` and equivalents); rendered skills carry only the owning extension's **`hints.local`** (**`hint`** on **`read-contextual` → `rules`** is ignored for all pipelines). Deduping is by exact stripped string (first occurrence wins ordering across streams).
 
 Example:
 
@@ -114,20 +118,31 @@ task?
 
 When a skill is used:
 
-1. Read `spawn/navigation.yaml` if it has not already been read.
+1. Read the IDE entry file (such as `AGENTS.md`) when its Spawn block with the
+   navigation index is not in context.
 2. Read the skill's mandatory files.
 3. Consider the skill's contextual files.
-4. Follow the skill body and any **Hints** list rendered in the skill file.
+4. Follow the skill body, the entrypoint instruction (read the IDE entry file
+   when its Spawn block is not in context), and any **Hints** list rendered in the
+   skill file.
 5. Continue to respect global navigation and local rules.
 
-Spawn rendering also duplicates paths from `spawn/navigation.yaml` **rules**
-groups into each skill's mandatory reads (`read-required` → `rules`) and
-contextual reads (`read-contextual` → `rules`), with the same path-normalization
-and dedup rules as navigation (mandatory tier wins when a path appears in
-both). That way agents opening a skill in the IDE still see repo rule files listed
-explicitly without maintaining a parallel list in extension config.
+Rendered skills do not duplicate navigation: skill metadata carries only
+skill-local context (the owner extension's `localRead` files plus the skill's
+`required-read`). Global reads and hints live in the entry-point block
+(embedded `spawn/navigation.yaml`, task 32); the skill references that
+context through the entrypoint instruction instead of listing navigation
+paths itself.
 
-**Hints in rendered skills:** normalized metadata adds a **Hints:** section **after** the skill **body** and **before** **Mandatory reads**. Hint strings are plain text, merged from **each** installed extension’s **`hints.global`** (installed-extension order), then **`hints.local`** only for the extension that owns the skill, then maintainer **`read-required` → `rules`** contributions: **`hint`** on file-backed rows **and** **hint-only** rows (YAML order within that stream; deduped across streams with first occurrence winning). **Rendered skills** apply a per-hint and combined-size budget: **`SpawnWarning`** when limits are exceeded, and the block may be **truncated** (including a terminal bullet with `...`). **AGENTS.md** (managed block) lists the same rollup class of hints **without truncation**; oversize content still emits **`SpawnWarning`** with guidance to shorten hints or reduce installed extensions. **`hints.local`** is **not** included in the AGENTS rollup (skills only).
+**Hints in rendered skills:** normalized metadata carries only **`hints.local`**
+of the extension that owns the skill, rendered as a **Hints:** section **after**
+the skill **body** and **before** **Mandatory reads** (plain-text strings,
+deduped by exact stripped string). Per-hint and combined-size budgets still
+apply to the skill block: **`SpawnWarning`** when limits are exceeded, and the
+block may be **truncated** (including a terminal bullet with `...`).
+**`hints.global`** and maintainer **`read-required` → `rules`** hints live only
+in the IDE entry-point rollup (AGENTS.md managed block) and are not merged into
+skills.
 
 `spawn/navigation.yaml` remains the canonical index of which repository rules exist
 and whether each is mandatory or contextual for the merged navigation surface.
@@ -138,13 +153,25 @@ The Spawn-managed IDE entrypoint block should express this logic in plain
 agent-facing language:
 
 ```markdown
-Before working, read `spawn/navigation.yaml`.
-Read every file listed under `read-required`.
-Inspect `read-contextual` descriptions and read only files relevant to the
+Read every file listed under `Mandatory reads`.
+Inspect `Contextual reads` descriptions and read only files relevant to the
 current task.
+
+Hints:
+- {rollup hints, full text}
+
+Mandatory reads:
+- `spawn/rules/team.yaml` - Team rules.
+- `spec/main.md` - Spec task process.
+
+Contextual reads:
+- `spec/design/hla.md` - High-level architecture.
 ```
 
-When hints are present, Spawn appends a **`Hints:`** bullet list (full text, no truncation) built from **`rollup_hints_for_agents`** — extension **`hints.global`** in installed-extension order, then maintainer **`read-required` → `rules`** hints — and may emit warnings if size thresholds are exceeded.
+When `spawn/navigation.yaml` is missing, refresh emits `SpawnError` instead of
+rendering an empty block.
+
+When hints are present, Spawn renders a **`Hints:`** bullet list (full text, no truncation) before the reads lists; the rollup is built from **`rollup_hints_for_agents`** — extension **`hints.global`** in installed-extension order, then maintainer **`read-required` → `rules`** hints — and may emit warnings if size thresholds are exceeded.
 
 Adapters may format the block differently, but the semantic contract is the
 same across IDEs.
@@ -172,10 +199,6 @@ adapters.
 Conceptual pseudocode:
 
 ```text
-global_map = get-required-read-global()   # dict[ext -> flat list]
-global_required = flatten_values(global_map)
-global_auto_map = get-auto-read-global()
-global_auto = flatten_values(global_auto_map)
 local_required = get-required-read-ext-local(extension)
 local_auto = get-auto-read-local(extension)
 
@@ -183,21 +206,22 @@ for skill_path in list-skills(extension):
   skill_info = get-skill-raw-info(extension, skill_path)
   required = distinct(
     skill_info.required-read +
-    local_required +
-    global_required
+    local_required
   )
-  auto = distinct(local_auto + global_auto)
+  auto = distinct(local_auto)
   resolve descriptions for required and auto files from read metadata
   emit skill metadata
 ```
 
 `skill_info.required-read` is only for skill-specific mandatory files. It does
-not need to repeat files from `local_required` or `global_required`, because the
-generation step always merges those categories and removes duplicates.
+not need to repeat files from `local_required`, because the generation step
+always merges those categories and removes duplicates.
 
-**Hints** use the **same breadth for `hints.global`** as flattened global mandatory
-reads: every installed extension’s **`hints.global`** list contributes in
-extension-order before **`hints.local`** for the **`extension`** argument, then maintainer **`read-required` → `rules`** hint strings (file-backed **`hint`** fields and **hint-only** rows; exact merge and dedupe in `low_level.generate_skills_metadata`).
+**Hints** carry only **`hints.local`** of the `extension` argument (exact merge
+and dedupe in `low_level.generate_skills_metadata`; truncation budgets for the
+skill block preserved). **`hints.global`** and maintainer hint strings live
+only in the entry-point block (AGENTS.md rollup) and are not part of skill
+metadata.
 
 Illustrative output pseudostructure:
 
@@ -227,10 +251,14 @@ A rendered skill must include:
 - name;
 - description;
 - original skill content;
-- optional **Hints** bullets (from metadata), placed after the body;
-- mandatory read files (`spawn/navigation.yaml` listed once, last among mandatory bullets);
+- an entrypoint instruction: when the Spawn block from the IDE entry file
+  (such as `AGENTS.md`) is not in context, read that entry file first (rendered
+  before mandatory reads);
+- optional **Hints** bullets (owner `hints.local` only), placed after the body
+  and before mandatory reads;
+- mandatory read files (skill-local required reads only, no navigation paths);
 - contextual read files;
-- repository context via those reads (including the navigation path).
+- skill-local repository context via those reads.
 
 Example rendered Markdown:
 
@@ -242,6 +270,9 @@ description: Execute approved spectasks.
 
 Use this skill body...
 
+Before this skill, if the Spawn block instructions from `AGENTS.md` are not
+loaded, read `AGENTS.md` first.
+
 Optional when hints exist:
 
 Hints:
@@ -249,7 +280,6 @@ Hints:
 
 Mandatory reads:
 - `spec/main.md` - Spec task process.
-- `spawn/navigation.yaml` - Merged Spawn navigation (read-required, read-contextual).
 
 Contextual reads:
 - `spec/design/hla.md` - Read when architecture context is needed.
@@ -294,7 +324,8 @@ Devin even when their storage formats differ.
 
 1. A user asks the agent to execute a methodology task.
 2. The IDE sees a rendered skill whose name or description matches the request.
-3. The skill tells the agent to read `spawn/navigation.yaml`.
+3. The entrypoint instruction in the skill tells the agent to read the IDE
+   entry file when its Spawn block is not in context.
 4. The agent reads all `read-required` files and selects relevant
    `read-contextual` files by description.
 5. The agent reads the skill's local required files and any skill-specific

@@ -135,7 +135,13 @@ auto-read:
     description: Project high-level architecture.
 ```
 
-`SkillMetadata.hints` carries plain-text hint strings (possibly empty): **`hints.global` from every installed extension** plus **`hints.local` for the owning pack** plus maintainer **`read-required` rule** hints (`generate_skills_metadata`). IDE Markdown rendering lists them in a **Hints:** section **after** the skill body and **before** **Mandatory reads** (`spawn_cli.ide._helpers.render_skill_md`).
+`SkillMetadata.hints` carries plain-text hint strings (possibly empty): only
+the owning pack's **`hints.local`** (`generate_skills_metadata`). IDE Markdown
+rendering lists them in a **Hints:** section **after** the skill body and
+**before** **Mandatory reads** (`spawn_cli.ide._helpers.render_skill_md`).
+Rendered skills do not include `spawn/navigation.yaml` among their reads;
+global context is reached through the entry file's Spawn block, referenced by
+an entrypoint instruction rendered after the skill body.
 
 MCP metadata:
 
@@ -195,9 +201,13 @@ Adapters must preserve the same semantic content:
 
 1. Skill name and description.
 2. Original skill body (extension source markdown after frontmatter).
-3. **Hints** bullets from `SkillMetadata.hints`, when non-empty, **after** the body and **before** mandatory reads.
-4. Mandatory reads: merged `required-read` paths plus `spawn/navigation.yaml` exactly once, always the last mandatory bullet.
-5. Contextual reads from `auto-read`.
+3. An entrypoint instruction: read the IDE entry file (such as `AGENTS.md`)
+   when its Spawn block is not in context, rendered right after the body.
+4. **Hints** bullets from `SkillMetadata.hints` (owner `hints.local` only),
+   when non-empty, after the entrypoint instruction and before mandatory reads.
+5. Mandatory reads: skill-local `required-read` paths only (no
+   `spawn/navigation.yaml` bullet).
+6. Contextual reads from `auto-read`.
 
 ### Markdown Skill Shape
 
@@ -220,12 +230,14 @@ description: Execute approved spectasks.
 
 {source skill content}
 
+Before this skill, if the Spawn block instructions from `AGENTS.md` are not
+loaded, read `AGENTS.md` first.
+
 Hints:
 - Short plain-text reminder when `hints` metadata is non-empty.
 
 Mandatory reads:
 - `spec/main.md` - Spec task process.
-- `spawn/navigation.yaml` - Merged Spawn navigation (read-required, read-contextual).
 
 Contextual reads:
 - `spec/design/hla.md` - Project high-level architecture.
@@ -274,14 +286,14 @@ Hints:
 
 Mandatory reads:
 - ...
-- `spawn/navigation.yaml` - Merged Spawn navigation (read-required, read-contextual).
 
 ...
 ```
 
 Spawn uses `alwaysApply: false` for fallback skill rules so the rule is
-available by description rather than injected into every request. Required
-global context is still handled by the entry point and `spawn/navigation.yaml`.
+available by description rather than injected into every request. Global
+context is reached through the entry file's Spawn block; rendered skills do
+not embed `spawn/navigation.yaml`.
 
 ### GitHub Copilot Instructions Shape
 
@@ -304,7 +316,6 @@ Hints:
 
 Mandatory reads:
 - ...
-- `spawn/navigation.yaml` - Merged Spawn navigation (read-required, read-contextual).
 
 ...
 ```
@@ -552,17 +563,21 @@ SpawnError on unparseable JSON before mutation).
 Entry point files are user-visible and may already contain user instructions.
 Adapters must update only a Spawn-managed block when possible:
 
-```markdown
+````
 <!-- spawn:start -->
-Before working, read `spawn/navigation.yaml`.
 Read every file listed under `read-required`.
 Inspect `read-contextual` descriptions and read only files relevant to the
 current task.
 
+spawn/navigation.yaml:
+```yaml
+<full merged navigation.yaml content>
+```
+
 Hints:
 - Example maintainer or extension-global reminder.
 <!-- spawn:end -->
-```
+````
 
 If the IDE requires a whole-file entry point, the adapter must warn before
 overwriting. The warning should name the file and recommend backing up user

@@ -209,8 +209,10 @@ when a command or workflow needs files that should be read for that skill only,
 not for unrelated extension skills.
 
 Skill-level `required-read` should not repeat files that are already included
-through `globalRead: required` or `localRead: required`. Spawn merges those
-sources automatically and de-duplicates the final rendered skill metadata.
+through `localRead: required`. Spawn merges those sources automatically and
+de-duplicates the final rendered skill metadata. Skill metadata stays
+skill-local: `globalRead` files are not merged into skills — they reach agents
+through the entry file's Spawn block (navigation index).
 
 ## Skills
 

@@ -294,6 +294,55 @@ def _extension_global_hint_streams_ordered(target_root: Path) -> list[list[str]]
     return streams
 
 
+def navigation_refs_for_agents(target_root: Path) -> tuple[list[SkillFileRef], list[SkillFileRef]]:
+    """Flatten merged navigation.yaml into ordered agent-facing read refs.
+
+    Required refs come first (rules + ext files in YAML order); contextual refs
+    follow, excluding paths already listed as required. Hint-only rows are
+    skipped; dedup is by normalized path (first occurrence wins).
+    """
+    raw = load_yaml(_spawn(target_root) / "navigation.yaml")
+    if not isinstance(raw, dict):
+        return [], []
+
+    def flat(section: Any) -> list[SkillFileRef]:
+        out: list[SkillFileRef] = []
+        seen: set[str] = set()
+        if not isinstance(section, list):
+            return out
+        for grp in section:
+            if not isinstance(grp, dict):
+                continue
+            for key in ("rules", "files"):
+                entries = grp.get(key)
+                if not isinstance(entries, list):
+                    continue
+                for entry in entries:
+                    if not isinstance(entry, dict):
+                        continue
+                    p = entry.get("path")
+                    if not isinstance(p, str) or not p.strip():
+                        continue
+                    nk = _norm_read_path(p)
+                    if nk in seen:
+                        continue
+                    seen.add(nk)
+                    desc = entry.get("description")
+                    out.append(
+                        SkillFileRef(file=p.strip(), description="" if desc is None else str(desc))
+                    )
+        return out
+
+    required = flat(raw.get("read-required"))
+    req_keys = {_norm_read_path(r.file) for r in required}
+    contextual = [
+        r
+        for r in flat(raw.get("read-contextual"))
+        if _norm_read_path(r.file) not in req_keys
+    ]
+    return required, contextual
+
+
 def rollup_hints_for_agents(target_root: Path) -> list[str]:
     """Deduped ordered hints for ``AGENTS.md``: every extension ``hints.global``, then maintainer."""
 
@@ -466,60 +515,9 @@ def get_skill_raw_info(target_root: Path, extension: str, skill_path: Path) -> S
     )
 
 
-def _flatten_global_refs_ordered(
-    target_root: Path, per_ext: dict[str, list[SkillFileRef]]
-) -> list[SkillFileRef]:
-    out: list[SkillFileRef] = []
-    seen: set[str] = set()
-    for ext_id in list_extensions(target_root):
-        for ref in per_ext.get(ext_id, []):
-            nk = _norm_read_path(ref.file)
-            if nk in seen:
-                continue
-            seen.add(nk)
-            out.append(ref)
-    return out
-
-
 def _norm_read_path(path_str: str) -> str:
     """Normalize relative paths when comparing skill required vs contextual lists."""
     return Path(path_str).as_posix().replace("\\", "/")
-
-
-def _navigation_rules_refs_from_section(section: Any) -> list[SkillFileRef]:
-    out: list[SkillFileRef] = []
-    if not isinstance(section, list):
-        return out
-    for grp in section:
-        if not isinstance(grp, dict):
-            continue
-        rules_raw = grp.get("rules")
-        if not isinstance(rules_raw, list):
-            continue
-        for entry in rules_raw:
-            if not isinstance(entry, dict):
-                continue
-            path_raw = entry.get("path")
-            if not isinstance(path_raw, str) or not path_raw.strip():
-                continue
-            desc_raw = entry.get("description")
-            desc = "" if desc_raw is None else str(desc_raw)
-            out.append(SkillFileRef(file=path_raw.strip(), description=desc))
-    return out
-
-
-def _navigation_yaml_rules_refs(target_root: Path) -> tuple[list[SkillFileRef], list[SkillFileRef]]:
-    """Return (read-required rules, read-contextual rules) from merged navigation.yaml."""
-    path = _spawn(target_root) / "navigation.yaml"
-    raw = load_yaml(path)
-    if not isinstance(raw, dict):
-        return [], []
-    rr = raw.get("read-required")
-    cq = raw.get("read-contextual")
-    return (
-        _navigation_rules_refs_from_section(rr if isinstance(rr, list) else []),
-        _navigation_rules_refs_from_section(cq if isinstance(cq, list) else []),
-    )
 
 
 def _required_read_description_for_path(
@@ -527,13 +525,8 @@ def _required_read_description_for_path(
     merged_global: list[SkillFileRef],
     local_req: list[SkillFileRef],
     cfg_ext: ExtensionConfig,
-    nav_rules_required: list[SkillFileRef] | None = None,
 ) -> str:
     nk = _norm_read_path(p)
-    if nav_rules_required:
-        for r in nav_rules_required:
-            if _norm_read_path(r.file) == nk and r.description:
-                return r.description
     for r in merged_global:
         if _norm_read_path(r.file) == nk and r.description:
             return r.description
@@ -545,52 +538,32 @@ def _required_read_description_for_path(
 
 def generate_skills_metadata(target_root: Path, extension: str) -> list[SkillMetadata]:
     cfg_ext = _load_ext_config(target_root, extension)
-    maintainer_hints = _navigation_read_required_rule_hints_ordered(target_root)
-    global_streams = _extension_global_hint_streams_ordered(target_root)
     local_raw = list(cfg_ext.hints.local) if cfg_ext.hints else []
-    merged_for_skill = _merge_hint_streams_ordered(
-        [*global_streams, local_raw, maintainer_hints]
-    )
     skill_hints = (
-        _finalize_hints_for_skill_metadata(merged_for_skill) if merged_for_skill else []
+        _finalize_hints_for_skill_metadata(local_raw) if local_raw else []
     )
 
-    merged_global_required = _flatten_global_refs_ordered(
-        target_root, get_required_read_global_all(target_root)
-    )
-    merged_global_auto = _flatten_global_refs_ordered(target_root, get_auto_read_global_all(target_root))
     local_required = get_required_read_ext_local(target_root, extension)
     local_auto = get_auto_read_local(target_root, extension)
-    nav_rules_required, nav_rules_contextual = _navigation_yaml_rules_refs(target_root)
 
     metas: list[SkillMetadata] = []
     for skill_path in list_skills(target_root, extension):
         raw = get_skill_raw_info(target_root, extension, skill_path)
         required_paths: list[str] = []
         seen_norm: set[str] = set()
-        for blob in (
-            list(raw.required_read),
-            [r.file for r in local_required],
-            [r.file for r in merged_global_required],
-        ):
+        for blob in (list(raw.required_read), [r.file for r in local_required]):
             for fp in blob:
                 nk = _norm_read_path(fp)
                 if nk in seen_norm:
                     continue
                 seen_norm.add(nk)
                 required_paths.append(fp)
-        for ref in nav_rules_required:
-            nk = _norm_read_path(ref.file)
-            if nk in seen_norm:
-                continue
-            seen_norm.add(nk)
-            required_paths.append(ref.file)
 
         required_out = [
             SkillFileRef(
                 file=p,
                 description=_required_read_description_for_path(
-                    p, merged_global_required, local_required, cfg_ext, nav_rules_required
+                    p, [], local_required, cfg_ext
                 ),
             )
             for p in required_paths
@@ -601,18 +574,6 @@ def generate_skills_metadata(target_root: Path, extension: str) -> list[SkillMet
         auto_out: list[SkillFileRef] = []
         seen_auto: set[str] = set()
         for ar in local_auto:
-            key = _norm_read_path(ar.file)
-            if key in required_key_set or key in seen_auto:
-                continue
-            seen_auto.add(key)
-            auto_out.append(ar)
-        for ar in merged_global_auto:
-            key = _norm_read_path(ar.file)
-            if key in required_key_set or key in seen_auto:
-                continue
-            seen_auto.add(key)
-            auto_out.append(ar)
-        for ar in nav_rules_contextual:
             key = _norm_read_path(ar.file)
             if key in required_key_set or key in seen_auto:
                 continue

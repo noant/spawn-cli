@@ -120,6 +120,12 @@ def test_generate_skills_metadata(tmp_path: Path) -> None:
                 "globalRead": "auto",
                 "localRead": "no",
             },
+            "loc.md": {
+                "description": "Local",
+                "mode": "static",
+                "globalRead": "no",
+                "localRead": "required",
+            },
         },
         "skills": {
             "two.md": {
@@ -137,14 +143,14 @@ def test_generate_skills_metadata(tmp_path: Path) -> None:
     meta = ll.generate_skills_metadata(tmp_path, "spectask")
     by_name = {m.name: m for m in meta}
     one = by_name["one"]
-    paths_one = [r.file for r in one.required_read]
-    assert paths_one.count("glob.md") == 1
+    paths_one = {r.file for r in one.required_read}
+    assert "glob.md" not in paths_one
+    assert paths_one == {"loc.md"}
     two = by_name["two"]
     paths_two_set = {r.file for r in two.required_read}
-    assert paths_two_set == {"extra.md", "glob.md"}
+    assert paths_two_set == {"extra.md", "loc.md"}
 
-    globs = [r.file for r in one.auto_read]
-    assert globs.count("ctx.md") == 1
+    assert one.auto_read == []
 
 
 def test_generate_skills_metadata_required_vs_contextual_dedup(tmp_path: Path) -> None:
@@ -185,11 +191,8 @@ def test_generate_skills_metadata_required_vs_contextual_dedup(tmp_path: Path) -
     m = next(x for x in meta if x.name == "skill")
     req_paths = {r.file for r in m.required_read}
     auto_paths = {r.file for r in m.auto_read}
-    assert req_paths == {
-        "mixed-auto-local-required.md",
-        "mixed-global-required-local-auto.md",
-    }
-    assert auto_paths == {"ctx.md"}
+    assert req_paths == {"mixed-auto-local-required.md"}
+    assert auto_paths == {"mixed-global-required-local-auto.md", "ctx.md"}
     assert not (req_paths & auto_paths)
 
 
@@ -230,11 +233,11 @@ def test_generate_skills_metadata_required_paths_normalized_dedup(tmp_path: Path
     assert req_norm == {ll._norm_read_path("glob.md"), ll._norm_read_path("doc/dup.md")}
     assert len(m.required_read) == 2
     auto_norm = {ll._norm_read_path(r.file) for r in m.auto_read}
-    assert auto_norm == {ll._norm_read_path("ctx.md")}
+    assert auto_norm == set()
     assert not (req_norm & auto_norm)
 
 
-def test_generate_skills_metadata_includes_navigation_rules_refs(tmp_path: Path) -> None:
+def test_generate_skills_metadata_excludes_navigation_rules_refs(tmp_path: Path) -> None:
     ll.init(tmp_path)
     cfg = {
         "name": "spectask",
@@ -278,14 +281,14 @@ def test_generate_skills_metadata_includes_navigation_rules_refs(tmp_path: Path)
     )
 
     m = next(x for x in ll.generate_skills_metadata(tmp_path, "spectask") if x.name == "one")
-    req_by = {ll._norm_read_path(r.file): r.description for r in m.required_read}
-    assert ll._norm_read_path("spawn/rules/required.md") in req_by
-    assert req_by[ll._norm_read_path("spawn/rules/required.md")] == "Req rule."
-    assert ll._norm_read_path(same_path) in req_by
-    auto_by = {ll._norm_read_path(r.file): r.description for r in m.auto_read}
-    assert ll._norm_read_path("spawn/rules/context.md") in auto_by
-    assert auto_by[ll._norm_read_path("spawn/rules/context.md")] == "Ctx rule."
-    assert ll._norm_read_path(same_path) not in auto_by
+    req_files = {ll._norm_read_path(r.file) for r in m.required_read}
+    assert ll._norm_read_path("spawn/rules/required.md") not in req_files
+    assert ll._norm_read_path(same_path) not in req_files
+    auto_files = {ll._norm_read_path(r.file) for r in m.auto_read}
+    assert ll._norm_read_path("spawn/rules/context.md") not in auto_files
+    assert ll._norm_read_path(same_path) not in auto_files
+    assert m.required_read == []
+    assert m.auto_read == []
 
 
 def test_generate_skills_metadata_hints_merge_and_contextual_ignored(tmp_path: Path) -> None:
@@ -326,15 +329,15 @@ def test_generate_skills_metadata_hints_merge_and_contextual_ignored(tmp_path: P
     )
 
     m = next(x for x in ll.generate_skills_metadata(tmp_path, "spectask") if x.name == "one")
-    assert m.hints
+    assert m.hints == ["local hint"]
     joined = "\n".join(m.hints)
-    assert joined.index("global dup") < joined.index("local hint")
-    assert joined.index("local hint") < joined.index("from required")
+    assert "global dup" not in joined
+    assert "from required" not in joined
     assert "contextual skipped" not in joined
 
 
-def test_generate_skills_metadata_global_hints_from_all_extensions(tmp_path: Path) -> None:
-    """hints.global behaves like cross-extension mandatory reads: every skill sees every pack's globals."""
+def test_generate_skills_metadata_global_hints_excluded(tmp_path: Path) -> None:
+    """hints.global is never propagated into skill hints: skills see only their own local hints."""
     ll.init(tmp_path)
     extend = tmp_path / "spawn" / ".extend"
 
@@ -374,13 +377,8 @@ def test_generate_skills_metadata_global_hints_from_all_extensions(tmp_path: Pat
     m_beta = next(x for x in ll.generate_skills_metadata(tmp_path, "betaext") if x.name == "one")
     m_alfa = next(x for x in ll.generate_skills_metadata(tmp_path, "alfa") if x.name == "one")
 
-    beta_joined = "\n".join(m_beta.hints)
-    assert beta_joined.index("from alfa") < beta_joined.index("from beta")
-    assert beta_joined.index("from beta") < beta_joined.index("only on beta skill")
-
-    alfa_joined = "\n".join(m_alfa.hints)
-    assert "from alfa" in alfa_joined and "from beta" in alfa_joined
-    assert "only on beta skill" not in alfa_joined
+    assert m_beta.hints == ["only on beta skill"]
+    assert m_alfa.hints == []
 
 
 def test_generate_skills_metadata_skill_hint_per_hint_truncate_warns(tmp_path: Path) -> None:
@@ -392,7 +390,7 @@ def test_generate_skills_metadata_skill_hint_per_hint_truncate_warns(tmp_path: P
         "schema": 1,
         "files": {},
         "skills": {"one.md": {}},
-        "hints": {"global": [long]},
+        "hints": {"local": [long]},
     }
     root = tmp_path / "spawn" / ".extend" / "spectask"
     skill_dir = root / "skills"
@@ -420,7 +418,7 @@ def test_generate_skills_metadata_combined_budget_adds_ellipsis_hint(tmp_path: P
         "schema": 1,
         "files": {},
         "skills": {"one.md": {}},
-        "hints": {"global": pieces},
+        "hints": {"local": pieces},
     }
     root = tmp_path / "spawn" / ".extend" / "spectask"
     skill_dir = root / "skills"
@@ -827,9 +825,6 @@ def test_save_rules_navigation_preserves_read_required_hint_only_rows(tmp_path: 
     ]
     hints = ll._navigation_read_required_rule_hints_ordered(tmp_path)
     assert hints == ["alpha", "beta", "gamma"]
-    req_refs, _ctx = ll._navigation_yaml_rules_refs(tmp_path)
-    assert len(req_refs) == 1
-    assert ll._norm_read_path(req_refs[0].file) == ll._norm_read_path("spawn/rules/req.md")
 
 
 def test_save_rules_navigation_missing_path_with_hint_does_not_salvage_hint(tmp_path: Path) -> None:
