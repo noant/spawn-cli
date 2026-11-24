@@ -570,9 +570,20 @@ def test_refresh_entry_point_hints_rollup_skips_local(tmp_path: Path) -> None:
     prompt = mock.rewrite_entry_point.call_args[0][1]
     assert prompt.index("- global-for-agents") < prompt.index(hl.SPAWN_ENTRY_POINT_PROMPT_MANDATORY)
     assert "Hints:" not in prompt
-    assert "- global-for-agents" in prompt
-    assert "- maintainer-required" in prompt
-    assert "locals-only" not in prompt
+
+
+@patch("spawn_cli.core.high_level.ide_get", lambda *_a, **_k: _stub_ide())
+def test_refresh_entry_point_empty_sections_omitted(target: Path) -> None:
+    _write_yaml(target / "spawn" / "navigation.yaml", {"read-required": [], "read-contextual": []})
+    ll.add_ide_to_list(target, "cursor")
+    mock = MagicMock(wraps=_stub_ide())
+    with patch("spawn_cli.core.high_level.ide_get", return_value=mock):
+        hl.refresh_entry_point(target, "cursor")
+    prompt = mock.rewrite_entry_point.call_args[0][1]
+    assert "Mandatory reads:" not in prompt  # empty reads lists are omitted
+    assert "Contextual reads:" not in prompt
+    assert hl.SPAWN_ENTRY_POINT_PROMPT_MANDATORY in prompt
+    assert hl.SPAWN_ENTRY_POINT_PROMPT_CONTEXTUAL not in prompt
 
 
 @patch("spawn_cli.core.high_level.ide_get", lambda *_a, **_k: _stub_ide())

@@ -49,10 +49,11 @@ def render_skill_md(skill: SkillMetadata, entry_file: str | None = None) -> str:
         for h in skill.hints:
             lines += [f"- {h}"]
         lines += [""]
-    lines += ["Mandatory reads:"]
-    for ref in skill.required_read:
-        lines += [f"- `{ref.file}` - {ref.description}"]
-    lines += [""]
+    if skill.required_read:
+        lines += ["Mandatory reads:"]
+        for ref in skill.required_read:
+            lines += [f"- `{ref.file}` - {ref.description}"]
+        lines += [""]
     if skill.auto_read:
         lines += ["Contextual reads:"]
         for ref in skill.auto_read:

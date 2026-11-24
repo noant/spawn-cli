@@ -120,8 +120,8 @@ def test_render_skill_md_minimal() -> None:
     assert "---\nname: spectask-run\ndescription: Run tasks.\n---" in md
     assert "spawn/navigation.yaml" not in md
     idx_body = md.index("Skill body line.")
-    idx_mand = md.index("Mandatory reads:")
-    assert idx_body < idx_mand
+    assert idx_body == md.rindex("Skill body line.")
+    assert "Mandatory reads:" not in md  # empty sections are omitted
     assert "Contextual reads:" not in md
 
 

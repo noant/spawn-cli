@@ -202,7 +202,9 @@ def _navigation_reads_section(target_root: Path) -> str:
     required, contextual = ll.navigation_refs_for_agents(target_root)
     # Each instruction sentence sits directly before its reads list; hint
     # bullets are prepended by refresh_entry_point.
-    lines = [SPAWN_ENTRY_POINT_PROMPT_MANDATORY, "Mandatory reads:"]
+    lines = [SPAWN_ENTRY_POINT_PROMPT_MANDATORY]
+    if required:
+        lines += ["Mandatory reads:"]
     for ref in required:
         lines.append(f"- `{ref.file}` - {ref.description}")
     if contextual:

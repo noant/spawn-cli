@@ -209,8 +209,9 @@ Adapters must preserve the same semantic content:
 4. An entrypoint instruction: read the IDE entry file (such as `AGENTS.md`)
    when its Spawn block is not in context, rendered right after the body.
 5. Mandatory reads: skill-local `required-read` paths only (no
-   `spawn/navigation.yaml` bullet).
-6. Contextual reads from `auto-read`.
+   `spawn/navigation.yaml` bullet); the section is omitted when the list is
+   empty.
+6. Contextual reads from `auto-read` (omitted when empty).
 
 ### Markdown Skill Shape
 
@@ -584,7 +585,8 @@ Contextual reads:
 ````
 
 Hint bullets (no caption) come first; each instruction sentence sits directly
-before its reads list.
+before its reads list. Empty reads lists render no section header (and no
+contextual instruction when `Contextual reads` is empty).
 
 If the IDE requires a whole-file entry point, the adapter must warn before
 overwriting. The warning should name the file and recommend backing up user
