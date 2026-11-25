@@ -16,6 +16,14 @@ Mandatory reads:
 
 Inspect `Contextual reads` descriptions and read only files relevant to the current task.
 Contextual reads:
+- `spec/design/data-structure.md` - Spawn target and extension repository data structures.
+- `spec/design/utility.md` - Spawn CLI command and repository transformation design.
+- `spec/design/utility-method-flows.md` - Per-module data flow and persistence for utility layer methods.
+- `spec/design/agentic-flow.md` - Agent-facing Spawn navigation and rendered skill flow.
+- `spec/design/extensions.md` - Spawn extension authoring and AIDD methodology packaging.
+- `spec/design/extension-author-guide.md` - User-facing guide for extension authors (layout, config, workflows).
+- `spec/design/ide-adapters.md` - IDE adapter matrix and Spawn metadata rendering contracts.
+- `spec/design/user-guide.md` - Brief end-user install and invocation (pip, uvx, local sources).
 - `spec/main.md` - Spec-Tasks methodology — folder structure, eight-step process, overview template.
 - `spec/design/hla.md` - Project high-level architecture; updated in Step 8.
 <!-- spawn:end -->
