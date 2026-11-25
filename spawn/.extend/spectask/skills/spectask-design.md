@@ -1,21 +1,21 @@
 ---
 name: spectask-design
-description: Use when registering architecture files in spec/design.yaml or drafting/updating spec/design/*.md, including the HLA document.
+description: Use when registering architecture files in spawn/navigation.yaml read-contextual or drafting/updating spec/design/*.md, including the HLA document.
 ---
 
 **Mandatory:** read **spec/main.md** in full — Folder Structure and Step 8 design rules.
 
 **Role:** `A1-drafter`
 
-**Steps:** ad-hoc design docs / `spec/design.yaml` (not a Status step). Post-impl updates → Step 8.
+**Steps:** ad-hoc design docs / `spawn/navigation.yaml` read-contextual (not a Status step). Post-impl updates → Step 8.
 
 **Rules:** `R1-paths`, `R2-no-clutter`, `R10-ask`, `R14-changed-files`
 
 **Flow:**
 
-1. Read **spec/main.md** fully — Folder Structure (`spec/design.yaml`, `spec/design/hla.md`, `spec/design/{name}.md`) and Step 8 Index / Scope / Write rules.
+1. Read **spec/main.md** fully — Folder Structure (`spec/design/`, `spec/design/hla.md`) and Step 8 Index / Scope / Write rules.
 2. Add or edit `spec/design/{name}.md` as needed; paths under Folder Structure only (`R1-paths`).
-3. Register or update rows in `spec/design.yaml` (`path` + `description`).
+3. Register or update rows in `spawn/navigation.yaml` (read-contextual) (`path` + `description`).
 4. List changed files (`R14-changed-files`). Do not run the full Steps 1-8 Status cycle unless the user is closing a task via Step 8.
 
 ## HLA update rule

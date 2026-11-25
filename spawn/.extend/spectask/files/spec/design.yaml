@@ -1,5 +1,0 @@
-schema: 1
-# Registry of architecture docs under spec/design/. Keys: path (POSIX, repo-relative), description.
-documents:
-  - path: spec/design/hla.md
-    description: "Project high-level architecture"

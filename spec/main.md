@@ -3,11 +3,8 @@
 ## Folder Structure
 
 - spec/main.md — this file.
-- spec/design.yaml — indexes architecture documents (`path` + `description` per entry); optional but recommended for multiple design files.
-- spec/design/hla.md — project high-level architecture (required).
-- spec/design/{name}.md — other architecture documents (optional; ADRs, notes, etc.)
-  - register in **spec/design.yaml**
-  - declare as readable paths for agents, typically via a Spawn extension's `files:` (with appropriate reads), so they appear in `spawn/navigation.yaml`
+- spec/design/ — architecture documents; `hla.md` (required) plus optional ADRs and notes.
+  - declare design docs as readable paths for agents in `spawn/navigation.yaml` read-contextual
 - spec/tasks/{task-code}-{slug}/ — task folder (artifact tree)
   - `{task-code}` identifies the task (often a serial code or an external tracker key)
   - `{slug}` is a short descriptive name
@@ -488,13 +485,13 @@ If the user requests rework or fixes after Step 5:
 **Executor:** `A1-drafter` (current context)
 
 - do not start Step 8 until "Code review / debugging" is marked (Step 7); in [auto] run mode proceed after Step 6 (Step 7 skipped, unchecked)
-- **Index** — read **spec/design.yaml**
+- **Index** — read the design rows in **spawn/navigation.yaml** (read-contextual).
   - if missing, only **spec/design/hla.md** applies (Folder Structure)
-  - add **spec/design.yaml** when you register more than one path under **spec/design/**
+  - add rows when you register more than one path under **spec/design/**
 - **Scope** — from subtasks, the Execution Scheme, and the files changed/added in this task, choose the `path` rows to update
   - update those that matter; skip the rest
 - **Write** — for each chosen path, align the markdown with the repo after this task; create the file if it is listed but missing
-- if the task introduced or renamed architecture docs under **spec/design/**, update **spec/design.yaml** (`path` + `description` for each)
+- if the task introduced or renamed architecture docs under **spec/design/**, add or update their rows in **spawn/navigation.yaml** (`path` + `description`)
 - rename the folder to _DONE_{task-code}-{name}
 - if the Source seed Path in the overview is concrete and the listed spec/seeds file is linked to this overview, rename it once with _DONE_ added
 - run the history rotation (moves `_DONE_*` folders older than the newest 10 into `spec/tasks/__history/`):

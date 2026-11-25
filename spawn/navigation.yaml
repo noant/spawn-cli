@@ -32,11 +32,10 @@ read-contextual:
     description: Optional convention — adapters write one canonical config file; no variant-format merges, error before mutation.
   - path: spawn/rules/06-new-ide-adapter-checklist.md
     description: Optional convention — full checklist (wiring, vacancy, tests, docs) for adding a new IDE adapter.
+- rules: []
 - ext: spectask
   files:
   - path: spec/main.md
     description: Spec-Tasks methodology — folder structure, eight-step process, overview template.
   - path: spec/design/hla.md
     description: Project high-level architecture; updated in Step 8.
-  - path: spec/design.yaml
-    description: Index of architecture documents under spec/design/ — path and description per entry.

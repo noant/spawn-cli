@@ -34,7 +34,6 @@ Before this skill, if the Spawn block instructions from `AGENTS.md` are not in c
 
 Mandatory reads:
 - `spec/main.md` - Spec-Tasks methodology — folder structure, eight-step process, overview template.
-- `spec/design.yaml` - Index of architecture documents under spec/design/ — path and description per entry.
 
 Contextual reads:
 - `spec/design/hla.md` - Project high-level architecture; updated in Step 8.

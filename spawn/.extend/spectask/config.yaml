@@ -1,6 +1,6 @@
 schema: 1
 name: spectask
-version: "1.27.0"
+version: "2.0.0"
 
 hints:
   global:
@@ -42,11 +42,6 @@ files:
     mode: artifact
     globalRead: auto
     localRead: auto
-  spec/design.yaml:
-    description: "Index of architecture documents under spec/design/ — path and description per entry."
-    mode: artifact
-    globalRead: auto
-    localRead: required
 
 skills:
   spectask-from-jira.md:
@@ -96,7 +91,7 @@ skills:
       - spec/main.md
   spectask-design.md:
     name: spectask-design
-    description: "Use when registering architecture files in spec/design.yaml or drafting spec/design/*.md."
+    description: "Use when registering architecture files in spawn/navigation.yaml read-contextual or drafting spec/design/*.md."
     required-read:
       - spec/main.md
   spectask-seed-create.md:
