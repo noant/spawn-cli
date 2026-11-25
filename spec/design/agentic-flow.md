@@ -79,7 +79,10 @@ these examples as strings.
 Navigation is generated from two sources:
 
 - extension files with `globalRead: required` or `globalRead: auto`;
-- user-maintained local rules under `spawn/rules/`.
+- user-maintained local rules under `spawn/rules/`;
+- any other repo-relative file (e.g. `spec/design/*.md`) referenced from a `rules` row — kept while the file exists, pruned with a warning when missing (path containment enforced: absolute and root-escaping paths rejected).
+
+`save_rules_navigation` round-trips `spawn/navigation.yaml` in ruamel round-trip mode, preserving comments.
 
 Merged **`spawn/navigation.yaml`** may also carry **hints**: each extension’s **`- ext:`** entry can include a **`hints`** list (mirrored from that pack’s **`hints.global`** in **`config.yaml`**). Under **`read-required` → `rules`**, maintainer reminders use **hint-only** rows (a **`hint`** mapping with **no** mandatory **`path`**); file-backed rows list **`path`** and **`description`** only—**`hint`** must not sit on the same row as **`path`** (refresh moves any legacy **`path`+`hint`** pair into a separate hint-only row). Only these maintainer hints and extension **`hints`** feed the IDE hint-bullet rollup for the **entry file** (`AGENTS.md` and equivalents); rendered skills carry only the owning extension's **`hints.local`** (**`hint`** on **`read-contextual` → `rules`** is ignored for all pipelines). Deduping is by exact stripped string (first occurrence wins ordering across streams).
 

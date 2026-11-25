@@ -675,6 +675,92 @@ def test_save_rules_navigation_missing_rule_warns(tmp_path: Path) -> None:
     assert rules_grp["rules"] == []
 
 
+def test_save_rules_navigation_keeps_external_existing_path(tmp_path):
+    (tmp_path / "spawn" / "rules").mkdir(parents=True)
+    (tmp_path / "spec" / "design").mkdir(parents=True)
+    (tmp_path / "spec" / "design" / "hla.md").write_text("# HLA", encoding="utf-8")
+    nav = tmp_path / "spawn" / "navigation.yaml"
+    nav.write_text(
+        "read-required:\n"
+        "- rules:\n"
+        "  - path: spec/design/hla.md\n"
+        "    description: HLA doc.\n"
+        "  - path: spawn/rules/team.yaml\n"
+        "    description: Local rule file.\n",
+        encoding="utf-8",
+    )
+    ll.save_rules_navigation(tmp_path)
+    data = YAML_W.load(nav.read_text(encoding="utf-8"))
+    paths = [r["path"] for r in data["read-required"][0]["rules"]]
+    assert "spec/design/hla.md" in paths
+
+def test_save_rules_navigation_prunes_missing_external_path_with_warning(tmp_path):
+    (tmp_path / "spawn" / "rules").mkdir(parents=True)
+    nav = tmp_path / "spawn" / "navigation.yaml"
+    nav.write_text(
+        "read-required:\n"
+        "- rules:\n"
+        "  - path: spec/design/gone.md\n"
+        "    description: gone.\n",
+        encoding="utf-8",
+    )
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        ll.save_rules_navigation(tmp_path)
+    assert any("Removed missing rule path" in str(w.message) for w in caught)
+    data = YAML_W.load(nav.read_text(encoding="utf-8"))
+    rules = data["read-required"][0]["rules"]
+    assert all(r["path"] != "spec/design/gone.md" for r in rules)
+
+def test_save_rules_navigation_rejects_escaping_path(tmp_path):
+    (tmp_path / "spawn" / "rules").mkdir(parents=True)
+    (tmp_path.parent / "outside.md").write_text("# outside", encoding="utf-8")
+    nav = tmp_path / "spawn" / "navigation.yaml"
+    nav.write_text(
+        "read-required:\n"
+        "- rules:\n"
+        "  - path: ../outside.md\n"
+        "    description: escape.\n",
+        encoding="utf-8",
+    )
+    ll.save_rules_navigation(tmp_path)
+    data = YAML_W.load(nav.read_text(encoding="utf-8"))
+    rules = data["read-required"][0]["rules"]
+    assert all(r["path"] != "../outside.md" for r in rules)
+
+def test_save_rules_navigation_rejects_absolute_path(tmp_path):
+    (tmp_path / "spawn" / "rules").mkdir(parents=True)
+    (tmp_path / "spawn" / "rules" / "abs.md").write_text("# abs", encoding="utf-8")
+    nav = tmp_path / "spawn" / "navigation.yaml"
+    inside = tmp_path / "spawn" / "rules" / "abs.md"
+    nav.write_text(
+        "read-required:\n"
+        f"- rules:\n  - path: {inside}\n    description: abs.\n",
+        encoding="utf-8",
+    )
+    ll.save_rules_navigation(tmp_path)
+    data = YAML_W.load(nav.read_text(encoding="utf-8"))
+    rules = data["read-required"][0]["rules"]
+    assert all(str(r["path"]) != str(inside) for r in rules)
+
+def test_save_rules_navigation_preserves_comments(tmp_path):
+    (tmp_path / "spawn" / "rules").mkdir(parents=True)
+    (tmp_path / "spawn" / "rules" / "team.yaml").write_text("x: 1", encoding="utf-8")
+    nav = tmp_path / "spawn" / "navigation.yaml"
+    nav.write_text(
+        "# top comment\n"
+        "read-required:\n"
+        "- rules:\n"
+        "  - path: spawn/rules/team.yaml # inline comment\n"
+        "    description: Local rule file.\n",
+        encoding="utf-8",
+    )
+    ll.save_rules_navigation(tmp_path)
+    text = nav.read_text(encoding="utf-8")
+    assert "# top comment" in text
+    assert "# inline comment" in text
+
+
 def test_save_extension_navigation_hints_roundtrip_and_contextual_omits_hints(tmp_path: Path) -> None:
     ll.init(tmp_path)
     from spawn_cli.models.skill import SkillFileRef

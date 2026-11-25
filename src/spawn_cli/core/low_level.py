@@ -1126,11 +1126,41 @@ def save_extension_navigation(
 
 
 
+def _nav_path_exists_within_repo(target_root: Path, rel_posix: str) -> bool:
+    """True when rel_posix is a repo-relative file path (no absolute, no escape) that exists."""
+    if not rel_posix or Path(rel_posix).is_absolute():
+        return False
+    try:
+        root = Path(target_root).resolve()
+        resolved = (root / Path(rel_posix)).resolve()
+    except (ValueError, OSError, RuntimeError):
+        return False
+    if not (root == resolved or root in resolved.parents):
+        return False
+    return resolved.is_file()
+
+
 def save_rules_navigation(target_root: Path) -> None:
     nav_path = _spawn(target_root) / 'navigation.yaml'
-    raw = load_yaml(nav_path) or {}
-    rr: list[Any] = list(raw['read-required']) if isinstance(raw.get('read-required'), list) else []
-    rc: list[Any] = list(raw.get('read-contextual')) if isinstance(raw.get('read-contextual'), list) else []
+    yaml_rt = YAML(typ="rt")
+    configure_yaml_dump(yaml_rt)
+    if nav_path.is_file():
+        with nav_path.open("r", encoding="utf-8") as fh:
+            raw = yaml_rt.load(fh)
+    else:
+        raw = None
+    if raw is None or not isinstance(raw, dict):
+        from ruamel.yaml.comments import CommentedMap
+
+        raw = CommentedMap()
+    rr: list[Any] = raw.get('read-required')
+    if not isinstance(rr, list):
+        rr = []
+        raw['read-required'] = rr
+    rc: list[Any] = raw.get('read-contextual')
+    if not isinstance(rc, list):
+        rc = []
+        raw['read-contextual'] = rc
 
     rule_dir = _spawn(target_root) / 'rules'
     paths_on_disk: set[str] = set()
@@ -1193,13 +1223,12 @@ def save_rules_navigation(target_root: Path) -> None:
             if path_in_entry:
                 if isinstance(path_raw, str) and path_raw.strip():
                     rk = posix_norm(path_raw.strip())
-                    exists = rk in paths_on_disk and (Path(target_root) / Path(rk)).is_file()
+                    exists = _nav_path_exists_within_repo(target_root, rk)
                     if exists:
-                        row: dict[str, Any] = {
-                            'path': rk,
-                            'description': str(entry.get('description') or 'Local rule file.'),
-                        }
-                        out.append(row)
+                        entry.pop('hint', None)
+                        entry['path'] = rk
+                        entry['description'] = str(entry.get('description') or 'Local rule file.')
+                        out.append(entry)
                         if hint_stripped:
                             warnings.warn(
                                 f'Moved maintainer hint from file-backed rule row to standalone '
@@ -1240,16 +1269,11 @@ def save_rules_navigation(target_root: Path) -> None:
             if not isinstance(entry, dict) or 'path' not in entry:
                 continue
             rk = posix_norm(str(entry['path']))
-            exists = rk in paths_on_disk and (Path(target_root) / Path(rk)).is_file()
+            exists = _nav_path_exists_within_repo(target_root, rk)
             if exists:
-                row: dict[str, Any] = {
-                    'path': rk,
-                    'description': str(entry.get('description') or 'Local rule file.'),
-                }
-                hint_val = entry.get('hint')
-                if isinstance(hint_val, str):
-                    row['hint'] = hint_val
-                out.append(row)
+                entry['path'] = rk
+                entry['description'] = str(entry.get('description') or 'Local rule file.')
+                out.append(entry)
             else:
                 warnings.warn(
                     f"Removed missing rule path from navigation: {rk}",
@@ -1261,10 +1285,10 @@ def save_rules_navigation(target_root: Path) -> None:
     if cq_rules_list is not None:
         prune_contextual_rules(cq_rules_list)
 
-    raw["read-required"] = rr
-    raw["read-contextual"] = rc
     _ensure_navigation_root_key_order(raw)
-    save_yaml(nav_path, raw)
+    ensure_dir(nav_path.parent)
+    with nav_path.open("w", encoding="utf-8") as fh:
+        yaml_rt.dump(raw, fh)
 
 
 def init(target_root: Path) -> None:
